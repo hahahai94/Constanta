@@ -81,6 +81,8 @@ def auth_view(request):
 
 def logout_view(request):
     logout(request)
+    request.user.last_seen = None
+    request.user.save(update_fields=['last_seen'])
     return redirect('auth')
 
 
@@ -763,6 +765,18 @@ def delete_message(request, message_id):
         except Message.DoesNotExist:
             return JsonResponse({'status': 'failed'}, status=403)
     return JsonResponse({'status': 'failed'}, status=400)
+
+
+
+from django.utils import timezone
+
+@login_required
+def heartbeat(request):
+    """Обновляет время последней активности"""
+    request.user.last_seen = timezone.now()
+    request.user.save(update_fields=['last_seen'])
+    return JsonResponse({'status': 'ok'})
+
 
 
 from django.contrib import messages

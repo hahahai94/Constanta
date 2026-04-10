@@ -55,6 +55,21 @@
             background: #fff;
         }
 
+        .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 4px;
+                    }
+        .status-dot.online {
+         background: #2ecc71;
+         box-shadow: 0 0 4px #2ecc71;
+        }
+        .status-dot.offline {
+        background: #95a5a6;
+        }
+
         .input-area {
             padding: 20px;
             border-top: 1px solid #ddd;
@@ -176,138 +191,138 @@
             }
 
            /* 🔹 Вложения */
-.attachment-image img {
+    .attachment-image img {
     cursor: pointer;
     transition: transform 0.2s;
-}
+    }
 
-.attachment-image img:hover {
+    .attachment-image img:hover {
     transform: scale(1.02);
-}
+    }
 
-.attachment-voice audio {
+    .attachment-voice audio {
     max-width: 250px;
-}
+    }
 
-.attachment-file {
+    .attachment-file {
     max-width: 300px;
     word-break: break-all;
-}
+    }
 
-.msg-content {
+    .msg-content {
     word-break: break-word;
     white-space: pre-wrap;
-}
+    }
 
-/* 🔹 Панель ввода */
-.input-area {
+    /* 🔹 Панель ввода */
+    .input-area {
     position: relative;
-}
+    }
 
-#emoji-picker {
+    #emoji-picker {
     z-index: 1000;
-}
+    }
 
-.emoji-btn:hover {
+    .emoji-btn:hover {
     background: #f0f0f0;
-}
+    }
 
-#recording-indicator {
+    #recording-indicator {
     animation: pulse 1s infinite;
-}
+    }
 
-/* 🔹 Непрочитанные сообщения */
-.friend-item.active {
+    /* 🔹 Непрочитанные сообщения */
+    .friend-item.active {
     background: #cce5ff;
-}
+    }
 
-.friend-item .badge.bg-danger {
+    .friend-item .badge.bg-danger {
     font-size: 10px;
     padding: 2px 6px;
-}
+    }
 
-/* 🔹 Упоминания */
-.msg.mentioned {
+    /* 🔹 Упоминания */
+    .msg.mentioned {
     border: 2px solid #007bff;
     background: rgba(0, 123, 255, 0.05);
-}
+    }
 
-.mention {
+    .mention {
     color: #007bff;
     background: rgba(0, 123, 255, 0.1);
     padding: 2px 6px;
     border-radius: 4px;
     text-decoration: none;
     font-weight: 600;
-}
+    }
 
-.mention:hover {
+    .mention:hover {
     background: rgba(0, 123, 255, 0.2);
     text-decoration: underline;
-}
+    }
 
-.mention-all {
+    .mention-all {
     color: #dc3545;
     background: rgba(220, 53, 69, 0.1);
-}
+    }
 
-.mention-all:hover {
+    .mention-all:hover {
     background: rgba(220, 53, 69, 0.2);
-}
+    }
 
 
-/* 🔹 Уведомления */
-#notificationsDropdown {
+    /* 🔹 Уведомления */
+    #notificationsDropdown {
     font-size: 20px;
     cursor: pointer;
-}
+    }
 
-#notification-badge {
+    #notification-badge {
     font-size: 10px;
     padding: 2px 6px;
     min-width: 18px;
     height: 18px;
-}
+    }
 
-.notification-item {
+    .notification-item {
     border-bottom: 1px solid #eee;
     transition: background 0.2s;
-}
+    }
 
-.notification-item:hover {
+    .notification-item:hover {
     background: #f8f9fa;
-}
+    }
 
-.notification-item:last-child {
+    .notification-item:last-child {
     border-bottom: none;
-}
+    }
 
-.dropdown-menu {
+    .dropdown-menu {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
+    }
 
 
-/* 🔹 Сообщение с упоминанием пользователя */
-.msg.mentioned {
+    /* 🔹 Сообщение с упоминанием пользователя */
+    .msg.mentioned {
     border: 2px solid #007bff;
     background: rgba(0, 123, 255, 0.05);
-}
+    }
 
-@keyframes pulse {
+    @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
-}
+    }
 
-/* 🔹 Отключенные элементы */
-.btn:disabled {
+    /* 🔹 Отключенные элементы */
+    .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
+    }
 
-@keyframes pulse {
+    @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
-}
+    }
     }
 
     </style>
@@ -348,6 +363,28 @@
             notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         }
         notificationSound.play().catch(e => console.log('Звук не воспроизведён:', e));
+    }
+
+    setInterval(() => {
+        fetch('{% url "api_heartbeat" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken')}
+        }).catch(() => {});
+    }, 30000);
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
     }
 
     // Загрузка уведомлений

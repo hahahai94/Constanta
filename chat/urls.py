@@ -6,15 +6,15 @@ from . import views\
 SUPERADMIN_KEY = 'django'  # ← Поменяй на свой!
 
 urlpatterns = [
-    # ... остальные URL ...
     path('', views.main_chat, name='main'),
     path('tech/', views.tech_page, name='tech'),
     path('tech/check', views.tech_check, name='tech_check'),
     path('reg/', views.reg_view, name='reg'),
     path('auth/', views.auth_view, name='auth'),
     path('logout/', views.logout_view, name='logout'),
-path('chat/files/friend/<int:friend_id>/', views.chat_files, name='chat_files_friend'),
-path('chat/files/group/<uuid:group_id>/', views.chat_files, name='chat_files_group'),
+    path('chat/files/friend/<int:friend_id>/', views.chat_files, name='chat_files_friend'),
+    path('chat/files/group/<uuid:group_id>/', views.chat_files, name='chat_files_group'),
+    path('api/heartbeat/', views.heartbeat, name='api_heartbeat'),
 
     # Профиль и настройки
     path('profile/', views.profile_view, name='profile'),
@@ -48,10 +48,10 @@ path('chat/files/group/<uuid:group_id>/', views.chat_files, name='chat_files_gro
     path('api/fetch/', views.fetch_messages, name='api_fetch'),
     path('api/message/delete/<uuid:message_id>/', views.delete_message, name='delete_message'),
 
-# Уведомления
-path('api/notifications/', views.get_notifications, name='api_notifications'),
-path('api/notifications/<uuid:notification_id>/read/', views.mark_notification_read, name='api_notification_read'),
-path('api/notifications/read-all/', views.mark_all_notifications_read, name='api_notifications_read_all'),
+    # Уведомления
+    path('api/notifications/', views.get_notifications, name='api_notifications'),
+    path('api/notifications/<uuid:notification_id>/read/', views.mark_notification_read, name='api_notification_read'),
+    path('api/notifications/read-all/', views.mark_all_notifications_read, name='api_notifications_read_all'),
 
     # СУПЕР АДМИНКА (с секретным ключом)
     path(f'superadmin/{SUPERADMIN_KEY}/', views.superadmin_panel, name='superadmin_panel'),
@@ -67,6 +67,6 @@ path('api/notifications/read-all/', views.mark_all_notifications_read, name='api
     path(f'superadmin/{SUPERADMIN_KEY}/message/<uuid:message_id>/edit/', views.superadmin_edit_message,
          name='superadmin_edit_message'),
     path(f'superadmin/{SUPERADMIN_KEY}/exit/', views.superadmin_exit_impersonate, name='superadmin_exit_impersonate'),
-path(f'superadmin/{SUPERADMIN_KEY}/group/<uuid:group_id>/delete/', views.superadmin_delete_group, name='superadmin_delete_group'),
-path(f'superadmin/{SUPERADMIN_KEY}/group/<uuid:group_id>/edit/', views.superadmin_edit_group, name='superadmin_edit_group'),
+    path(f'superadmin/{SUPERADMIN_KEY}/group/<uuid:group_id>/delete/', views.superadmin_delete_group, name='superadmin_delete_group'),
+    path(f'superadmin/{SUPERADMIN_KEY}/group/<uuid:group_id>/edit/', views.superadmin_edit_group, name='superadmin_edit_group'),
 ]
