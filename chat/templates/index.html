@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block body_class %}chat-page{% endblock %}
+{% block container_class %}container-fluid p-0{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- Сайдбар -->
+    <div class="sidebar p-3">
+        <div class="mb-3">
+            <a href="{% url 'profile' %}" class="btn btn-sm btn-secondary w-100 mb-1">👤 Профиль</a>
+            <a href="{% url 'groups' %}" class="btn btn-sm btn-info w-100 mb-1">📁 Группы</a>
+            <a href="{% url 'users_catalog' %}" class="btn btn-sm btn-success w-100 mb-1">🔍 Все пользователи</a>
+            <a href="{% url 'logout' %}" class="btn btn-sm btn-danger w-100">🚪 Выйти</a>
+        </div>
+
+        <h6 class="text-muted mt-3">Группы</h6>
+        {% for membership in groups %}
+        <a href="{% url 'group_chat' membership.group.id %}" class="friend-item d-block text-decoration-none text-dark">
+            <img src="{{ membership.group.get_avatar_url }}" class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
+            <span class="text-truncate">{{ membership.group.name }}</span>
+        </a>
+        {% empty %}
+        <small class="text-muted">Нет групп</small>
+        {% endfor %}
+
+        <h6 class="text-muted mt-3">
+            Чаты
+            {% if conversations|length > 0 %}
+            <span class="badge bg-primary">{{ conversations|length }}</span>
+            {% endif %}
+        </h6>
+
+        {% for conv in conversations %}
+        <a href="?friend_id={{ conv.user.id }}"
+           class="friend-item d-block text-decoration-none text-dark {% if active_friend and active_friend.id == conv.user.id %}active{% endif %}">
+            <div class="d-flex align-items-center">
+                <img src="{{ conv.user.get_avatar_url }}" class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
+                <div class="flex-grow-1 min-width-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-truncate">
+                            {{ conv.user.get_display_name }}
+                            {% if conv.is_friend %}
+                            <span class="text-muted small">✓</span>
+                            {% endif %}
+                        </span>
+                        {% if conv.unread_count > 0 %}
+                        <span class="badge bg-danger rounded-pill ms-1">{{ conv.unread_count }}</span>
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">
+                        {% if conv.last_message %}
+                        {{ conv.last_message|date:"d.m.Y H:i" }}
+                        {% else %}
+                        {% if conv.is_friend %}Друг{% else %}Нет сообщений{% endif %}
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <small class="text-muted">Нет чатов. <a href="{% url 'users_catalog' %}">Найти людей</a></small>
+        {% endfor %}
+    </div>
+
+    <!-- Область чата -->
+    <div class="chat-area">
+        {% if active_friend %}
+        <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <img src="{{ active_friend.get_avatar_url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                <div>
+                    <h4 class="mb-0">{{ active_friend.get_display_name }}</h4>
+                    <small class="text-muted">@{{ active_friend.username }}</small>
+                </div>
+            </div>
+            <div>
+                <a href="{% url 'chat_files_friend' active_friend.id %}" class="btn btn-sm btn-outline-primary me-2">📁 Файлы</a>
+                {% if is_friend %}
+                <a href="{% url 'user_detail' active_friend.username %}" class="btn btn-sm btn-outline-info">👤 Профиль</a>
+                {% else %}
+                <form method="post" action="{% url 'friends_add' %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="friend_username" value="{{ active_friend.username }}">
+                    <button type="submit" class="btn btn-sm btn-success">➕ В друзья</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="messages-box" id="messages-box">
+            {% for msg in messages %}
+            <div class="msg {% if msg.sender == request.user %}mine{% else %}theirs{% endif %}"
+                 data-mentions="{{ msg.mentions }}"
+                 data-my-id="{{ my_user_id }}">
+                <div class="d-flex align-items-center mb-1">
+                    <img src="{{ msg.sender.get_avatar_url }}" class="rounded-circle me-2" style="width: 25px; height: 25px; object-fit: cover;">
+                    <small class="opacity-75">{{ msg.sender.get_display_name }} • {{ msg.created_at|date:"H:i" }}</small>
+                </div>
+
+                {% if msg.attachment_type == 'image' %}
+                <div class="mb-2">
+                    <img src="{{ msg.attachment.url }}" class="img-fluid rounded" style="max-width: 300px;">
+                </div>
+                {% endif %}
+
+                {% if msg.attachment_type == 'voice' %}
+                <div class="mb-2">
+                    <audio controls class="w-100">
+                        <source src="{{ msg.attachment.url }}" type="audio/wav">
+                    </audio>
+                    <small class="text-muted">🎤 {{ msg.attachment_size|filesizeformat }}</small>
+                </div>
+                {% endif %}
+
+                {% if msg.attachment_type == 'file' %}
+                <div class="mb-2 p-2 bg-white rounded border">
+                    <a href="{{ msg.attachment.url }}" target="_blank" class="text-decoration-none">
+                        📎 {{ msg.attachment_original_name|default:"Файл" }}
+                        <small class="text-muted d-block">{{ msg.attachment_size|filesizeformat }}</small>
+                    </a>
+                </div>
+                {% endif %}
+
+                {% if msg.content %}
+                <div class="msg-content">{{ msg.content|safe }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="input-area">
+            <form id="message-form" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+                <button type="button" class="btn btn-outline-secondary" id="btn-emoji">😊</button>
+                <button type="button" class="btn btn-outline-secondary" id="btn-file">📎</button>
+                <button type="button" class="btn btn-outline-secondary" id="btn-voice">🎤</button>
+                <input type="file" id="file-input" name="attachment" style="display: none;">
+                <input type="text" name="content" id="message-content" class="form-control" placeholder="Сообщение..." required>
+                <div id="recording-indicator" class="text-danger d-none">🔴 <button type="button" id="btn-stop-recording" class="btn btn-sm btn-danger">⏹️</button></div>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+            <div id="file-preview" class="mt-2 d-none">
+                <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
+                    <span id="file-preview-name"></span>
+                    <button type="button" class="btn-close" id="btn-remove-file"></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="emoji-picker" class="d-none position-absolute bg-white border rounded shadow p-2" style="bottom: 100px; right: 20px; max-width: 300px; z-index: 1000;">
+            <div class="d-flex flex-wrap gap-1" style="max-height: 200px; overflow-y: auto;">
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😀</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😃</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😄</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😁</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😆</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😅</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😂</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🤣</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😊</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😍</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🥰</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😎</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🤔</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">👍</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">👎</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">❤️</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🔥</button>
+                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🎉</button>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="d-flex h-100 align-items-center justify-content-center text-muted">
+            <div class="text-center">
+                <h3>Выберите собеседника слева</h3>
+                <a href="{% url 'users_catalog' %}" class="btn btn-primary mt-3">Найти людей</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('message-form');
+    const chatBox = document.getElementById('messages-box');
+    const fileInput = document.getElementById('file-input');
+    const filePreview = document.getElementById('file-preview');
+    const filePreviewName = document.getElementById('file-preview-name');
+    const btnRemoveFile = document.getElementById('btn-remove-file');
+    const btnEmoji = document.getElementById('btn-emoji');
+    const btnFile = document.getElementById('btn-file');
+    const btnVoice = document.getElementById('btn-voice');
+    const emojiPicker = document.getElementById('emoji-picker');
+    const recordingIndicator = document.getElementById('recording-indicator');
+    const btnStopRecording = document.getElementById('btn-stop-recording');
+    const messageContent = document.getElementById('message-content');
+    const friendId = "{{ active_friend.id|default:'' }}";
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+
+    if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+
+    document.querySelectorAll('.msg').forEach(msg => {
+        const mentions = JSON.parse(msg.dataset.mentions || '[]');
+        const myId = parseInt(msg.dataset.myId);
+        if(mentions.includes(myId)) {
+            msg.classList.add('mentioned');
+        }
+    });
+
+    btnFile.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', function() {
+        if(this.files && this.files[0]) {
+            const file = this.files[0];
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            filePreviewName.textContent = file.name + ' (' + sizeMB + ' МБ)';
+            filePreview.classList.remove('d-none');
+        }
+    });
+
+    btnRemoveFile.addEventListener('click', function() {
+        fileInput.value = '';
+        filePreview.classList.add('d-none');
+    });
+
+    btnEmoji.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPicker.classList.toggle('d-none');
+    });
+
+    document.querySelectorAll('.emoji-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            messageContent.value += this.textContent;
+            messageContent.focus();
+        });
+    });
+
+    document.addEventListener('click', function(e) {
+        if(!emojiPicker.contains(e.target) && e.target !== btnEmoji) {
+            emojiPicker.classList.add('d-none');
+        }
+    });
+
+    btnVoice.addEventListener('click', async function() {
+        if(!mediaRecorder) {
+            try {
+                if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Браузер не поддерживает запись аудио');
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.start();
+                recordingIndicator.classList.remove('d-none');
+                messageContent.disabled = true;
+                btnVoice.disabled = true;
+            } catch(err) {
+                console.error('Ошибка микрофона:', err);
+                alert('Не удалось записать голосовое: ' + err.message);
+            }
+        }
+    });
+
+    btnStopRecording.addEventListener('click', function() {
+        if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+
+            mediaRecorder.onstop = function() {
+                const blob = new Blob(audioChunks, { type: 'audio/wav' });
+                const file = new File([blob], 'voice_' + Date.now() + '.wav', { type: 'audio/wav' });
+
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+
+                const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                filePreviewName.textContent = '🎤 Голосовое (' + sizeMB + ' МБ)';
+                filePreview.classList.remove('d-none');
+
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                mediaRecorder = null;
+
+                recordingIndicator.classList.add('d-none');
+                messageContent.disabled = false;
+                btnVoice.disabled = false;
+            };
+        }
+    });
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(form);
+
+        fetch("{% url 'api_send' %}", {
+            method: 'POST',
+            body: formData,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
+        .then(r => r.json())
+        .then(data => {
+            if(data.status === 'ok') {
+                form.querySelector('input[name="content"]').value = '';
+                fileInput.value = '';
+                filePreview.classList.add('d-none');
+                location.reload();
+            } else {
+                alert('Ошибка: ' + (data.error || 'Не удалось отправить сообщение'));
+            }
+        })
+        .catch(err => {
+            console.error('Ошибка отправки:', err);
+            alert('Не удалось отправить сообщение');
+        });
+    });
+</script>
+{% endblock %}

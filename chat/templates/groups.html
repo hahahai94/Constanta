@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Мои группы</h2>
+    <a href="{% url 'main' %}" class="btn btn-secondary mb-3">Назад в чат</a>
+    <a href="{% url 'group_create' %}" class="btn btn-success mb-3">Создать группу</a>
+
+    <div class="row">
+    {% for membership in memberships %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <img src="{{ membership.group.get_avatar_url }}"
+                         class="rounded-circle mb-2"
+                         style="width: 80px; height: 80px; object-fit: cover;">
+                    <h5>{{ membership.group.name }}</h5>
+                    <p class="text-muted small">{{ membership.group.description|truncatechars:50 }}</p>
+                    <p class="badge bg-info">{{ membership.get_role_display }}</p>
+                    <a href="{% url 'group_chat' membership.group.id %}" class="btn btn-primary btn-sm">Открыть чат</a>
+                    {% if membership.role == 'owner' %}
+                    <a href="{% url 'group_edit' membership.group.id %}" class="btn btn-outline-secondary btn-sm">✏️</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+</div>
+{% endblock %}

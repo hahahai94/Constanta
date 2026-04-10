@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block body_class %}content-page{% endblock %}
+{% block container_class %}container{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card" style="max-width: 500px; margin: auto;">
+        <div class="card-body text-center">
+            <img src="{{ user.get_avatar_url }}" 
+                 class="rounded-circle mb-3" 
+                 style="width: 150px; height: 150px; object-fit: cover;">
+            <h3>{{ user.get_display_name }}</h3>
+            <p class="text-muted">@{{ user.username }}</p>
+            <p>{{ user.bio }}</p>
+
+            <div class="mt-3">
+    <a href="{% url 'profile_edit' %}" class="btn btn-primary mb-2">Редактировать профиль</a>
+    <a href="{% url 'change_username' %}" class="btn btn-warning mb-2">Сменить логин</a>
+    <a href="{% url 'change_password' %}" class="btn btn-danger mb-2">Сменить пароль</a>
+</div>
+
+
+            {% if user.is_superuser %}
+            <div class="mt-3">
+                <a href="{% url 'superadmin_panel' %}" class="btn btn-danger w-100">🔱 Панель Создателя</a>
+                <small class="text-muted d-block mt-1">/superadmin/django/</small>
+            </div>
+            {% endif %}
+
+            <a href="{% url 'main' %}" class="btn btn-secondary mt-3">Назад в чат</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

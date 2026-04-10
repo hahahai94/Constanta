@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalChat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+
+        /* 🔹 Базовые стили */
+        body {
+            min-height: 100vh;
+            background: #f5f5f5;
+        }
+
+        /* 🔹 Стили для чата */
+        .chat-page body {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            height: 100vh;
+            display: flex;
+        }
+
+        .table img.rounded-circle {
+         border: 2px solid #dee2e6;
+        }
+
+        .table .badge {
+         min-width: 80px;
+        }
+
+        .sidebar {
+            width: 300px;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            background: #f8f9fa;
+            flex-shrink: 0;
+            min-width: 280px;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .messages-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fff;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #ddd;
+            background: #f8f9fa;
+            flex-shrink: 0;
+        }
+
+        /* 🔹 Сообщения */
+        .msg {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .msg.mine {
+            background: #007bff;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .msg.theirs {
+            background: #e9ecef;
+            color: black;
+            align-self: flex-start;
+        }
+
+        .msg-header {
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .msg-content {
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        /* 🔹 Друзья и участники */
+        .friend-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .friend-item:hover {
+            background: #e2e6ea;
+        }
+
+        .friend-item.active {
+            background: #cce5ff;
+        }
+
+        /* 🔹 Элемент участника в группе */
+        .member-item {
+            min-width: 0;
+        }
+
+        .member-item > div:first-child {
+            min-width: 0;
+            flex: 1;
+        }
+
+        /* 🔹 Обрезка длинного текста */
+        .text-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* 🔹 Минимальная ширина для flex-контейнеров */
+        .min-width-0 {
+            min-width: 0;
+        }
+
+        /* 🔹 Кнопка удаления сообщения */
+        .delete-msg {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .msg:hover .delete-msg {
+            opacity: 1;
+        }
+
+        /* 🔹 Прокрутка */
+        .content-page {
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+
+        /* 🔹 Адаптив для маленьких экранов */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                max-width: 300px;
+                position: absolute;
+                z-index: 100;
+                height: 100%;
+                left: 0;
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .msg {
+                max-width: 85%;
+            }
+
+           /* 🔹 Вложения */
+.attachment-image img {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.attachment-image img:hover {
+    transform: scale(1.02);
+}
+
+.attachment-voice audio {
+    max-width: 250px;
+}
+
+.attachment-file {
+    max-width: 300px;
+    word-break: break-all;
+}
+
+.msg-content {
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* 🔹 Панель ввода */
+.input-area {
+    position: relative;
+}
+
+#emoji-picker {
+    z-index: 1000;
+}
+
+.emoji-btn:hover {
+    background: #f0f0f0;
+}
+
+#recording-indicator {
+    animation: pulse 1s infinite;
+}
+
+/* 🔹 Непрочитанные сообщения */
+.friend-item.active {
+    background: #cce5ff;
+}
+
+.friend-item .badge.bg-danger {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+/* 🔹 Упоминания */
+.msg.mentioned {
+    border: 2px solid #007bff;
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.mention {
+    color: #007bff;
+    background: rgba(0, 123, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.mention:hover {
+    background: rgba(0, 123, 255, 0.2);
+    text-decoration: underline;
+}
+
+.mention-all {
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.mention-all:hover {
+    background: rgba(220, 53, 69, 0.2);
+}
+
+
+/* 🔹 Уведомления */
+#notificationsDropdown {
+    font-size: 20px;
+    cursor: pointer;
+}
+
+#notification-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    min-width: 18px;
+    height: 18px;
+}
+
+.notification-item {
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.notification-item:hover {
+    background: #f8f9fa;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-menu {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+
+/* 🔹 Сообщение с упоминанием пользователя */
+.msg.mentioned {
+    border: 2px solid #007bff;
+    background: rgba(0, 123, 255, 0.05);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* 🔹 Отключенные элементы */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+    }
+
+    </style>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="{% block container_class %}container-fluid{% endblock %}">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 🔹 КНОПКА УВЕДОМЛЕНИЙ -->
+<li class="nav-item dropdown">
+    <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown">
+        🔔 <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 350px; max-height: 400px; overflow-y: auto;">
+        <li class="dropdown-header d-flex justify-content-between align-items-center">
+            <span>🔔 Уведомления</span>
+            <button type="button" class="btn btn-sm btn-link" id="mark-all-read">Все прочитаны</button>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <div id="notifications-list">
+            <li><div class="text-center text-muted py-3">Загрузка...</div></li>
+        </div>
+    </ul>
+</li>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+
+    <script>
+    // 🔹 Уведомления
+    let notificationSound = null;
+
+    // Проигрывание звука уведомления
+    function playNotificationSound() {
+        if(!notificationSound) {
+            notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        }
+        notificationSound.play().catch(e => console.log('Звук не воспроизведён:', e));
+    }
+
+    // Загрузка уведомлений
+    async function loadNotifications() {
+        try {
+            const response = await fetch('{% url "api_notifications" %}');
+            const data = await response.json();
+
+            const badge = document.getElementById('notification-badge');
+            const list = document.getElementById('notifications-list');
+
+            // Обновляем счётчик
+            if(data.unread_count > 0) {
+                badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+
+            // Обновляем список
+            if(data.notifications.length === 0) {
+                list.innerHTML = '<li><div class="text-center text-muted py-3">Нет новых уведомлений</div></li>';
+            } else {
+                list.innerHTML = data.notifications.map(notif => `
+                    <li>
+                        <a href="${notif.url}" class="dropdown-item notification-item" data-id="${notif.id}">
+                            <div class="d-flex align-items-start">
+                                <span class="me-2" style="font-size: 20px;">${notif.icon}</span>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between">
+                                        <strong class="small">${notif.title}</strong>
+                                        <small class="text-muted">${notif.time}</small>
+                                    </div>
+                                    <small class="text-muted">${notif.message}</small>
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                `).join('');
+
+                // Добавляем обработчики кликов
+                document.querySelectorAll('.notification-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        const id = this.dataset.id;
+                        fetch(`/api/notifications/${id}/read/`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        });
+                    });
+                });
+            }
+        } catch(err) {
+            console.error('Ошибка загрузки уведомлений:', err);
+        }
+    }
+
+    // Отметить все как прочитанные
+    document.getElementById('mark-all-read')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        fetch('{% url "api_notifications_read_all" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        }).then(() => loadNotifications());
+    });
+
+    // Получение CSRF токена
+    function getCookie(name) {
+        let cookieValue = null;
+        if(document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for(let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if(cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // 🔹 Polling уведомлений (каждые 5 секунд)
+    let lastNotificationCount = 0;
+    setInterval(() => {
+        loadNotifications().then(() => {
+            const badge = document.getElementById('notification-badge');
+            const currentCount = parseInt(badge?.textContent || '0');
+
+            // Если появились новые уведомления - звук
+            if(currentCount > lastNotificationCount && currentCount > 0) {
+                playNotificationSound();
+
+                // Browser notification (если разрешено)
+                if(Notification.permission === 'granted') {
+                    new Notification('Новое уведомление!', {
+                        body: 'У вас новое сообщение или упоминание',
+                        icon: '/static/default_avatar.png'
+                    });
+                }
+            }
+
+            lastNotificationCount = currentCount;
+        });
+    }, 5000);
+
+    // Запрос разрешения на браузерные уведомления
+    if(Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    // Загрузка при старте
+    document.addEventListener('DOMContentLoaded', loadNotifications);
+</script>
+
+</body>
+</html>

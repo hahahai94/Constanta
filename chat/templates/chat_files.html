@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block body_class %}content-page{% endblock %}
+{% block container_class %}container{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📁 Файлы чата: {{ chat_name }}</h2>
+        <a href="{% if chat_type == 'personal' %}{% url 'main' %}?friend_id={{ friend_id }}{% else %}{% url 'group_chat' group_id %}{% endif %}" 
+           class="btn btn-secondary">← Назад в чат</a>
+    </div>
+    
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>🖼️ {{ images_count }}</h3>
+                    <p>Изображений</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>📎 {{ files_count }}</h3>
+                    <p>Файлов</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>🎤 {{ voice_count }}</h3>
+                    <p>Голосовых</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Фильтры -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-primary active" onclick="filterFiles('all')">Все</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filterFiles('image')">🖼️ Фото</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filterFiles('file')">📎 Файлы</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filterFiles('voice')">🎤 Аудио</button>
+        </div>
+    </div>
+    
+    <!-- Сетка файлов -->
+    <div class="row" id="files-grid">
+        {% for msg in files %}
+        <div class="col-md-3 mb-4 file-item" data-type="{{ msg.attachment_type }}">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    {% if msg.attachment_type == 'image' %}
+                    <a href="{{ msg.attachment.url }}" target="_blank">
+                        <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 200px; object-fit: cover;">
+                    </a>
+                    <p class="text-muted small">📷 Фото</p>
+                    
+                    {% elif msg.attachment_type == 'file' %}
+                    <div class="py-4">
+                        <span style="font-size: 48px;">📄</span>
+                    </div>
+                    <p class="text-truncate"><strong>{{ msg.attachment_original_name|default:"Файл" }}</strong></p>
+                    <a href="{{ msg.attachment.url }}" target="_blank" class="btn btn-sm btn-outline-primary">Скачать</a>
+                    <p class="text-muted small mt-1">{{ msg.attachment_size|filesizeformat }}</p>
+                    
+                    {% elif msg.attachment_type == 'voice' %}
+                    <div class="py-3">
+                        <span style="font-size: 48px;">🎤</span>
+                    </div>
+                    <audio controls class="w-100 mb-2">
+                        <source src="{{ msg.attachment.url }}" type="audio/wav">
+                    </audio>
+                    <p class="text-muted small">{{ msg.attachment_size|filesizeformat }}</p>
+                    {% endif %}
+                    
+                    <hr>
+                    <small class="text-muted">
+                        {{ msg.sender.get_display_name }} • {{ msg.created_at|date:"d.m.Y H:i" }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center text-muted py-5">
+            <span style="font-size: 64px;">📭</span>
+            <h4 class="mt-3">Нет файлов</h4>
+            <p>В этом чате пока нет медиафайлов</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterFiles(type) {
+        const items = document.querySelectorAll('.file-item');
+        const buttons = document.querySelectorAll('.btn-group .btn');
+        
+        // Активная кнопка
+        buttons.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        // Фильтрация
+        items.forEach(item => {
+            if(type === 'all' || item.dataset.type === type) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}

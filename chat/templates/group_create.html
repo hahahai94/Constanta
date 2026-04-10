@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card" style="max-width: 500px; margin: auto;">
+        <div class="card-header">
+            <h4>Создать группу</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-success w-100">Создать</button>
+            </form>
+        </div>
+        <div class="card-footer">
+            <a href="{% url 'groups' %}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

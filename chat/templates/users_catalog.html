@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Все пользователи</h2>
+    <a href="{% url 'main' %}" class="btn btn-secondary mb-3">Назад в чат</a>
+    
+    <form method="get" class="mb-4">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Поиск по нику..." value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Найти</button>
+        </div>
+    </form>
+    
+    <div class="row">
+        {% for user in users %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <img src="{{ user.get_avatar_url }}" 
+                         class="rounded-circle mb-2" 
+                         style="width: 80px; height: 80px; object-fit: cover;">
+                    <h5>{{ user.get_display_name }}</h5>
+                    <p class="text-muted small">@{{ user.username }}</p>
+                    <a href="{% url 'user_detail' user.username %}" class="btn btn-sm btn-info">Профиль</a>
+                    {% if user.is_friend %}
+                        <a href="{% url 'main' %}?friend_id={{ user.id }}" class="btn btn-sm btn-success">Написать</a>
+                    {% else %}
+                        <form method="post" action="{% url 'friends_add' %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="friend_username" value="{{ user.username }}">
+                            <button type="submit" class="btn btn-sm btn-primary">Добавить</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">Пользователи не найдены</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

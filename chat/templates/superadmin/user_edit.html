@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card" style="max-width: 600px; margin: auto;">
+        <div class="card-header bg-primary text-white">
+            <h4>✏️ Редактирование: {{ target_user.username }}</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="mb-3 text-center">
+                    <img src="{{ target_user.get_avatar_url }}" class="rounded-circle mb-2" style="width: 100px; height: 100px; object-fit: cover;">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Никнейм</label>
+                    <input type="text" name="nick" class="form-control" value="{{ target_user.nick|default:'' }}">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">О себе</label>
+                    <textarea name="bio" class="form-control" rows="3">{{ target_user.bio }}</textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Новая аватарка</label>
+                    <input type="file" name="avatar" class="form-control">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-danger">🔐 Пароль администратора (подтверждение)</label>
+                    <input type="password" name="admin_password" class="form-control" required>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100">Сохранить изменения</button>
+            </form>
+        </div>
+        <div class="card-footer">
+            <a href="{% url 'superadmin_panel' %}" class="btn btn-secondary">← Назад</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
