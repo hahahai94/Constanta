@@ -18,6 +18,20 @@
     <a href="{% url 'profile_edit' %}" class="btn btn-primary mb-2">Редактировать профиль</a>
     <a href="{% url 'change_username' %}" class="btn btn-warning mb-2">Сменить логин</a>
     <a href="{% url 'change_password' %}" class="btn btn-danger mb-2">Сменить пароль</a>
+    <!-- 🔴 КНОПКА ВЫХОДА С ПОДТВЕРЖДЕНИЕМ -->
+    <button onclick="confirmLogout()" class="btn btn-danger w-100 mt-3">
+    🚪 Выйти из аккаунта
+    </button>
+
+    <script>
+    function confirmLogout() {
+         // Всплывающее окно подтверждения
+    if (confirm("Вы действительно хотите выйти из системы?")) {
+        // Если нажал "ОК" -> переходим на logout
+        window.location.href = "{% url 'logout' %}";
+        }
+    }
+    </script>
 </div>
 
 
