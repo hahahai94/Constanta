@@ -1,29 +1,59 @@
 {% extends 'base.html' %}
-{% block content %}
-<div class="container mt-5">
-    <h2>Мои группы</h2>
-    <a href="{% url 'main' %}" class="btn btn-secondary mb-3">Назад в чат</a>
-    <a href="{% url 'group_create' %}" class="btn btn-success mb-3">Создать группу</a>
+{% load static %}
 
-    <div class="row">
-    {% for membership in memberships %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body text-center">
-                    <img src="{{ membership.group.get_avatar_url }}"
-                         class="rounded-circle mb-2"
-                         style="width: 80px; height: 80px; object-fit: cover;">
-                    <h5>{{ membership.group.name }}</h5>
-                    <p class="text-muted small">{{ membership.group.description|truncatechars:50 }}</p>
-                    <p class="badge bg-info">{{ membership.get_role_display }}</p>
-                    <a href="{% url 'group_chat' membership.group.id %}" class="btn btn-primary btn-sm">Открыть чат</a>
-                    {% if membership.role == 'owner' %}
-                    <a href="{% url 'group_edit' membership.group.id %}" class="btn btn-outline-secondary btn-sm">✏️</a>
-                    {% endif %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📁 Мои группы</h2>
+        <button type="button" class="btn-grad grad-green" data-bs-toggle="modal" data-bs-target="#createGroupModal">➕ Создать группу</button>
+    </div>
+
+    <div class="row g-4">
+        {% for membership in memberships %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card-modern">
+                <div class="d-flex align-items-center mb-3">
+                    <img src="{{ membership.group.get_avatar_url }}" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                    <div>
+                        <h5 class="mb-0">{{ membership.group.name }}</h5>
+                        <small class="text-muted">{{ membership.group.members.count }} участников</small>
+                    </div>
+                </div>
+                <p class="text-muted small">{{ membership.group.description|truncatewords:15 }}</p>
+                <div class="d-grid">
+                    <a href="{% url 'group_chat' membership.group.id %}" class="btn-grad grad-blue w-100">Открыть чат 💬</a>
                 </div>
             </div>
         </div>
-    {% endfor %}
+        {% empty %}
+        <div class="col-12 text-center text-muted py-5">
+            <h3>У тебя пока нет групп</h3>
+            <p>Создай свою первую группу!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 🔹 МОДАЛКА СОЗДАНИЯ ГРУППЫ -->
+<div class="modal fade" id="createGroupModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; overflow: hidden;">
+            <form method="post" action="{% url 'create_group' %}">
+                {% csrf_token %}
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title">➕ Новая группа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-bold">Название группы</label>
+                    <input type="text" name="name" class="form-control-modern" placeholder="Например: Работа, Друзья, Игры..." required>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn-grad grad-green rounded-pill px-4">Создать</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -3,48 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LocalChat</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
+    <title>{% block title %}Constanta Messenger{% endblock %}</title>
 
-        /* 🔹 Базовые стили */
-        body {
-            min-height: 100vh;
-            background: #f5f5f5;
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+    <style>
+        /* ==================== БАЗОВЫЕ СТИЛИ ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        /* 🔹 Стили для чата */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        /* ==================== НАВИГАЦИЯ ==================== */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-weight: 700;
+            font-size: 24px;
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover {
+            color: white !important;
+            transform: translateY(-2px);
+        }
+
+        /* ==================== ГРАДИЕНТНЫЕ КНОПКИ ==================== */
+        .btn-grad {
+            color: #ffffff !important;
+            border: none !important;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: pointer;
+        }
+
+        .btn-grad:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+            color: #ffffff !important;
+            opacity: 0.95;
+        }
+
+        .grad-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; }
+        .grad-green  { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important; }
+        .grad-pink   { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important; }
+        .grad-blue   { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important; }
+        .grad-red    { background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%) !important; }
+        .grad-orange { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%) !important; }
+
+        /* ==================== ЧАТ ЛЕЙАУТ ==================== */
         .chat-page body {
             height: 100vh;
             overflow: hidden;
         }
 
-        .chat-container {
-            height: 100vh;
+        .chat-wrapper {
             display: flex;
-        }
-
-        .table img.rounded-circle {
-         border: 2px solid #dee2e6;
-        }
-
-        .table .badge {
-         min-width: 80px;
+            height: 100vh;
+            overflow: hidden;
         }
 
         .sidebar {
-            width: 300px;
-            border-right: 1px solid #ddd;
+            width: 320px;
+            border-right: 1px solid #e0e0e0;
+            background: #fff;
             overflow-y: auto;
-            background: #f8f9fa;
             flex-shrink: 0;
-            min-width: 280px;
         }
 
         .chat-area {
             flex: 1;
             display: flex;
             flex-direction: column;
+            background: #f0f2f5;
             min-width: 0;
         }
 
@@ -52,456 +110,304 @@
             flex: 1;
             overflow-y: auto;
             padding: 20px;
-            background: #fff;
-        }
-
-        .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 4px;
-                    }
-        .status-dot.online {
-         background: #2ecc71;
-         box-shadow: 0 0 4px #2ecc71;
-        }
-        .status-dot.offline {
-        background: #95a5a6;
+            background: #e5ddd5;
         }
 
         .input-area {
-            padding: 20px;
-            border-top: 1px solid #ddd;
-            background: #f8f9fa;
-            flex-shrink: 0;
+            background: #fff;
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
         }
 
-        /* 🔹 Сообщения */
+        /* ==================== СООБЩЕНИЯ ==================== */
         .msg {
             margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 70%;
-            position: relative;
-            word-wrap: break-word;
+            display: flex;
+            align-items: flex-end;
         }
 
         .msg.mine {
-            background: #007bff;
-            color: white;
-            align-self: flex-end;
-            margin-left: auto;
+            justify-content: flex-end;
         }
 
         .msg.theirs {
-            background: #e9ecef;
+            justify-content: flex-start;
+        }
+
+        .msg-bubble {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .msg.mine .msg-bubble {
+            background: #2196f3;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.theirs .msg-bubble {
+            background: white;
             color: black;
-            align-self: flex-start;
+            border-bottom-left-radius: 4px;
         }
 
-        .msg-header {
-            max-width: 100%;
-            overflow: hidden;
+        .msg-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
+            text-align: right;
         }
 
-        .msg-content {
-            word-break: break-word;
-            white-space: pre-wrap;
+        .msg-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            margin-right: 10px;
+            object-fit: cover;
         }
 
-        /* 🔹 Друзья и участники */
-        .friend-item {
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            align-items: center;
-            min-width: 0;
+        /* ==================== СТАТУСЫ ==================== */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
         }
 
-        .friend-item:hover {
-            background: #e2e6ea;
+        .status-dot.online {
+            background: #4caf50;
+            box-shadow: 0 0 4px #4caf50;
+            animation: pulse 2s infinite;
         }
 
-        .friend-item.active {
-            background: #cce5ff;
+        .status-dot.offline {
+            background: #9e9e9e;
         }
 
-        /* 🔹 Элемент участника в группе */
-        .member-item {
-            min-width: 0;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
-        .member-item > div:first-child {
-            min-width: 0;
-            flex: 1;
+        /* ==================== ЭЛЕМЕНТЫ СПИСКА ==================== */
+        .chat-item {
+            display: block;
+            padding: 12px 15px;
+            margin-bottom: 5px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.2s;
         }
 
-        /* 🔹 Обрезка длинного текста */
-        .text-truncate {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .chat-item:hover {
+            background: #f5f5f5;
         }
 
-        /* 🔹 Минимальная ширина для flex-контейнеров */
-        .min-width-0 {
-            min-width: 0;
+        .chat-item.active {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
         }
 
-        /* 🔹 Кнопка удаления сообщения */
-        .delete-msg {
+        /* ==================== ЭМОДЗИ ПИКЕР ==================== */
+        #emoji-picker {
             position: absolute;
-            top: 5px;
-            right: 5px;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .msg:hover .delete-msg {
-            opacity: 1;
-        }
-
-        /* 🔹 Прокрутка */
-        .content-page {
-            min-height: 100vh;
+            bottom: 80px;
+            right: 20px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 10px;
+            z-index: 1000;
+            max-width: 300px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
-        /* 🔹 Адаптив для маленьких экранов */
+        .emoji-btn {
+            min-width: 40px;
+            height: 40px;
+            font-size: 22px;
+            padding: 4px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .emoji-btn:hover {
+            background: #f0f0f0;
+            transform: scale(1.2);
+        }
+
+        /* ==================== КАРТОЧКИ ==================== */
+        .card-modern {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            padding: 25px;
+            margin-bottom: 20px;
+            border: none;
+        }
+
+        /* ==================== ФОРМЫ ==================== */
+        .form-control-modern {
+            border-radius: 12px;
+            padding: 12px;
+            border: 2px solid #eee;
+            transition: 0.3s;
+        }
+
+        .form-control-modern:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
+        }
+
+        /* ==================== УВЕДОМЛЕНИЯ ==================== */
+        #notification-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            min-width: 18px;
+            height: 18px;
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        /* ==================== СКРОЛЛБАР ==================== */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* ==================== МОБИЛЬНАЯ АДАПТАЦИЯ ==================== */
         @media (max-width: 768px) {
             .sidebar {
-                width: 100%;
-                max-width: 300px;
-                position: absolute;
-                z-index: 100;
-                height: 100%;
+                position: fixed;
                 left: 0;
+                top: 0;
+                height: 100vh;
+                width: 100%;
+                max-width: 320px;
+                z-index: 1000;
                 transform: translateX(-100%);
-                transition: transform 0.3s;
+                transition: transform 0.3s ease;
             }
 
             .sidebar.show {
                 transform: translateX(0);
             }
 
-            .msg {
-                max-width: 85%;
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
             }
 
-           /* 🔹 Вложения */
-    .attachment-image img {
-    cursor: pointer;
-    transition: transform 0.2s;
-    }
+            .sidebar-overlay.show {
+                display: block;
+            }
 
-    .attachment-image img:hover {
-    transform: scale(1.02);
-    }
+            .mobile-menu-btn {
+                display: block !important;
+            }
 
-    .attachment-voice audio {
-    max-width: 250px;
-    }
+            .msg-bubble {
+                max-width: 85%;
+            }
+        }
 
-    .attachment-file {
-    max-width: 300px;
-    word-break: break-all;
-    }
+        @media (min-width: 769px) {
+            .mobile-menu-btn,
+            .sidebar-overlay {
+                display: none !important;
+            }
+        }
 
-    .msg-content {
-    word-break: break-word;
-    white-space: pre-wrap;
-    }
+        /* ==================== УТИЛИТЫ ==================== */
+        .text-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
-    /* 🔹 Панель ввода */
-    .input-area {
-    position: relative;
-    }
-
-    #emoji-picker {
-    z-index: 1000;
-    }
-
-    .emoji-btn:hover {
-    background: #f0f0f0;
-    }
-
-    #recording-indicator {
-    animation: pulse 1s infinite;
-    }
-
-    /* 🔹 Непрочитанные сообщения */
-    .friend-item.active {
-    background: #cce5ff;
-    }
-
-    .friend-item .badge.bg-danger {
-    font-size: 10px;
-    padding: 2px 6px;
-    }
-
-    /* 🔹 Упоминания */
-    .msg.mentioned {
-    border: 2px solid #007bff;
-    background: rgba(0, 123, 255, 0.05);
-    }
-
-    .mention {
-    color: #007bff;
-    background: rgba(0, 123, 255, 0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: 600;
-    }
-
-    .mention:hover {
-    background: rgba(0, 123, 255, 0.2);
-    text-decoration: underline;
-    }
-
-    .mention-all {
-    color: #dc3545;
-    background: rgba(220, 53, 69, 0.1);
-    }
-
-    .mention-all:hover {
-    background: rgba(220, 53, 69, 0.2);
-    }
-
-
-    /* 🔹 Уведомления */
-    #notificationsDropdown {
-    font-size: 20px;
-    cursor: pointer;
-    }
-
-    #notification-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    min-width: 18px;
-    height: 18px;
-    }
-
-    .notification-item {
-    border-bottom: 1px solid #eee;
-    transition: background 0.2s;
-    }
-
-    .notification-item:hover {
-    background: #f8f9fa;
-    }
-
-    .notification-item:last-child {
-    border-bottom: none;
-    }
-
-    .dropdown-menu {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-
-    /* 🔹 Сообщение с упоминанием пользователя */
-    .msg.mentioned {
-    border: 2px solid #007bff;
-    background: rgba(0, 123, 255, 0.05);
-    }
-
-    @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-    }
-
-    /* 🔹 Отключенные элементы */
-    .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    }
-
-    @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-    }
-    }
-
+        .min-width-0 {
+            min-width: 0;
+        }
     </style>
+
+    {% block extra_css %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-    <div class="{% block container_class %}container-fluid{% endblock %}">
+
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-0">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'main' %}">💬 Constanta</a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                {% if user.is_authenticated %}
+                <li class="nav-item me-2">
+                    <a class="btn-grad grad-purple" href="{% url 'profile' %}" style="padding: 8px 15px; font-size: 14px;">👤 Профиль</a>
+                </li>
+                <li class="nav-item me-2">
+                     <a class="btn-grad grad-pink" href="{% url 'groups' %}" style="padding: 8px 15px; font-size: 14px;">📁 Группы</a>
+                </li>
+                <li class="nav-item me-2">
+                     <a class="btn-grad grad-blue" href="{% url 'users_catalog' %}" style="padding: 8px 15px; font-size: 14px;">🔍 Люди</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn-grad grad-red" href="{% url 'logout' %}" style="padding: 8px 15px; font-size: 14px;">🚪 Выйти</a>
+                </li>
+                {% else %}
+                <li class="nav-item me-2">
+                    <a class="btn-grad grad-green" href="{% url 'login' %}" style="padding: 8px 15px; font-size: 14px;">Войти</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn-grad grad-purple" href="{% url 'reg' %}" style="padding: 8px 15px; font-size: 14px;">Регистрация</a>
+                </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Основной контент -->
+    <div class="{% block container_class %}container{% endblock %} mt-0 p-0">
         {% block content %}{% endblock %}
     </div>
 
-    <!-- 🔹 КНОПКА УВЕДОМЛЕНИЙ -->
-<li class="nav-item dropdown">
-    <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown">
-        🔔 <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
-    </a>
-    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 350px; max-height: 400px; overflow-y: auto;">
-        <li class="dropdown-header d-flex justify-content-between align-items-center">
-            <span>🔔 Уведомления</span>
-            <button type="button" class="btn btn-sm btn-link" id="mark-all-read">Все прочитаны</button>
-        </li>
-        <li><hr class="dropdown-divider"></li>
-        <div id="notifications-list">
-            <li><div class="text-center text-muted py-3">Загрузка...</div></li>
-        </div>
-    </ul>
-</li>
-
-
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Скрипты страницы -->
     {% block scripts %}{% endblock %}
-
-    <script>
-    // 🔹 Уведомления
-    let notificationSound = null;
-
-    // Проигрывание звука уведомления
-    function playNotificationSound() {
-        if(!notificationSound) {
-            notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        }
-        notificationSound.play().catch(e => console.log('Звук не воспроизведён:', e));
-    }
-
-    setInterval(() => {
-        fetch('{% url "api_heartbeat" %}', {
-            method: 'POST',
-            headers: {'X-CSRFToken': getCookie('csrftoken')}
-        }).catch(() => {});
-    }, 30000);
-
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
-    // Загрузка уведомлений
-    async function loadNotifications() {
-        try {
-            const response = await fetch('{% url "api_notifications" %}');
-            const data = await response.json();
-
-            const badge = document.getElementById('notification-badge');
-            const list = document.getElementById('notifications-list');
-
-            // Обновляем счётчик
-            if(data.unread_count > 0) {
-                badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
-                badge.classList.remove('d-none');
-            } else {
-                badge.classList.add('d-none');
-            }
-
-            // Обновляем список
-            if(data.notifications.length === 0) {
-                list.innerHTML = '<li><div class="text-center text-muted py-3">Нет новых уведомлений</div></li>';
-            } else {
-                list.innerHTML = data.notifications.map(notif => `
-                    <li>
-                        <a href="${notif.url}" class="dropdown-item notification-item" data-id="${notif.id}">
-                            <div class="d-flex align-items-start">
-                                <span class="me-2" style="font-size: 20px;">${notif.icon}</span>
-                                <div class="flex-grow-1">
-                                    <div class="d-flex justify-content-between">
-                                        <strong class="small">${notif.title}</strong>
-                                        <small class="text-muted">${notif.time}</small>
-                                    </div>
-                                    <small class="text-muted">${notif.message}</small>
-                                </div>
-                            </div>
-                        </a>
-                    </li>
-                `).join('');
-
-                // Добавляем обработчики кликов
-                document.querySelectorAll('.notification-item').forEach(item => {
-                    item.addEventListener('click', function() {
-                        const id = this.dataset.id;
-                        fetch(`/api/notifications/${id}/read/`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken')
-                            }
-                        });
-                    });
-                });
-            }
-        } catch(err) {
-            console.error('Ошибка загрузки уведомлений:', err);
-        }
-    }
-
-    // Отметить все как прочитанные
-    document.getElementById('mark-all-read')?.addEventListener('click', function(e) {
-        e.preventDefault();
-        fetch('{% url "api_notifications_read_all" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        }).then(() => loadNotifications());
-    });
-
-    // Получение CSRF токена
-    function getCookie(name) {
-        let cookieValue = null;
-        if(document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for(let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if(cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
-    // 🔹 Polling уведомлений (каждые 5 секунд)
-    let lastNotificationCount = 0;
-    setInterval(() => {
-        loadNotifications().then(() => {
-            const badge = document.getElementById('notification-badge');
-            const currentCount = parseInt(badge?.textContent || '0');
-
-            // Если появились новые уведомления - звук
-            if(currentCount > lastNotificationCount && currentCount > 0) {
-                playNotificationSound();
-
-                // Browser notification (если разрешено)
-                if(Notification.permission === 'granted') {
-                    new Notification('Новое уведомление!', {
-                        body: 'У вас новое сообщение или упоминание',
-                        icon: '/static/default_avatar.png'
-                    });
-                }
-            }
-
-            lastNotificationCount = currentCount;
-        });
-    }, 5000);
-
-    // Запрос разрешения на браузерные уведомления
-    if(Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-
-    // Загрузка при старте
-    document.addEventListener('DOMContentLoaded', loadNotifications);
-</script>
 
 </body>
 </html>

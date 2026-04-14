@@ -79,11 +79,21 @@ def auth_view(request):
     form = LoginForm()
     return render(request, 'auth.html', {'form': form, 'type': 'auth'})
 
+
+from django.contrib.auth import logout as auth_logout
+from django.shortcuts import redirect
+from django.utils import timezone
+
+
 def logout_view(request):
-    logout(request)
-    request.user.last_seen = None
-    request.user.save(update_fields=['last_seen'])
-    return redirect('auth')
+    # 🔹 1. Сначала обновляем last_seen (ПОКА пользователь ещё залогинен!)
+    if request.user.is_authenticated:
+        request.user.last_seen = timezone.now()
+        request.user.save(update_fields=['last_seen'])
+
+    # 🔹 2. Только потом делаем выход
+    auth_logout(request)
+    return redirect('login')  # или 'main', куда нужно
 
 
 # --- Профиль и Настройки ---
@@ -91,6 +101,23 @@ def logout_view(request):
 @login_required
 def profile_view(request):
     return render(request, 'profile.html', {'user': request.user})
+
+
+@login_required
+def profile(request):
+    user = request.user
+    if request.method == 'POST':
+        user.nick = request.POST.get('nick', user.nick).strip()
+        user.email = request.POST.get('email', user.email).strip()
+
+        if request.FILES.get('avatar'):
+            user.avatar = request.FILES.get('avatar')
+
+        user.save()
+        messages.success(request, '✅ Профиль успешно обновлён!')
+        return redirect('profile')
+
+    return render(request, 'profile.html', {'user': user})
 
 
 @login_required
@@ -156,14 +183,21 @@ def change_password(request):
 
 @login_required
 def users_catalog(request):
-    search = request.GET.get('search', '')
-    users = User.objects.exclude(id=request.user.id)
-    if search:
-        users = users.filter(Q(username__icontains=search) | Q(nick__icontains=search))
-    friend_ids = Friendship.objects.filter(user=request.user).values_list('friend_id', flat=True)
-    for user in users:
-        user.is_friend = user.id in friend_ids
-    return render(request, 'users_catalog.html', {'users': users, 'search': search})
+    q = request.GET.get('q', '').strip()
+    if q:
+        users = User.objects.filter(
+            Q(username__icontains=q) |
+            Q(nick__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q)
+        ).exclude(id=request.user.id)
+    else:
+        users = User.objects.exclude(id=request.user.id)
+
+    return render(request, 'users_catalog.html', {
+        'users': users,
+        'query': q
+    })
 
 
 @login_required
@@ -236,6 +270,18 @@ def groups_list(request):
 
 
 @login_required
+def create_group(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            group = Group.objects.create(name=name, owner=request.user)
+            GroupMember.objects.create(group=group, user=request.user, role='owner')
+            messages.success(request, f'Группа "{name}" создана!')
+            return redirect('group_chat', group_id=group.id)
+    return redirect('groups')
+
+
+@login_required
 def group_create(request):
     if request.method == 'POST':
         form = GroupForm(request.POST, request.FILES)
@@ -253,35 +299,37 @@ def group_create(request):
 @login_required
 def group_chat(request, group_id):
     group = get_object_or_404(Group, id=group_id)
-    if not group.is_member(request.user):
+
+    # Проверяем, что пользователь в группе
+    membership = GroupMember.objects.filter(group=group, user=request.user).first()
+    if not membership:
+        messages.error(request, 'Вы не участник этой группы')
         return redirect('groups')
 
-    messages_qs = Message.objects.filter(group=group, is_deleted=False).order_by('created_at')[:100]
-    members = GroupMember.objects.filter(group=group).select_related('user')
+    # Определяем права
+    is_owner = (group.owner == request.user)
+    is_admin = (membership.role == 'admin') or is_owner
 
-    is_owner = group.is_owner(request.user)
-    is_admin = GroupMember.objects.filter(group=group, user=request.user, role='admin').exists()
-
-    # 🔹 Доступные пользователи (не в группе)
-    member_ids = GroupMember.objects.filter(group=group).values_list('user_id', flat=True)
-    available_users = User.objects.exclude(id__in=member_ids).exclude(id=request.user.id)[:100]
-
-    # Формы
-    add_member_form = AddMemberForm(group=group)
+    # Данные
+    members = GroupMember.objects.filter(group=group).select_related('user').order_by(
+        models.Case(
+            models.When(role='owner', then=0),
+            models.When(role='admin', then=1),
+            default=2,
+            output_field=models.IntegerField()
+        ),
+        'user__username'
+    )
+    messages_qs = Message.objects.filter(group=group, is_deleted=False).order_by('created_at')[:50]
 
     return render(request, 'group_chat.html', {
         'group': group,
-        'messages': messages_qs,
         'members': members,
+        'messages': messages_qs,
         'is_owner': is_owner,
-        'is_admin': is_admin or is_owner,
-        'message_form': MessageForm(),
-        'add_member_form': add_member_form,
-        'role_form': ChangeMemberRoleForm(),
-        'available_users': available_users,  # ← ДОБАВИТЬ
+        'is_admin': is_admin,
         'my_user_id': request.user.id,
     })
-
 
 @login_required
 def group_add_member(request, group_id):
@@ -523,75 +571,25 @@ def send_message(request):
         friend_id = request.POST.get('friend_id')
         group_id = request.POST.get('group_id')
         content = request.POST.get('content', '')
+        reply_to_id = request.POST.get('reply_to_id')  # ← НОВОЕ
 
-        attachment = request.FILES.get('attachment')
-        attachment_type = 'none'
-        attachment_size = 0
-        attachment_hash = ''
-        attachment_original_name = ''
-        upload_path = None
+        # ... (твоя существующая логика файла) ...
 
-        # 🔹 Обработка файла
-        if attachment:
-            # Проверка размера (50 МБ)
-            if attachment.size > 50 * 1024 * 1024:
-                return JsonResponse({'status': 'failed', 'error': 'Файл слишком большой (макс. 50 МБ)'}, status=400)
+        # 🔹 Валидация reply_to
+        reply_msg = None
+        if reply_to_id:
+            reply_msg = Message.objects.filter(id=reply_to_id).first()
+            # Проверка: сообщение должно быть в этом же чате
+            if reply_msg:
+                if friend_id and not (
+                        reply_msg.receiver_id == request.user.id or reply_msg.sender_id == request.user.id):
+                    reply_msg = None
+                elif group_id and reply_msg.group_id != int(group_id):
+                    reply_msg = None
 
-            # Генерация хеша
-            import hashlib
-            from datetime import datetime
-            timestamp = datetime.now().isoformat()
-            file_content = attachment.read()
-            hash_input = f"{file_content.hex()}{request.user.id}{timestamp}".encode('utf-8')
-            attachment_hash = hashlib.sha256(hash_input).hexdigest()
-            attachment.seek(0)
-
-            # Определение типа
-            if attachment.content_type and attachment.content_type.startswith('image/'):
-                attachment_type = 'image'
-            elif attachment.content_type and attachment.content_type.startswith('audio/'):
-                attachment_type = 'voice'
-            else:
-                attachment_type = 'file'
-
-            attachment_size = attachment.size
-            attachment_original_name = attachment.name
-
-            # Путь с хешем
-            import os
-            from django.conf import settings
-            subdir = attachment_hash[:2]
-            ext = os.path.splitext(attachment.name)[1].lower()
-            new_filename = f"{attachment_hash}{ext}"
-            upload_path = os.path.join('attachments', subdir, new_filename)
-
-            # Сохранение файла
-            from django.core.files.storage import default_storage
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, 'attachments', subdir), exist_ok=True)
-            default_storage.save(upload_path, attachment)
-
-        if not content and not attachment:
-            return JsonResponse({'status': 'failed', 'error': 'Пустое сообщение'}, status=400)
-
-        # 🔹 Обработка упоминаний
-        parsed_content = content
-        mentions_json = '[]'
-        mentioned_ids = []
-
-        if content:
-            from .utils import parse_mentions
-            if group_id:
-                group = get_object_or_404(Group, id=group_id)
-                parsed_content, mentioned_ids = parse_mentions(content, group=group)
-            elif friend_id:
-                parsed_content, mentioned_ids = parse_mentions(content, receiver=None)
-            mentions_json = json.dumps(mentioned_ids)
-
-        # 🔹 Создание сообщения (ИСПРАВЛЕНО - только именованные аргументы!)
-        msg = None
         if friend_id:
             receiver = get_object_or_404(User, id=friend_id)
-            msg = Message.objects.create(
+            Message.objects.create(
                 sender=request.user,
                 receiver=receiver,
                 group=None,
@@ -601,27 +599,14 @@ def send_message(request):
                 attachment_original_name=attachment_original_name,
                 attachment_type=attachment_type,
                 attachment_size=attachment_size,
-                mentions=mentions_json
+                mentions=mentions_json,
+                reply_to=reply_msg  # ← ДОБАВИТЬ
             )
-
-            # 🔹 Уведомление получателю
-            if receiver != request.user:
-                from .utils import create_notification
-                create_notification(
-                    user=receiver,
-                    notification_type='message',
-                    title=f'Новое сообщение от {request.user.get_display_name()}',
-                    message=content[:100] if content else '📎 Вложение',
-                    url=f'/?friend_id={request.user.id}',
-                    related_message=msg
-                )
-
         elif group_id:
             group = get_object_or_404(Group, id=group_id)
             if group.is_member(request.user):
-                msg = Message.objects.create(
+                Message.objects.create(
                     sender=request.user,
-                    receiver=None,
                     group=group,
                     content=parsed_content,
                     attachment=upload_path if upload_path else None,
@@ -629,29 +614,11 @@ def send_message(request):
                     attachment_original_name=attachment_original_name,
                     attachment_type=attachment_type,
                     attachment_size=attachment_size,
-                    mentions=mentions_json
+                    mentions=mentions_json,
+                    reply_to=reply_msg  # ← ДОБАВИТЬ
                 )
 
-                # 🔹 Уведомления об упоминаниях
-                if mentioned_ids:
-                    from .utils import create_notification
-                    for user_id in mentioned_ids:
-                        if user_id != request.user.id:
-                            try:
-                                mentioned_user = User.objects.get(id=user_id)
-                                create_notification(
-                                    user=mentioned_user,
-                                    notification_type='mention',
-                                    title=f'Вас упомянули в чате',
-                                    message=f'{request.user.get_display_name()} упомянул вас',
-                                    url=f'/groups/{group_id}/',
-                                    related_message=msg
-                                )
-                            except User.DoesNotExist:
-                                pass
-
         return JsonResponse({'status': 'ok'})
-
     return JsonResponse({'status': 'failed'}, status=400)
 
 
@@ -1149,3 +1116,73 @@ def superadmin_edit_group(request, group_id):
         return redirect('superadmin_panel')
 
     return render(request, 'superadmin/group_edit.html', {'group': group})
+
+# ==================== УПРАВЛЕНИЕ ГРУППАМИ ====================
+
+@login_required
+def edit_group(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+    member = GroupMember.objects.filter(group=group, user=request.user).first()
+    if not member or member.role not in ['owner', 'admin']:
+        return redirect('group_chat', group_id=group_id)
+
+    if request.method == 'POST':
+        group.name = request.POST.get('name', group.name).strip()
+        group.description = request.POST.get('description', group.description).strip()
+        if request.FILES.get('avatar'):
+            group.avatar = request.FILES.get('avatar')
+        group.save()
+        messages.success(request, '✅ Группа обновлена')
+    return redirect('group_chat', group_id=group_id)
+
+
+@login_required
+def add_member(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+    member = GroupMember.objects.filter(group=group, user=request.user).first()
+    if not member or member.role not in ['owner', 'admin']:
+        return redirect('group_chat', group_id=group_id)
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        try:
+            user = User.objects.get(username=username)
+            if not GroupMember.objects.filter(group=group, user=user).exists():
+                GroupMember.objects.create(group=group, user=user, role='member')
+                messages.success(request, f'✅ {user.get_display_name()} добавлен')
+            else:
+                messages.warning(request, '⚠️ Уже в группе')
+        except User.DoesNotExist:
+            messages.error(request, '❌ Пользователь не найден')
+    return redirect('group_chat', group_id=group_id)
+
+
+@login_required
+def remove_member(request, group_id, user_id):
+    group = get_object_or_404(Group, id=group_id)
+    current = GroupMember.objects.filter(group=group, user=request.user).first()
+    if not current or current.role not in ['owner', 'admin']:
+        return redirect('group_chat', group_id=group_id)
+
+    target = get_object_or_404(GroupMember, group=group, user_id=user_id)
+    if target.role == 'owner':
+        messages.error(request, '🚫 Нельзя удалить владельца')
+    else:
+        target.delete()
+        messages.success(request, '✅ Участник удалён')
+    return redirect('group_chat', group_id=group_id)
+
+
+@login_required
+def change_role(request, group_id, user_id, new_role):
+    group = get_object_or_404(Group, id=group_id)
+    current = GroupMember.objects.filter(group=group, user=request.user).first()
+    if not current or current.role != 'owner':
+        return redirect('group_chat', group_id=group_id)
+
+    target = get_object_or_404(GroupMember, group=group, user_id=user_id)
+    if new_role in ['member', 'admin']:
+        target.role = new_role
+        target.save()
+        messages.success(request, f'✅ Роль изменена на {target.get_role_display()}')
+    return redirect('group_chat', group_id=group_id)

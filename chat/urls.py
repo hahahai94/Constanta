@@ -10,7 +10,7 @@ urlpatterns = [
     path('tech/', views.tech_page, name='tech'),
     path('tech/check', views.tech_check, name='tech_check'),
     path('reg/', views.reg_view, name='reg'),
-    path('auth/', views.auth_view, name='auth'),
+    path('auth/', views.auth_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('chat/files/friend/<int:friend_id>/', views.chat_files, name='chat_files_friend'),
     path('chat/files/group/<uuid:group_id>/', views.chat_files, name='chat_files_group'),
@@ -35,6 +35,7 @@ urlpatterns = [
     # Группы
     path('groups/', views.groups_list, name='groups'),
     path('groups/create/', views.group_create, name='group_create'),
+    path('groups/create/', views.create_group, name='create_group'),
     path('groups/<uuid:group_id>/', views.group_chat, name='group_chat'),
     path('groups/<uuid:group_id>/add/', views.group_add_member, name='group_add_member'),
     path('groups/<uuid:group_id>/remove/<int:user_id>/', views.group_remove_member, name='group_remove_member'),
@@ -42,6 +43,10 @@ urlpatterns = [
     path('groups/<uuid:group_id>/leave/', views.group_leave, name='group_leave'),
     path('groups/<uuid:group_id>/delete/', views.group_delete, name='group_delete'),
     path('groups/<uuid:group_id>/edit/', views.group_edit, name='group_edit'),
+    path('group/<uuid:group_id>/edit/', views.edit_group, name='edit_group'),
+    path('group/<uuid:group_id>/add-member/', views.add_member, name='add_member'),
+    path('group/<uuid:group_id>/remove-member/<int:user_id>/', views.remove_member, name='remove_member'),
+    path('group/<uuid:group_id>/change-role/<int:user_id>/<str:new_role>/', views.change_role, name='change_role'),
 
     # API
     path('api/send/', views.send_message, name='api_send'),

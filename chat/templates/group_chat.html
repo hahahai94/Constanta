@@ -1,189 +1,133 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block body_class %}chat-page{% endblock %}
-{% block container_class %}container-fluid p-0{% endblock %}
-
 {% block content %}
-<div class="chat-container">
-    <!-- Сайдбар -->
+<div class="chat-wrapper">
+    <!-- 🔹 САЙДБАР -->
     <div class="sidebar p-3">
-        <div class="d-flex align-items-center mb-3">
-            <img src="{{ group.get_avatar_url }}" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
-            <div class="flex-grow-1 min-width-0">
-                <h5 class="mb-0 text-truncate" title="{{ group.name }}">{{ group.name }}</h5>
-                <small class="text-muted">{{ members.count }} участников</small>
-            </div>
-            {% if is_owner %}
-            <a href="{% url 'group_edit' group.id %}" class="btn btn-sm btn-outline-primary ms-2 flex-shrink-0">✏️</a>
-            {% endif %}
-        </div>
+        <a href="{% url 'profile' %}" class="btn-grad grad-purple w-100 mb-2">👤 Профиль</a>
+        <a href="{% url 'groups' %}" class="btn-grad grad-pink w-100 mb-2">📁 Мои группы</a>
 
-        <a href="{% url 'groups' %}" class="btn btn-secondary btn-sm w-100 mb-3">← Назад к группам</a>
-
-        <h6 class="text-muted">Участники</h6>
-        {% for member in members %}
-        <div class="member-item d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
-            <div class="d-flex align-items-center min-width-0 flex-grow-1">
-                <img src="{{ member.user.get_avatar_url }}" class="rounded-circle me-2 flex-shrink-0" style="width: 30px; height: 30px; object-fit: cover;">
-                <span class="text-truncate">{{ member.user.get_display_name }}</span>
+        <h6 class="text-muted mt-4 mb-2">Участники ({{ members.count }})</h6>
+        {% for m in members %}
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm">
+            <div class="d-flex align-items-center">
+                <img src="{{ m.user.get_avatar_url }}" class="rounded-circle me-2" style="width: 35px; height: 35px; object-fit: cover;">
+                <div>
+                    <div class="fw-bold small">{{ m.user.get_display_name }}</div>
+                    <span class="badge bg-secondary" style="font-size: 10px;">{{ m.get_role_display }}</span>
+                </div>
             </div>
-            <span class="badge bg-secondary">{{ member.get_role_display }}</span>
+            <!-- КНОПКИ УПРАВЛЕНИЯ УЧАСТНИКОМ (видны всегда для теста) -->
+            <div class="dropdown">
+                <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="dropdown">⚙️</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item text-danger" href="{% url 'remove_member' group.id m.user.id %}" onclick="return confirm('Удалить?')">🗑️ Удалить</a></li>
+                    {% if m.role == 'member' %}
+                    <li><a class="dropdown-item" href="{% url 'change_role' group.id m.user.id 'admin' %}">⬆️ Админ</a></li>
+                    {% elif m.role == 'admin' %}
+                    <li><a class="dropdown-item" href="{% url 'change_role' group.id m.user.id 'member' %}">⬇️ Участник</a></li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
+        {% empty %}
+        <small class="text-muted">Нет участников</small>
         {% endfor %}
 
-        {% if is_owner %}
+        <!-- КНОПКА ДОБАВИТЬ (видна всегда для теста) -->
         <hr>
-
-        <!-- 🔹 КНОПКА ДОБАВИТЬ УЧАСТНИКА (MODAL) -->
-        <h6>Добавить участника</h6>
-        <button type="button" class="btn btn-success btn-sm w-100 mb-3" data-bs-toggle="modal" data-bs-target="#addMemberModal">
-            ➕ Добавить участника
-        </button>
-
-        <a href="{% url 'group_delete' group.id %}" class="btn btn-danger btn-sm w-100" onclick="return confirm('Удалить группу?')">🗑️ Удалить группу</a>
-        {% else %}
-        <a href="{% url 'group_leave' group.id %}" class="btn btn-warning btn-sm w-100">Выйти из группы</a>
-        {% endif %}
+        <button type="button" class="btn-grad grad-green w-100 mb-2" data-bs-toggle="modal" data-bs-target="#addMemberModal">➕ Добавить участника</button>
     </div>
 
-    <!-- Чат -->
+    <!-- 🔹 ЧАТ -->
     <div class="chat-area">
-        <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+        <!-- Шапка с кнопкой настроек -->
+        <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center shadow-sm">
             <div class="d-flex align-items-center">
-                <img src="{{ group.get_avatar_url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                <img src="{{ group.get_avatar_url }}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;">
                 <div>
-                    <h4 class="mb-0">{{ group.name }}</h4>
+                    <h5 class="mb-0">{{ group.name }}</h5>
                     <small class="text-muted">{{ members.count }} участников</small>
                 </div>
             </div>
-            <a href="{% url 'chat_files_group' group.id %}" class="btn btn-sm btn-outline-primary">📁 Файлы</a>
+            <!-- КНОПКА НАСТРОЙКИ (видна всегда для теста) -->
+            <button type="button" class="btn-grad grad-orange" data-bs-toggle="modal" data-bs-target="#editGroupModal" style="padding: 8px 15px; font-size: 14px;">⚙️ Настройки</button>
         </div>
 
+        <!-- Сообщения -->
         <div class="messages-box" id="messages-box">
             {% for msg in messages %}
-            <div class="msg {% if msg.sender == request.user %}mine{% else %}theirs{% endif %}"
-                 data-mentions="{{ msg.mentions }}"
-                 data-my-id="{{ my_user_id }}">
-                <div class="d-flex align-items-center mb-1">
-                    <img src="{{ msg.sender.get_avatar_url }}" class="rounded-circle me-2" style="width: 25px; height: 25px; object-fit: cover;">
-                    <small class="opacity-75">{{ msg.sender.get_display_name }} • {{ msg.created_at|date:"H:i" }}</small>
-                </div>
-
-                {% if msg.attachment_type == 'image' %}
-                <div class="mb-2">
-                    <img src="{{ msg.attachment.url }}" class="img-fluid rounded" style="max-width: 300px;">
-                </div>
+            <div class="msg {% if msg.sender == request.user %}mine{% else %}theirs{% endif %}">
+                {% if msg.sender != request.user %}
+                <img src="{{ msg.sender.get_avatar_url }}" class="msg-avatar">
                 {% endif %}
-
-                {% if msg.attachment_type == 'voice' %}
-                <div class="mb-2">
-                    <audio controls class="w-100">
-                        <source src="{{ msg.attachment.url }}" type="audio/wav">
-                    </audio>
-                    <small class="text-muted">🎤 {{ msg.attachment_size|filesizeformat }}</small>
+                <div class="msg-bubble">
+                    <small class="d-block opacity-75 mb-1">{{ msg.sender.get_display_name }}</small>
+                    {{ msg.content|safe }}
+                    <div class="msg-time text-end mt-1">{{ msg.created_at|date:"H:i" }}</div>
                 </div>
-                {% endif %}
-
-                {% if msg.attachment_type == 'file' %}
-                <div class="mb-2 p-2 bg-white rounded border">
-                    <a href="{{ msg.attachment.url }}" target="_blank" class="text-decoration-none">
-                        📎 {{ msg.attachment_original_name|default:"Файл" }}
-                        <small class="text-muted d-block">{{ msg.attachment_size|filesizeformat }}</small>
-                    </a>
-                </div>
-                {% endif %}
-
-                {% if msg.content %}
-                <div class="msg-content">{{ msg.content|safe }}</div>
-                {% endif %}
             </div>
             {% empty %}
-            <div class="text-center text-muted mt-5">
-                <p>📭 Пока нет сообщений</p>
-            </div>
+            <div class="text-center text-muted py-5">📭 Пока нет сообщений</div>
             {% endfor %}
         </div>
 
+        <!-- Ввод -->
         <div class="input-area">
             <form id="message-form" class="d-flex gap-2 align-items-center">
                 {% csrf_token %}
                 <input type="hidden" name="group_id" value="{{ group.id }}">
-                <button type="button" class="btn btn-outline-secondary" id="btn-emoji">😊</button>
-                <button type="button" class="btn btn-outline-secondary" id="btn-file">📎</button>
-                <button type="button" class="btn btn-outline-secondary" id="btn-voice">🎤</button>
-                <input type="file" id="file-input" name="attachment" style="display: none;">
-                <input type="text" name="content" id="message-content" class="form-control" placeholder="Сообщение..." required>
-                <div id="recording-indicator" class="text-danger d-none">🔴 <button type="button" id="btn-stop-recording" class="btn btn-sm btn-danger">⏹️</button></div>
-                <button type="submit" class="btn btn-primary">Send</button>
+                <input type="text" name="content" id="message-content" class="form-control-modern flex-grow-1" placeholder="Написать в группу..." required>
+                <button type="submit" class="btn-grad grad-blue" style="width: 80px;">Send ➤</button>
             </form>
-            <div id="file-preview" class="mt-2 d-none">
-                <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
-                    <span id="file-preview-name"></span>
-                    <button type="button" class="btn-close" id="btn-remove-file"></button>
-                </div>
-            </div>
-        </div>
-
-        <div id="emoji-picker" class="d-none position-absolute bg-white border rounded shadow p-2" style="bottom: 100px; right: 20px; max-width: 300px; z-index: 1000;">
-            <div class="d-flex flex-wrap gap-1" style="max-height: 200px; overflow-y: auto;">
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😀</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😃</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😄</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😁</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😆</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😅</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😂</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🤣</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😊</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😍</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🥰</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">😎</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🤔</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">👍</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">👎</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">❤️</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🔥</button>
-                <button type="button" class="btn btn-sm btn-link emoji-btn" style="font-size: 20px;">🎉</button>
-            </div>
         </div>
     </div>
 </div>
 
-<!-- 🔹 MODAL ДОБАВЛЕНИЯ УЧАСТНИКА -->
+<!-- 🔹 МОДАЛКА: Добавить участника -->
 <div class="modal fade" id="addMemberModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="post" action="{% url 'group_add_member' group.id %}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px;">
+            <form method="post" action="{% url 'add_member' group.id %}">
                 {% csrf_token %}
-                <div class="modal-header">
+                <div class="modal-header border-0">
                     <h5 class="modal-title">➕ Добавить участника</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">🔍 Поиск пользователя</label>
-                        <input type="text" id="user-search" class="form-control" placeholder="Введите имя или username...">
-                        <small class="text-muted">Начните вводить для поиска</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">👤 Выберите пользователя</label>
-                        <select name="user" id="user-select" class="form-control" required>
-                            <option value="">── Выберите пользователя ──</option>
-                            {% for user in available_users %}
-                            <option value="{{ user.id }}" data-display="{{ user.get_display_name }}" data-username="{{ user.username }}">
-                                {{ user.get_display_name }} (@{{ user.username }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                        {% if available_users|length == 0 %}
-                        <small class="text-warning">⚠️ Нет доступных пользователей для добавления</small>
-                        {% endif %}
-                    </div>
+                    <input type="text" name="username" class="form-control-modern" placeholder="Введите @username" required>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-success" {% if available_users|length == 0 %}disabled{% endif %}>➕ Добавить</button>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn-grad grad-green rounded-pill px-4">Добавить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 🔹 МОДАЛКА: Редактировать группу -->
+<div class="modal fade" id="editGroupModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px;">
+            <form method="post" action="{% url 'edit_group' group.id %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">⚙️ Настройки группы</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <img src="{{ group.get_avatar_url }}" class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;">
+                    </div>
+                    <input type="text" name="name" class="form-control-modern mb-2" value="{{ group.name }}" placeholder="Название" required>
+                    <textarea name="description" class="form-control-modern mb-2" rows="2" placeholder="Описание">{{ group.description }}</textarea>
+                    <input type="file" name="avatar" class="form-control-modern" accept="image/*">
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn-grad grad-orange rounded-pill px-4">Сохранить</button>
                 </div>
             </form>
         </div>
@@ -195,175 +139,18 @@
 <script>
     const form = document.getElementById('message-form');
     const chatBox = document.getElementById('messages-box');
-    const fileInput = document.getElementById('file-input');
-    const filePreview = document.getElementById('file-preview');
-    const filePreviewName = document.getElementById('file-preview-name');
-    const btnRemoveFile = document.getElementById('btn-remove-file');
-    const btnEmoji = document.getElementById('btn-emoji');
-    const btnFile = document.getElementById('btn-file');
-    const btnVoice = document.getElementById('btn-voice');
-    const emojiPicker = document.getElementById('emoji-picker');
-    const recordingIndicator = document.getElementById('recording-indicator');
-    const btnStopRecording = document.getElementById('btn-stop-recording');
-    const messageContent = document.getElementById('message-content');
-
-    let mediaRecorder = null;
-    let audioChunks = [];
-
     if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
 
-    // 🔹 Подсветка упоминаний
-    document.querySelectorAll('.msg').forEach(msg => {
-        const mentions = JSON.parse(msg.dataset.mentions || '[]');
-        const myId = parseInt(msg.dataset.myId);
-        if(mentions.includes(myId)) {
-            msg.classList.add('mentioned');
-        }
-    });
-
-    // 🔹 Поиск в modal
-    const userSearch = document.getElementById('user-search');
-    const userSelect = document.getElementById('user-select');
-
-    if(userSearch && userSelect) {
-        userSearch.addEventListener('input', function() {
-            const query = this.value.toLowerCase();
-            const options = userSelect.querySelectorAll('option');
-
-            options.forEach(option => {
-                if(option.value === '') {
-                    return; // Пропускаем первый option
-                }
-                const text = option.textContent.toLowerCase();
-                if(text.includes(query)) {
-                    option.style.display = '';
-                } else {
-                    option.style.display = 'none';
-                }
-            });
-        });
-
-        // При открытии modal - фокус на поиск
-        document.getElementById('addMemberModal').addEventListener('shown.bs.modal', function() {
-            userSearch.focus();
-        });
-
-        // При закрытии modal - очистка поиска
-        document.getElementById('addMemberModal').addEventListener('hidden.bs.modal', function() {
-            userSearch.value = '';
-            userSelect.value = '';
-        });
-    }
-
-    btnFile.addEventListener('click', () => fileInput.click());
-
-    fileInput.addEventListener('change', function() {
-        if(this.files && this.files[0]) {
-            const file = this.files[0];
-            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-            filePreviewName.textContent = file.name + ' (' + sizeMB + ' МБ)';
-            filePreview.classList.remove('d-none');
-        }
-    });
-
-    btnRemoveFile.addEventListener('click', function() {
-        fileInput.value = '';
-        filePreview.classList.add('d-none');
-    });
-
-    btnEmoji.addEventListener('click', (e) => {
-        e.stopPropagation();
-        emojiPicker.classList.toggle('d-none');
-    });
-
-    document.querySelectorAll('.emoji-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            messageContent.value += this.textContent;
-            messageContent.focus();
-        });
-    });
-
-    document.addEventListener('click', function(e) {
-        if(!emojiPicker.contains(e.target) && e.target !== btnEmoji) {
-            emojiPicker.classList.add('d-none');
-        }
-    });
-
-    btnVoice.addEventListener('click', async function() {
-        if(!mediaRecorder) {
-            try {
-                if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error('Браузер не поддерживает запись аудио');
-                }
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.start();
-                recordingIndicator.classList.remove('d-none');
-                messageContent.disabled = true;
-                btnVoice.disabled = true;
-            } catch(err) {
-                console.error('Ошибка микрофона:', err);
-                alert('Не удалось записать голосовое: ' + err.message);
-            }
-        }
-    });
-
-    btnStopRecording.addEventListener('click', function() {
-        if(mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-
-            mediaRecorder.onstop = function() {
-                const blob = new Blob(audioChunks, { type: 'audio/wav' });
-                const file = new File([blob], 'voice_' + Date.now() + '.wav', { type: 'audio/wav' });
-
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                fileInput.files = dataTransfer.files;
-
-                const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-                filePreviewName.textContent = '🎤 Голосовое (' + sizeMB + ' МБ)';
-                filePreview.classList.remove('d-none');
-
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                mediaRecorder = null;
-
-                recordingIndicator.classList.add('d-none');
-                messageContent.disabled = false;
-                btnVoice.disabled = false;
-            };
-        }
-    });
-
-    form.addEventListener('submit', function(e) {
+    form?.addEventListener('submit', function(e) {
         e.preventDefault();
-        const formData = new FormData(form);
-
-        fetch("{% url 'api_send' %}", {
-            method: 'POST',
-            body: formData,
-            headers: {'X-Requested-With': 'XMLHttpRequest'}
-        })
-        .then(r => r.json())
-        .then(data => {
-            if(data.status === 'ok') {
+        const fd = new FormData(form);
+        fetch("{% url 'api_send' %}", { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        .then(r => r.json()).then(d => {
+            if(d.status === 'ok') {
                 form.querySelector('input[name="content"]').value = '';
-                fileInput.value = '';
-                filePreview.classList.add('d-none');
                 location.reload();
-            } else {
-                alert('Ошибка: ' + (data.error || 'Не удалось отправить сообщение'));
-            }
-        })
-        .catch(err => {
-            console.error('Ошибка отправки:', err);
-            alert('Не удалось отправить сообщение');
-        });
+            } else alert('Ошибка: ' + (d.error || ''));
+        }).catch(() => alert('Ошибка сети'));
     });
 </script>
 {% endblock %}

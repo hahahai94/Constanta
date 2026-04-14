@@ -68,6 +68,15 @@ class Message(models.Model):
     group = models.ForeignKey('Group', related_name='messages', on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
 
+    reply_to = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='replies',
+        verbose_name="Ответ на сообщение"
+    )
+
     # 🔹 Вложения с хешированием
     attachment_type = models.CharField(max_length=20, choices=[
         ('none', 'Нет'),
