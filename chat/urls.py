@@ -11,6 +11,7 @@ urlpatterns = [
     path('tech/check', views.tech_check, name='tech_check'),
     path('reg/', views.reg_view, name='reg'),
     path('auth/', views.auth_view, name='login'),
+    path('auth/', views.auth_view, name='auth'),
     path('logout/', views.logout_view, name='logout'),
     path('chat/files/friend/<int:friend_id>/', views.chat_files, name='chat_files_friend'),
     path('chat/files/group/<uuid:group_id>/', views.chat_files, name='chat_files_group'),

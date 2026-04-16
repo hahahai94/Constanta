@@ -10,6 +10,20 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+# TODO: Переехать на UV
+
+# TODO: views.py -> views/
+# TODO: models.py -> models/
+# TODO: utils.py -> utils/
+# TODO: Использовать админку Django
+# TODO: Написать автотесты!!!
+# TODO: CSS и JS нужно хранить в static/css / static/js
+# TODO: Выносить повторы CSS и JS в static/css/lib и static/js/lib
+# TODO: Выносить повторы HTML-блоков в templates/parts
+
+
+# TODO: Прибраться в настройках
+
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -19,15 +33,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
+# TODO: .env / .env.example просто существует, просто здравствуй, просто как дела
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-^&d7q26w&+6!v%c05%p3n*d3q6e&_$5s#6r8$w=g&w*ijdqcbg'
+# TODO: SECRET_KEY = env( 'SECRET_KEY' )
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    '1.1.1.71',
     '127.0.0.1',
+    '1.1.1.71',
     'http://1.1.1.71',
     '192.168.1.67',
     'http://192.168.1.67'
@@ -62,9 +78,11 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'Constanta.urls'
 
 TEMPLATES = [
+    # TODO: Посмотреть на возможность интеграции Jinja2
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
+        # TODO: Использовать глобальные templates/, по необходимости делить на области видимости соответственно приложениям
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -83,6 +101,7 @@ WSGI_APPLICATION = 'Constanta.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
+    # TODO: Не забывать про возможность внедрения более серьёзных БД ( MySQL / PostgresSQL )
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
@@ -109,11 +128,17 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# TODO: Логи, просто существуют - они важны, logs/, используй "конкурентный ротационный писарь"
+# TODO: Используй разделение логов по модулям, ошибки и статика тоже отдельно
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
+# TODO: Перевести на русский, камон
 LANGUAGE_CODE = 'en-us'
 
+# TODO: Переводить для клиентов в их локальное время ( н-р, moment.js )
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
@@ -124,12 +149,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
+# TODO: Внедрить compress
 STATIC_URL = 'static/'
 
 AUTH_USER_MODEL = 'chat.User'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# TODO: Не забывать про nginx
 # 🔹 Максимальный размер файла (10 МБ)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
@@ -143,6 +170,8 @@ LOGIN_URL = '/auth/'  # ← Наш кастомный URL входа
 LOGIN_REDIRECT_URL = '/main/'  # Куда перенаправлять после входа
 LOGOUT_REDIRECT_URL = '/auth/'  # Куда после выхода
 
+# TODO: Это выглядит как костыль, у Django итак есть система авторизации из коробки
+# TODO: is_muted ( ну типо мягкий бан ) и is_active ( полный бан )
 AUTHENTICATION_BACKENDS = [
     'chat.backends.CustomAuthBackend',  # ← Наш кастомный (первым!)
     'django.contrib.auth.backends.ModelBackend',  # ← Стандартный

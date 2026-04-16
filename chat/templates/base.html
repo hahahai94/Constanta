@@ -80,14 +80,16 @@
 
         /* ==================== ЧАТ ЛЕЙАУТ ==================== */
         .chat-page body {
-            height: 100vh;
-            overflow: hidden;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         }
 
         .chat-wrapper {
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
+        display: flex;
+        height: calc(100vh - 56px) !important; /* 56px = высота Bootstrap-навбара */
+        overflow: hidden;
         }
 
         .sidebar {

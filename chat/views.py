@@ -570,55 +570,141 @@ def send_message(request):
     if request.method == 'POST':
         friend_id = request.POST.get('friend_id')
         group_id = request.POST.get('group_id')
-        content = request.POST.get('content', '')
-        reply_to_id = request.POST.get('reply_to_id')  # ← НОВОЕ
+        content = request.POST.get('content', '').strip()
+        reply_to_id = request.POST.get('reply_to_id')
 
-        # ... (твоя существующая логика файла) ...
+        # 🔹 1. Инициализируем переменные ЗАРАНЕЕ (чтобы не было NameError)
+        parsed_content = content
+        mentions_json = '[]'
+        mentioned_ids = []
 
-        # 🔹 Валидация reply_to
+        # 🔹 2. Обработка вложений
+        attachment = request.FILES.get('attachment')
+        attachment_type = 'none'
+        attachment_size = 0
+        attachment_hash = ''
+        attachment_original_name = ''
+        upload_path = None
+
+        if attachment:
+            if attachment.size > 50 * 1024 * 1024:
+                return JsonResponse({'status': 'failed', 'error': 'Файл > 50 МБ'}, status=400)
+
+            import hashlib
+            from datetime import datetime
+            timestamp = datetime.now().isoformat()
+            file_content = attachment.read()
+            hash_input = f"{file_content.hex()}{request.user.id}{timestamp}".encode('utf-8')
+            attachment_hash = hashlib.sha256(hash_input).hexdigest()
+            attachment.seek(0)
+
+            if attachment.content_type.startswith('image/'):
+                attachment_type = 'image'
+            elif attachment.content_type.startswith('audio/'):
+                attachment_type = 'voice'
+            else:
+                attachment_type = 'file'
+
+            attachment_size = attachment.size
+            attachment_original_name = attachment.name
+
+            import os
+            from django.conf import settings
+            subdir = attachment_hash[:2]
+            ext = os.path.splitext(attachment.name)[1].lower()
+            upload_path = os.path.join('attachments', subdir, f"{attachment_hash}{ext}")
+
+            from django.core.files.storage import default_storage
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, 'attachments', subdir), exist_ok=True)
+            default_storage.save(upload_path, attachment)
+
+        # 🔹 3. Парсинг упоминаний (безопасный)
+        if content:
+            try:
+                from .utils import parse_mentions
+                if group_id:
+                    group = get_object_or_404(Group, id=group_id)
+                    parsed_content, mentioned_ids = parse_mentions(content, group=group)
+                elif friend_id:
+                    parsed_content, mentioned_ids = parse_mentions(content, receiver=None)
+                mentions_json = json.dumps(mentioned_ids)
+            except Exception:
+                parsed_content = content  # Фоллбек если парсер сломан
+
+        # 🔹 4. Обработка ответа на сообщение
         reply_msg = None
         if reply_to_id:
             reply_msg = Message.objects.filter(id=reply_to_id).first()
-            # Проверка: сообщение должно быть в этом же чате
-            if reply_msg:
-                if friend_id and not (
-                        reply_msg.receiver_id == request.user.id or reply_msg.sender_id == request.user.id):
-                    reply_msg = None
-                elif group_id and reply_msg.group_id != int(group_id):
-                    reply_msg = None
 
+        # 🔹 5. Создание сообщения
+        msg = None
         if friend_id:
             receiver = get_object_or_404(User, id=friend_id)
-            Message.objects.create(
+            msg = Message.objects.create(
                 sender=request.user,
                 receiver=receiver,
                 group=None,
-                content=parsed_content,
+                content=parsed_content,  # ✅ Теперь всегда определено
                 attachment=upload_path if upload_path else None,
                 attachment_hash=attachment_hash,
                 attachment_original_name=attachment_original_name,
                 attachment_type=attachment_type,
                 attachment_size=attachment_size,
                 mentions=mentions_json,
-                reply_to=reply_msg  # ← ДОБАВИТЬ
+                reply_to=reply_msg
             )
+
+            # Уведомление получателю
+            if receiver != request.user:
+                from .utils import create_notification
+                create_notification(
+                    user=receiver,
+                    notification_type='message',
+                    title=f'Новое сообщение от {request.user.get_display_name()}',
+                    message=content[:100] if content else '📎 Вложение',
+                    url=f'/?friend_id={request.user.id}',
+                    related_message=msg
+                )
+
         elif group_id:
             group = get_object_or_404(Group, id=group_id)
-            if group.is_member(request.user):
-                Message.objects.create(
+            # Проверяем участие безопасным способом
+            is_member = GroupMember.objects.filter(group=group, user=request.user).exists()
+            if is_member:
+                msg = Message.objects.create(
                     sender=request.user,
+                    receiver=None,
                     group=group,
-                    content=parsed_content,
+                    content=parsed_content,  # ✅ Теперь всегда определено
                     attachment=upload_path if upload_path else None,
                     attachment_hash=attachment_hash,
                     attachment_original_name=attachment_original_name,
                     attachment_type=attachment_type,
                     attachment_size=attachment_size,
                     mentions=mentions_json,
-                    reply_to=reply_msg  # ← ДОБАВИТЬ
+                    reply_to=reply_msg
                 )
 
+                # Уведомления об упоминаниях в группе
+                if mentioned_ids:
+                    from .utils import create_notification
+                    for uid in mentioned_ids:
+                        if uid != request.user.id:
+                            try:
+                                u = User.objects.get(id=uid)
+                                create_notification(
+                                    user=u,
+                                    notification_type='mention',
+                                    title=f'Вас упомянули в {group.name}',
+                                    message=f'{request.user.get_display_name()} упомянул вас',
+                                    url=f'/groups/{group.id}/',
+                                    related_message=msg
+                                )
+                            except User.DoesNotExist:
+                                pass
+
         return JsonResponse({'status': 'ok'})
+
     return JsonResponse({'status': 'failed'}, status=400)
 
 
