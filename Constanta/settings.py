@@ -12,11 +12,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 # TODO: Переехать на UV
 
-# TODO: views.py -> views/
 # TODO: models.py -> models/
 # TODO: utils.py -> utils/
 # TODO: Использовать админку Django
-# TODO: Написать автотесты!!!
 # TODO: CSS и JS нужно хранить в static/css / static/js
 # TODO: Выносить повторы CSS и JS в static/css/lib и static/js/lib
 # TODO: Выносить повторы HTML-блоков в templates/parts
@@ -25,6 +23,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 # TODO: Прибраться в настройках
 
 from pathlib import Path
+from environs import Env  # ← НОВОЕ: для работы с .env
+
+# Инициализация environs
+env = Env()
+env.read_env()  # Читает файл .env из корня проекта
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,25 +36,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# TODO: .env / .env.example просто существует, просто здравствуй, просто как дела
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-^&d7q26w&+6!v%c05%p3n*d3q6e&_$5s#6r8$w=g&w*ijdqcbg'
-# TODO: SECRET_KEY = env( 'SECRET_KEY' )
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
     '127.0.0.1',
     '1.1.1.71',
     'http://1.1.1.71',
     '192.168.1.67',
     'http://192.168.1.67'
-]
-CSRF_TRUSTED_ORIGINS = [
+])
+
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'http://1.1.1.71',
     'http://192.168.1.67'
-]
+])
 
 # Application definition
 
@@ -102,10 +104,7 @@ WSGI_APPLICATION = 'Constanta.wsgi.application'
 
 DATABASES = {
     # TODO: Не забывать про возможность внедрения более серьёзных БД ( MySQL / PostgresSQL )
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.dj_db_url('DATABASE_URL', default='sqlite:///db.sqlite3')
 }
 
 
@@ -131,15 +130,37 @@ AUTH_PASSWORD_VALIDATORS = [
 # TODO: Логи, просто существуют - они важны, logs/, используй "конкурентный ротационный писарь"
 # TODO: Используй разделение логов по модулям, ошибки и статика тоже отдельно
 
+# 🔹 Базовая настройка логирования (можно расширить позже)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        # TODO: Добавить RotatingFileHandler для продакшена
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO' if not DEBUG else 'DEBUG',
+    },
+}
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-# TODO: Перевести на русский, камон
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = env('LANGUAGE_CODE', default='ru')
 
 # TODO: Переводить для клиентов в их локальное время ( н-р, moment.js )
-TIME_ZONE = 'UTC'
+TIME_ZONE = env('TIMEZONE', default='Asia/Vladivostok')  # ← Твой часовой пояс
 
 USE_I18N = True
 
@@ -158,8 +179,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # TODO: Не забывать про nginx
 # 🔹 Максимальный размер файла (10 МБ)
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int('FILE_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int('DATA_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024)
 
 
 # Для дефолтной аватарки
@@ -176,3 +197,34 @@ AUTHENTICATION_BACKENDS = [
     'chat.backends.CustomAuthBackend',  # ← Наш кастомный (первым!)
     'django.contrib.auth.backends.ModelBackend',  # ← Стандартный
 ]
+
+
+# 🔹 Дополнительные настройки из .env (на будущее)
+# === Email ===
+EMAIL_HOST = env('EMAIL_HOST', default='')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@constanta.local')
+
+# === Производительность ===
+# TODO: Добавить кэширование (Redis / Memcached)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# === Сессии ===
+SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=1209600)  # 2 недели
+SESSION_SAVE_EVERY_REQUEST = env.bool('SESSION_SAVE_EVERY_REQUEST', default=False)
+
+# === Сообщения ===
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+
+# === Лимиты ===
+MAX_FRIENDS_PER_USER = env.int('MAX_FRIENDS_PER_USER', default=500)
+MAX_GROUPS_PER_USER = env.int('MAX_GROUPS_PER_USER', default=50)
+MAX_MESSAGE_LENGTH = env.int('MAX_MESSAGE_LENGTH', default=2000)

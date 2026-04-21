@@ -389,10 +389,10 @@
                 </li>
                 {% else %}
                 <li class="nav-item me-2">
-                    <a class="btn-grad grad-green" href="{% url 'login' %}" style="padding: 8px 15px; font-size: 14px;">Войти</a>
+                    <a class="btn-grad grad-green" href="{% url 'auth' %}" style="padding: 8px 15px; font-size: 14px;">Войти</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn-grad grad-purple" href="{% url 'reg' %}" style="padding: 8px 15px; font-size: 14px;">Регистрация</a>
+                    <a class="btn-grad grad-purple" href="{% url 'auth' %}" style="padding: 8px 15px; font-size: 14px;">Регистрация</a>
                 </li>
                     {% endif %}
                 </ul>
