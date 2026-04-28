@@ -1,5 +1,7 @@
 # chat/urls.py
 from django.urls import path
+from django.conf import settings          # ← ДОБАВЛЕНО
+from django.conf.urls.static import static # ← ДОБАВЛЕНО
 from . import views
 
 urlpatterns = [
@@ -19,7 +21,7 @@ urlpatterns = [
     # 👥 Каталог
     path('users/', views.users_catalog, name='users_catalog'),
 
-    # 📁 Группы (ВСЕ пути с <uuid:group_id> восстановлены)
+    # 📁 Группы
     path('groups/', views.groups_list, name='groups'),
     path('groups/create/', views.create_group, name='create_group'),
     path('group/<uuid:group_id>/', views.group_chat, name='group_chat'),
@@ -31,4 +33,8 @@ urlpatterns = [
     # ⚡ API
     path('api/send/', views.send_message, name='api_send'),
     path('api/heartbeat/', views.api_heartbeat, name='api_heartbeat'),
-]
+]  # ← ЗАКРЫВАЮЩАЯ СКОБКА СПЕРВА
+
+# 🔹 Раздача медиа-файлов (только в режиме разработки)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
