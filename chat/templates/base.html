@@ -165,12 +165,19 @@
         }
 
         .msg-avatar {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            margin-right: 10px;
-            object-fit: cover;
+        width: 45px !important;      /* Фиксированная ширина */
+        height: 45px !important;     /* Фиксированная высота */
+        object-fit: cover;           /* Обрезка без искажений */
+        border-radius: 50%;          /* Круглая форма */
+        flex-shrink: 0;              /* Чтобы не сжималась */
         }
+
+        .chat-avatar {
+        width: 45px !important;
+        height: 45px !important;
+        object-fit: cover;
+        border-radius: 50%;
+        }>png
 
         /* ==================== СТАТУСЫ ==================== */
         .status-dot {

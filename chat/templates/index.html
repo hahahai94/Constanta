@@ -68,8 +68,8 @@
         <h6 class="text-muted mt-3 mb-2 ps-2">Чаты</h6>
         {% for conv in conversations %}
         <a href="?friend_id={{ conv.user.id }}" class="chat-item {% if active_friend and active_friend.id == conv.user.id %}active{% endif %} d-flex align-items-center">
-            <img src="{{ conv.user.get_avatar_url }}" class="rounded-circle me-2" style="width: 45px; height: 45px; object-fit: cover;">
-            <div class="flex-grow-1 min-width-0">
+            <img src="{% if conversation.avatar %}{{ conversation.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+            class="rounded-circle me-2 chat-avatar">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-truncate fw-bold">{{ conv.user.get_display_name }}</span>
                     {{ conv.user|user_status|safe }}

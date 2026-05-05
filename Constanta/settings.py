@@ -172,6 +172,8 @@ USE_TZ = True
 
 # TODO: Внедрить compress
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [BASE_DIR / 'Constanta' / 'static']
 
 AUTH_USER_MODEL = 'chat.User'
 MEDIA_URL = '/media/'
