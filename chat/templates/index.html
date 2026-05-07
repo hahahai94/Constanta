@@ -1,253 +1,134 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load status_tags %}
-
-{% block body_class %}chat-page{% endblock %}
-{% block container_class %}container-fluid p-0{% endblock %}
 
 {% block content %}
-<style>
-    .chat-wrapper { display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 320px; border-right: 1px solid #e0e0e0; background: #fff; overflow-y: auto; flex-shrink: 0; }
-    .chat-area { flex: 1; display: flex; flex-direction: column; background: #f0f2f5; min-width: 0; }
-    .messages-box { flex: 1; overflow-y: auto; padding: 20px; }
-    .input-area { background: #fff; padding: 15px; border-top: 1px solid #e0e0e0; }
-
-    .nav-btn { display: block; width: 100%; padding: 12px 15px; margin-bottom: 8px; border-radius: 10px; text-decoration: none; color: #333; font-weight: 500; transition: all 0.2s; border: none; cursor: pointer; }
-    .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .nav-btn.profile { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-    .nav-btn.groups { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
-    .nav-btn.users { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
-
-    .chat-item { display: block; padding: 12px 15px; margin-bottom: 5px; border-radius: 10px; text-decoration: none; color: #333; transition: all 0.2s; }
-    .chat-item:hover { background: #f5f5f5; }
-    .chat-item.active { background: #e3f2fd; border-left: 4px solid #2196f3; }
-
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-    .status-dot.online { background: #4caf50; box-shadow: 0 0 4px #4caf50; }
-    .status-dot.offline { background: #9e9e9e; }
-
-    .msg { margin-bottom: 15px; display: flex; }
-    .msg.mine { justify-content: flex-end; }
-    .msg.theirs { justify-content: flex-start; }
-    .msg-bubble { max-width: 70%; padding: 10px 15px; border-radius: 18px; position: relative; word-wrap: break-word; }
-    .msg.mine .msg-bubble { background: #2196f3; color: white; border-bottom-right-radius: 4px; }
-    .msg.theirs .msg-bubble { background: white; color: black; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-    .msg-time { font-size: 11px; opacity: 0.7; margin-top: 4px; }
-    .msg-avatar { width: 35px; height: 35px; border-radius: 50%; margin-right: 10px; object-fit: cover; }
-
-    #emoji-picker { position: absolute; bottom: 80px; right: 20px; background: white; border: 1px solid #ddd; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; z-index: 1000; }
-    .emoji-btn { min-width: 40px; height: 40px; font-size: 22px; padding: 4px; }
-</style>
-
-<div class="chat-wrapper">
-    <!-- 🔹 ЛЕВАЯ ПАНЕЛЬ -->
-    <div class="sidebar p-3">
-        <!-- Навигация в сайдбаре -->
-        <div class="mb-4">
-            <a href="{% url 'profile' %}" class="btn-grad grad-purple w-100 mb-2">👤 Профиль</a>
-            <a href="{% url 'groups' %}" class="btn-grad grad-pink w-100 mb-2">📁 Группы</a>
-            <a href="{% url 'users_catalog' %}" class="btn-grad grad-blue w-100 mb-2">🔍 Все пользователи</a>
-        </div>
-
-        <!-- Группы -->
-        <h6 class="text-muted mb-2 ps-2">Группы</h6>
-        {% for membership in groups %}
-        <a href="{% url 'group_chat' membership.group.id %}" class="chat-item d-flex align-items-center">
-            <img src="{{ membership.group.get_avatar_url }}" class="rounded-circle me-2" style="width: 45px; height: 45px; object-fit: cover;">
-            <div class="flex-grow-1">
-                <div class="fw-bold">{{ membership.group.name }}</div>
-                <small class="text-muted">{{ membership.group.members.count }} участников</small>
+<div class="container-fluid h-100">
+    <div class="row h-100">
+        <!-- ЛЕВАЯ ПАНЕЛЬ: СПИСОК ЧАТОВ -->
+        <div class="col-md-4 col-lg-3 border-end bg-white h-100 overflow-auto">
+            <div class="p-3 border-bottom">
+                <h5 class="mb-0">💬 Чаты</h5>
             </div>
-        </a>
-        {% empty %}
-        <small class="text-muted ps-2">Нет групп</small>
-        {% endfor %}
 
-        <!-- Чаты -->
-        <h6 class="text-muted mt-3 mb-2 ps-2">Чаты</h6>
-        {% for conv in conversations %}
-        <a href="?friend_id={{ conv.user.id }}" class="chat-item {% if active_friend and active_friend.id == conv.user.id %}active{% endif %} d-flex align-items-center">
-            <img src="{% if conversation.avatar %}{{ conversation.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
-            class="rounded-circle me-2 chat-avatar">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="text-truncate fw-bold">{{ conv.user.get_display_name }}</span>
-                    {{ conv.user|user_status|safe }}
-                </div>
-                <small class="text-muted">{{ conv.last_message|date:"H:i"|default:"" }}</small>
-            </div>
-        </a>
-        {% empty %}
-        <small class="text-muted ps-2">Нет чатов. <a href="{% url 'users_catalog' %}">Найти людей</a></small>
-        {% endfor %}
-    </div>
+            {% if conversations %}
+                {% for conversation in conversations %}
+                <a href="?friend_id={{ conversation.id }}" class="chat-item-link text-decoration-none text-dark">
+                    <div class="chat-item d-flex align-items-center p-3">
+                        <!-- АВАТАРКА -->
+                        <img src="{% if conversation.avatar %}{{ conversation.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                             class="chat-avatar me-3"
+                             alt="{{ conversation.username }}">
 
-    <!-- 🔹 ОБЛАСТЬ ЧАТА -->
-    <div class="chat-area">
-        {% if active_friend %}
-        <!-- Шапка -->
-        <div class="p-3 bg-white border-bottom d-flex align-items-center">
-            <img src="{{ active_friend.get_avatar_url }}" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
-            <div>
-                <h5 class="mb-0">{{ active_friend.get_display_name }}</h5>
-                {{ active_friend|user_status|safe }}
-            </div>
-        </div>
-
-        <!-- Сообщения -->
-        <div class="messages-box" id="messages-box">
-            {% for msg in messages %}
-            <div class="msg {% if msg.sender == request.user %}mine{% else %}theirs{% endif %}">
-                {% if msg.sender != request.user %}
-                <img src="{{ msg.sender.get_avatar_url }}" class="msg-avatar">
-                {% endif %}
-                <div class="msg-bubble">
-                    {% if msg.attachment_type == 'image' %}
-                    <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-width: 300px;">
-                    {% elif msg.attachment_type == 'voice' %}
-                    <audio controls class="w-100 mb-2"><source src="{{ msg.attachment.url }}" type="audio/wav"></audio>
-                    {% elif msg.attachment_type == 'file' %}
-                    <div class="p-2 bg-white rounded border mb-2">
-                        <a href="{{ msg.attachment.url }}" target="_blank" class="text-decoration-none text-dark">📎 {{ msg.attachment_original_name|default:"Файл" }}</a>
-                        <small class="text-muted d-block">{{ msg.attachment_size|filesizeformat }}</small>
+                        <!-- ИНФОРМАЦИЯ -->
+                        <div class="chat-info flex-grow-1 overflow-hidden">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="chat-name mb-0 text-truncate">
+                                    {{ conversation.get_display_name|default:conversation.username }}
+                                </h6>
+                            </div>
+                            <small class="text-muted">Нажмите, чтобы открыть чат</small>
+                        </div>
                     </div>
-                    {% endif %}
-                    {% if msg.content %}<div>{{ msg.content|safe }}</div>{% endif %}
-                    <div class="msg-time">{{ msg.sender.get_display_name }} • {{ msg.created_at|date:"H:i" }}</div>
+                </a>
+                {% endfor %}
+            {% else %}
+                <div class="p-4 text-center text-muted">
+                    <div class="mb-3" style="font-size: 3rem;">💬</div>
+                    <p>У вас пока нет чатов</p>
+                    <a href="{% url 'users_catalog' %}" class="btn btn-primary btn-sm">
+                        👥 Найти собеседника
+                    </a>
                 </div>
-            </div>
-            {% empty %}
-            <div class="text-center text-muted py-5">
-                <h4>📭 Начни переписку</h4>
-                <p>Отправь первое сообщение</p>
-            </div>
-            {% endfor %}
+            {% endif %}
         </div>
 
-        <!-- Ввод -->
-        <div class="input-area position-relative">
-            <form id="message-form" class="d-flex gap-2 align-items-center">
-                {% csrf_token %}
-                <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
-                <input type="hidden" name="reply_to_id" id="reply-to-id" value="">
-                <button type="button" class="btn btn-outline-secondary" id="btn-emoji" style="width: 45px; height: 45px;">😊</button>
-                <button type="button" class="btn btn-outline-secondary" id="btn-file" style="width: 45px; height: 45px;">📎</button>
-                <button type="button" class="btn btn-outline-secondary" id="btn-voice" style="width: 45px; height: 45px;">🎤</button>
-                <input type="file" id="file-input" name="attachment" style="display: none;">
-                <input type="text" name="content" id="message-content" class="form-control" placeholder="Сообщение..." style="flex: 1;">
-                <button type="submit" class="btn-grad grad-blue" style="width: 80px; height: 45px;">Send ➤</button>
-            </form>
+        <!-- ПРАВАЯ ПАНЕЛЬ: ЧАТ -->
+        <div class="col-md-8 col-lg-9 h-100">
+            {% if active_friend %}
+                <!-- Здесь твой код чата с сообщениями -->
+                <div class="h-100 d-flex flex-column">
+                    <div class="p-3 border-bottom bg-white">
+                        <div class="d-flex align-items-center">
+                            <img src="{% if active_friend.avatar %}{{ active_friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                                 class="chat-avatar me-3"
+                                 alt="{{ active_friend.username }}">
+                            <h5 class="mb-0">{{ active_friend.get_display_name|default:active_friend.username }}</h5>
+                        </div>
+                    </div>
 
-            <div id="emoji-picker" class="d-none">
-                <div class="d-flex flex-wrap gap-1">
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😀</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😃</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😄</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😁</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😆</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😅</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😂</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">🤣</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😊</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😍</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">🥰</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">😎</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">👍</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">❤️</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">🔥</button>
-                    <button type="button" class="btn btn-sm btn-link emoji-btn">🎉</button>
+                    <!-- СООБЩЕНИЯ -->
+                    <div class="flex-grow-1 overflow-auto p-3 bg-light">
+                        {% for message in messages %}
+                        <div class="d-flex mb-3 {% if message.sender == request.user %}justify-content-end{% endif %}">
+                            <div class="{% if message.sender == request.user %}bg-primary text-white{% else %}bg-white{% endif %} rounded p-2" style="max-width: 70%;">
+                                {{ message.content }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- ФОРМА ОТПРАВКИ -->
+                    <div class="p-3 border-top bg-white">
+                        <form method="post" action="{% url 'api_send' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+                            <div class="input-group">
+                                <input type="text" name="content" class="form-control" placeholder="Введите сообщение...">
+                                <button type="submit" class="btn btn-primary">Отправить</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            {% else %}
+                <!-- ЗАГЛУШКА, ЕСЛИ ЧАТ НЕ ВЫБРАН -->
+                <div class="h-100 d-flex align-items-center justify-content-center bg-light">
+                    <div class="text-center text-muted">
+                        <div style="font-size: 5rem;">💬</div>
+                        <h4>Выберите чат, чтобы начать общение</h4>
+                    </div>
+                </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="d-flex h-100 align-items-center justify-content-center text-muted">
-            <div class="text-center">
-                <h3 style="font-size: 64px;">💬</h3>
-                <h4>Выберите чат</h4>
-                <p>Выберите собеседника из списка слева</p>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-    // 🔹 ПУЛЬС ОНЛАЙНА
-    setInterval(() => {
-        fetch('{% url "api_heartbeat" %}', { method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')} }).catch(() => {});
-    }, 30000);
+{% block extra_css %}
+<style>
+.chat-item {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid #f0f0f0;
+}
 
-    function getCookie(name) {
-        let v = null;
-        if (document.cookie && document.cookie !== '') {
-            document.cookie.split(';').forEach(c => {
-                c = c.trim();
-                if (c.substring(0, name.length + 1) === (name + '=')) v = decodeURIComponent(c.substring(name.length + 1));
-            });
-        }
-        return v;
-    }
+.chat-item:hover {
+    background-color: #f8f9fa;
+}
 
-    const form = document.getElementById('message-form');
-    const chatBox = document.getElementById('messages-box');
-    const fileInput = document.getElementById('file-input');
-    const btnEmoji = document.getElementById('btn-emoji');
-    const btnFile = document.getElementById('btn-file');
-    const btnVoice = document.getElementById('btn-voice');
-    const emojiPicker = document.getElementById('emoji-picker');
-    const messageContent = document.getElementById('message-content');
+.chat-item-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
 
-    if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+.chat-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
 
-    // Эмодзи
-    btnEmoji?.addEventListener('click', e => { e.stopPropagation(); emojiPicker.classList.toggle('d-none'); });
-    document.querySelectorAll('.emoji-btn').forEach(btn => btn.addEventListener('click', () => { messageContent.value += btn.textContent; messageContent.focus(); }));
-    document.addEventListener('click', e => { if(emojiPicker && !emojiPicker.contains(e.target) && e.target !== btnEmoji) emojiPicker.classList.add('d-none'); });
+.chat-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
 
-    // Файлы
-    btnFile?.addEventListener('click', () => fileInput.click());
-    fileInput?.addEventListener('change', function() {
-        if(this.files?.length) alert('Файл выбран: ' + this.files[0].name);
-    });
+.h-100 {
+    height: calc(100vh - 56px);
+}
 
-    // Голосовые
-    let mediaRecorder = null, audioChunks = [];
-    btnVoice?.addEventListener('click', async () => {
-        if(!mediaRecorder) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream); audioChunks = [];
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.start();
-                btnVoice.innerHTML = '⏹️'; btnVoice.classList.add('btn-danger');
-            } catch(err) { alert('Нет доступа к микрофону'); }
-        } else {
-            mediaRecorder.stop();
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(audioChunks, { type: 'audio/wav' });
-                const file = new File([blob], `voice_${Date.now()}.wav`, { type: 'audio/wav' });
-                const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files;
-                mediaRecorder.stream.getTracks().forEach(t => t.stop()); mediaRecorder = null;
-                btnVoice.innerHTML = '🎤'; btnVoice.classList.remove('btn-danger');
-                alert('Голосовое записано!');
-            };
-        }
-    });
-
-    // Отправка
-    form?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const fd = new FormData(form);
-        fetch("{% url 'api_send' %}", { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} })
-        .then(r => r.json()).then(d => {
-            if(d.status === 'ok') {
-                form.querySelector('input[name="content"]').value = '';
-                fileInput.value = '';
-                location.reload();
-            } else alert('Ошибка: ' + (d.error || ''));
-        }).catch(() => alert('Ошибка сети'));
-    });
-</script>
+.overflow-auto {
+    overflow-y: auto;
+}
+</style>
 {% endblock %}

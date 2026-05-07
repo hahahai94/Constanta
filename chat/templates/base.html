@@ -164,20 +164,19 @@
             text-align: right;
         }
 
-        .msg-avatar {
-        width: 45px !important;      /* Фиксированная ширина */
-        height: 45px !important;     /* Фиксированная высота */
-        object-fit: cover;           /* Обрезка без искажений */
-        border-radius: 50%;          /* Круглая форма */
-        flex-shrink: 0;              /* Чтобы не сжималась */
-        }
-
-        .chat-avatar {
+        /* Все аватарки в чатах */
+    .chat-avatar,
+    .msg-avatar,
+    .avatar-sm,
+    .avatar-md,
+    .avatar-lg,
+    .rounded-circle.me-2 {
         width: 45px !important;
         height: 45px !important;
-        object-fit: cover;
-        border-radius: 50%;
-        }>png
+        object-fit: cover !important;
+        border-radius: 50% !important;
+        flex-shrink: 0 !important;
+    }
 
         /* ==================== СТАТУСЫ ==================== */
         .status-dot {

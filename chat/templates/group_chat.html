@@ -152,5 +152,19 @@
             } else alert('Ошибка: ' + (d.error || ''));
         }).catch(() => alert('Ошибка сети'));
     });
+
+    /* Все аватарки в чатах */
+       .chat-avatar,
+    .msg-avatar,
+    .avatar-sm,
+    .avatar-md,
+    .avatar-lg,
+    .rounded-circle.me-2 {
+        width: 45px !important;
+        height: 45px !important;
+        object-fit: cover !important;
+        border-radius: 50% !important;
+        flex-shrink: 0 !important;
+    }
 </script>
 {% endblock %}
