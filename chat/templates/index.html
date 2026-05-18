@@ -2,133 +2,123 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid h-100">
-    <div class="row h-100">
-        <!-- ЛЕВАЯ ПАНЕЛЬ: СПИСОК ЧАТОВ -->
-        <div class="col-md-4 col-lg-3 border-end bg-white h-100 overflow-auto">
-            <div class="p-3 border-bottom">
-                <h5 class="mb-0">💬 Чаты</h5>
-            </div>
+<div class="container-fluid p-0" style="height: calc(100vh - 56px);">
 
-            {% if conversations %}
-                {% for conversation in conversations %}
-                <a href="?friend_id={{ conversation.id }}" class="chat-item-link text-decoration-none text-dark">
-                    <div class="chat-item d-flex align-items-center p-3">
-                        <!-- АВАТАРКА -->
-                        <img src="{% if conversation.avatar %}{{ conversation.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
-                             class="chat-avatar me-3"
-                             alt="{{ conversation.username }}">
-
-                        <!-- ИНФОРМАЦИЯ -->
-                        <div class="chat-info flex-grow-1 overflow-hidden">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <h6 class="chat-name mb-0 text-truncate">
-                                    {{ conversation.get_display_name|default:conversation.username }}
-                                </h6>
-                            </div>
-                            <small class="text-muted">Нажмите, чтобы открыть чат</small>
-                        </div>
-                    </div>
-                </a>
-                {% endfor %}
-            {% else %}
-                <div class="p-4 text-center text-muted">
-                    <div class="mb-3" style="font-size: 3rem;">💬</div>
-                    <p>У вас пока нет чатов</p>
-                    <a href="{% url 'users_catalog' %}" class="btn btn-primary btn-sm">
-                        👥 Найти собеседника
-                    </a>
-                </div>
-            {% endif %}
+    {% if not active_friend %}
+    <!-- ================= СПИСОК ЧАТОВ ================= -->
+    <div class="h-100 overflow-auto bg-white">
+        <div class="p-3 border-bottom bg-light sticky-top">
+            <h5 class="mb-0 fw-bold">💬 Чаты</h5>
         </div>
 
-        <!-- ПРАВАЯ ПАНЕЛЬ: ЧАТ -->
-        <div class="col-md-8 col-lg-9 h-100">
-            {% if active_friend %}
-                <!-- Здесь твой код чата с сообщениями -->
-                <div class="h-100 d-flex flex-column">
-                    <div class="p-3 border-bottom bg-white">
-                        <div class="d-flex align-items-center">
-                            <img src="{% if active_friend.avatar %}{{ active_friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
-                                 class="chat-avatar me-3"
-                                 alt="{{ active_friend.username }}">
-                            <h5 class="mb-0">{{ active_friend.get_display_name|default:active_friend.username }}</h5>
-                        </div>
+        {% if conversations %}
+            {% for conversation in conversations %}
+            {% if conversation.id != request.user.id %}
+            <a href="?friend_id={{ conversation.id }}" class="text-decoration-none text-dark d-block">
+                <div class="d-flex align-items-center p-3 border-bottom hover-bg">
+                    <img src="{% if conversation.avatar %}{{ conversation.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                         class="rounded-circle me-3"
+                         alt="{{ conversation.username }}"
+                         style="width: 48px; height: 48px; object-fit: cover; flex-shrink: 0;">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <h6 class="mb-1 text-truncate fw-semibold">{{ conversation.username }}</h6>
+                        <small class="text-muted">Нажмите, чтобы написать</small>
                     </div>
-
-                    <!-- СООБЩЕНИЯ -->
-                    <div class="flex-grow-1 overflow-auto p-3 bg-light">
-                        {% for message in messages %}
-                        <div class="d-flex mb-3 {% if message.sender == request.user %}justify-content-end{% endif %}">
-                            <div class="{% if message.sender == request.user %}bg-primary text-white{% else %}bg-white{% endif %} rounded p-2" style="max-width: 70%;">
-                                {{ message.content }}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <!-- ФОРМА ОТПРАВКИ -->
-                    <div class="p-3 border-top bg-white">
-                        <form method="post" action="{% url 'api_send' %}" enctype="multipart/form-data">
-                            {% csrf_token %}
-                            <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
-                            <div class="input-group">
-                                <input type="text" name="content" class="form-control" placeholder="Введите сообщение...">
-                                <button type="submit" class="btn btn-primary">Отправить</button>
-                            </div>
-                        </form>
-                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
                 </div>
-            {% else %}
-                <!-- ЗАГЛУШКА, ЕСЛИ ЧАТ НЕ ВЫБРАН -->
-                <div class="h-100 d-flex align-items-center justify-content-center bg-light">
-                    <div class="text-center text-muted">
-                        <div style="font-size: 5rem;">💬</div>
-                        <h4>Выберите чат, чтобы начать общение</h4>
-                    </div>
-                </div>
+            </a>
             {% endif %}
+            {% endfor %}
+        {% else %}
+            <div class="text-center py-5 text-muted px-3">
+                <div class="mb-3" style="font-size: 3rem; opacity: 0.5;">👥</div>
+                <h5 class="fw-bold">У вас пока нет чатов</h5>
+                <p class="small">Начните общение с кем-нибудь из пользователей</p>
+                <a href="{% url 'users_catalog' %}" class="btn btn-primary mt-2">
+                    <i class="bi bi-people me-2"></i>Найти пользователей
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    {% else %}
+    <!-- ================= ОКНО ЧАТА ================= -->
+    <div class="d-flex flex-column h-100 bg-light">
+        <!-- Шапка -->
+        <div class="bg-white border-bottom py-2 px-4 d-flex align-items-center shadow-sm">
+            <a href="?" class="btn btn-sm btn-outline-secondary me-3 rounded-pill">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <img src="{% if active_friend.avatar %}{{ active_friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                 class="rounded-circle me-3"
+                 style="width: 40px; height: 40px; object-fit: cover;">
+            <div>
+                <h6 class="mb-0 fw-bold">{{ active_friend.username }}</h6>
+                <small class="text-muted">в сети</small>
+            </div>
+        </div>
+
+        <!-- Сообщения -->
+        <div class="flex-grow-1 overflow-auto p-4" id="messages-container">
+            {% for message in messages %}
+            <div class="d-flex mb-3 {% if message.sender == request.user %}justify-content-end{% endif %}">
+                <div class="rounded-3 p-3 shadow-sm position-relative"
+                     style="max-width: 75%; word-wrap: break-word;
+                            background-color: {% if message.sender == request.user %}#0d6efd{% else %}#ffffff{% endif %};
+                            color: {% if message.sender == request.user %}#ffffff{% else %}#212529{% endif %};">
+                    {% if message.content %}
+                    <p class="mb-1 lh-base">{{ message.content|linebreaksbr }}</p>
+                    {% endif %}
+                    <small class="d-block text-end mt-1" style="font-size: 0.7rem; opacity: 0.8;">
+                        {{ message.created_at|date:"H:i" }}
+                    </small>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted py-5">
+                <div style="font-size: 3rem; opacity: 0.5;">💬</div>
+                <p class="mt-2 fw-semibold">Нет сообщений</p>
+                <p class="small">Напишите первым, чтобы начать диалог!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Поле ввода -->
+        <div class="bg-white border-top p-3">
+            <form method="post" action="{% url 'api_send' %}" class="w-100">
+                {% csrf_token %}
+                <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+                <div class="input-group input-group-lg">
+                    <input type="text" name="content" class="form-control border-0 bg-light"
+                           placeholder="Введите сообщение..." required autocomplete="off"
+                           style="border-radius: 20px 0 0 20px; padding-left: 20px;">
+                    <button type="submit" class="btn btn-primary px-4" style="border-radius: 0 20px 20px 0;">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+    {% endif %}
 </div>
-{% endblock %}
 
-{% block extra_css %}
+<!-- СТИЛИ И СКРИПТЫ -->
 <style>
-.chat-item {
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.chat-item:hover {
-    background-color: #f8f9fa;
-}
-
-.chat-item-link:hover {
-    text-decoration: none;
-    color: inherit;
-}
-
-.chat-avatar {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-}
-
-.chat-name {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.h-100 {
-    height: calc(100vh - 56px);
-}
-
-.overflow-auto {
-    overflow-y: auto;
-}
+    .hover-bg:hover { background-color: #f8f9fa; transition: 0.2s; }
+    #messages-container { scroll-behavior: smooth; }
+    /* Убираем лишние отступы на мобильных */
+    @media (max-width: 768px) {
+        .rounded-3 { max-width: 85% !important; }
+    }
 </style>
+
+<script>
+    // Автопрокрутка к последнему сообщению при открытии чата
+    {% if messages %}
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('messages-container');
+        container.scrollTop = container.scrollHeight;
+    });
+    {% endif %}
+</script>
 {% endblock %}

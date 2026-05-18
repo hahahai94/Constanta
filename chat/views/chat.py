@@ -1,33 +1,38 @@
 # chat/views/chat.py
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, Count
 from chat.models import User, Message
 
 
-@login_required
 def main_chat(request):
-    """Главная страница личных сообщений"""
     user = request.user
+
+    # 🔹 ПОКАЗЫВАЕМ ТОЛЬКО ТЕХ, С КЕМ ЕСТЬ СООБЩЕНИЯ
+    conversations = User.objects.filter(
+        Q(sent_messages__receiver=user) | Q(received_messages__sender=user)
+    ).exclude(id=user.id).distinct()
+
+    # ИЛИ если хочешь показывать ВСЕХ пользователей (раскомментируй):
+    # conversations = User.objects.exclude(id=user.id)
+
     friend_id = request.GET.get('friend_id')
+    active_friend = None
+    messages_list = []
 
-    # Активный собеседник (если выбран в URL)
-    active_friend = get_object_or_404(User, id=friend_id) if friend_id else None
-
-    # Список всех пользователей для сайдбара (кроме себя)
-    # Если позже добавишь модель друзей/чатов, замени этот запрос на неё
-    conversations = User.objects.exclude(id=user.id).order_by('username')
-
-    # Загрузка сообщений с активным собеседником
-    messages = []
-    if active_friend:
-        messages = Message.objects.filter(
-            Q(sender=user, receiver=active_friend) |
-            Q(sender=active_friend, receiver=user)
-        ).order_by('created_at')[:100]  # последние 100 сообщений
+    if friend_id:
+        try:
+            active_friend = User.objects.get(id=friend_id)
+            # Загружаем сообщения
+            messages_list = Message.objects.filter(
+                Q(sender=user, receiver=active_friend) |
+                Q(sender=active_friend, receiver=user)
+            ).order_by('created_at')
+        except User.DoesNotExist:
+            pass
 
     return render(request, 'index.html', {
         'conversations': conversations,
         'active_friend': active_friend,
-        'messages': messages,
+        'messages': messages_list,
     })
