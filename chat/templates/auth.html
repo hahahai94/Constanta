@@ -1,53 +1,90 @@
 {% extends 'base.html' %}
-
-{% block body_class %}content-page{% endblock %}
-{% block container_class %}container{% endblock %}
+{% load static %}
 
 {% block content %}
-<div class="container d-flex justify-content-center align-items-center h-100">
-    <div class="card p-4" style="width: 400px;">
-        <h3 class="text-center mb-4">
-            {% if type == 'reg' %}📝 Регистрация{% else %}🔐 Вход{% endif %}
-        </h3>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-body p-5">
+                    <!-- ЗАГОЛОВОК -->
+                    {% if type == 'reg' %}
+                        <h2 class="text-center mb-4">🔐 Регистрация</h2>
+                    {% else %}
+                        <h2 class="text-center mb-4">🔑 Вход</h2>
+                    {% endif %}
 
-        <!-- Сообщения об ошибках/успехе -->
-        {% if messages %}
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <!-- СООБЩЕНИЯ ОБ ОШИБКАХ -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- ФОРМА -->
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {% for field, errors in form.errors.items %}
+                                    {% for error in errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% if type == 'reg' %}
+                            <!-- ПОЛЯ РЕГИСТРАЦИИ -->
+                            <div class="mb-3">
+                                <label class="form-label">Имя пользователя</label>
+                                <input type="text" name="username" class="form-control"
+                                       value="{{ form.username.value|default:'' }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Пароль</label>
+                                <input type="password" name="password1" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Подтвердите пароль</label>
+                                <input type="password" name="password2" class="form-control" required>
+                            </div>
+                            <button type="submit" name="register" class="btn btn-primary w-100 mb-3">
+                                Зарегистрироваться
+                            </button>
+                            <div class="text-center">
+                                <a href="{% url 'auth' %}?mode=login" class="text-decoration-none">
+                                    Уже есть аккаунт? Войти
+                                </a>
+                            </div>
+                        {% else %}
+                            <!-- ПОЛЯ ВХОДА -->
+                            <div class="mb-3">
+                                <label class="form-label">Имя пользователя</label>
+                                <input type="text" name="username" class="form-control"
+                                       value="{{ form.username.value|default:'' }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Пароль</label>
+                                <input type="password" name="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 mb-3">
+                                Войти
+                            </button>
+                            <div class="text-center">
+                                <a href="{% url 'auth' %}?mode=reg" class="text-decoration-none">
+                                    Нет аккаунта? Зарегистрироваться
+                                </a>
+                            </div>
+                        {% endif %}
+                    </form>
+                </div>
             </div>
-            {% endfor %}
-        {% endif %}
-
-        <form method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit" class="btn btn-primary w-100">
-                {% if type == 'reg' %}Создать аккаунт{% else %}Войти{% endif %}
-            </button>
-        </form>
-
-        <div class="mt-3 text-center">
-            {% if type == 'reg' %}
-                Уже есть аккаунт? <a href="{% url 'auth' %}">Войти</a>
-            {% else %}
-                Нет аккаунта? <a href="{% url 'auth' %}">Зарегистрироваться</a>
-            {% endif %}
         </div>
-
-        <!-- Подсказка про бан -->
-        {% if type == 'auth' %}
-        <div class="alert alert-info mt-4 small mb-0" role="alert">
-            ℹ️ Не можете войти? Возможно ваш аккаунт заблокирован.
-            <br>
-            <strong>
-                <a href="https://t.me/DedSec_FAN" target="_blank" class="alert-link">
-                    ✈️ Написать админу @DedSec_FAN
-                </a>
-            </strong>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

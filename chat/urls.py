@@ -1,7 +1,6 @@
-# chat/urls.py
 from django.urls import path
-from django.conf import settings          # ← ДОБАВЛЕНО
-from django.conf.urls.static import static # ← ДОБАВЛЕНО
+from django.conf import settings
+from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
@@ -33,8 +32,8 @@ urlpatterns = [
     # ⚡ API
     path('api/send/', views.send_message, name='api_send'),
     path('api/heartbeat/', views.api_heartbeat, name='api_heartbeat'),
-]  # ← ЗАКРЫВАЮЩАЯ СКОБКА СПЕРВА
+]
 
-# 🔹 Раздача медиа-файлов (только в режиме разработки)
+# 🔹 Раздача медиа (только для разработки)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
