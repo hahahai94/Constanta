@@ -3,9 +3,12 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Count
 from chat.models import User, Message
+from django.shortcuts import render, redirect
 
 
 def main_chat(request):
+    if not request.user.is_authenticated:
+        return redirect('auth')
     user = request.user
 
     # 🔹 ПОКАЗЫВАЕМ ТОЛЬКО ТЕХ, С КЕМ ЕСТЬ СООБЩЕНИЯ

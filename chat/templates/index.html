@@ -73,18 +73,38 @@
         </div>
 
         <!-- Форма отправки -->
-        <form id="chat-form" method="POST" action="{% url 'api_send' %}" class="w-100">
-            {% csrf_token %}
-            <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
-            <!-- УБРАЛ group_id, чтобы не было ошибок -->
-            <div class="input-group input-group-lg">
-                <input type="text" name="content" class="form-control border-0 bg-light"
-                       placeholder="Сообщение..." required autocomplete="off">
-                <button type="submit" class="btn btn-primary px-4">
-                    <i class="bi bi-send-fill"></i>
-                </button>
+        <div class="position-relative">
+    <form id="chat-form" method="POST" action="{% url 'api_send' %}" class="w-100" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+
+        <div class="input-group input-group-lg">
+            <!-- Кнопка Эмодзи -->
+            <button type="button" class="btn btn-outline-secondary" id="emoji-btn" title="Вставить эмодзи">😊</button>
+
+            <!-- Поле ввода -->
+            <input type="text" name="content" id="message-input" class="form-control border-0 bg-light"
+                   placeholder="Сообщение..." required autocomplete="off">
+
+            <!-- Кнопка Файл (скрытый input) -->
+            <label class="btn btn-outline-secondary" title="Прикрепить файл">
+                <i class="bi bi-paperclip"></i>
+                <input type="file" name="attachment" id="file-input" class="d-none"
+                       accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.zip">
+            </label>
+
+            <!-- Кнопка Отправить -->
+            <button type="submit" class="btn btn-primary px-4" id="send-btn">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </div>
+    </form>
+
+    <!-- Панель Эмодзи -->
+            <div id="emoji-picker" class="d-none position-absolute bg-white border rounded shadow p-3"
+                 style="bottom: 100%; left: 0; width: 400px; max-height: 350px; overflow-y: auto; z-index: 1050; margin-bottom: 12px;">
             </div>
-        </form>
+        </div>
     </div>
     {% endif %}
 </div>
@@ -92,42 +112,124 @@
 
 {% block scripts %}
 <script>
-console.log('💬 Chat script loaded');
+console.log('💬 Chat v2: Emoji + Files + Polling');
+
+// ✅ Нормальный набор (только широко поддерживаемые Unicode-эмодзи)
+const emojiList = [
+    '😀','😃','😄','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','😘',
+    '😋','😛','😜','😝','🤑','🤔','🤐','😐','😑','😶','😏','😒',
+    '🙄','😬','😌','😔','😪','😴','😷','🤒','🤢','🤮','🥶','😵','🤠',
+    '😎','🤓','🧐','😕','😟','😮','😲','😳','🥺','😢','😭','😱','😤','😠',
+    '👻','💀','☠️','💩','👽','🤖','👹','👺','🙈','🙉','🙊','💥','💫','💨','👋',
+    '🤚','🖐️','✋','🖖','👌','🤏','✌️','🤟','🤘','🤙','👈','👉','👆','🖕',
+    '👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','❤️',
+    '🔥','⭐','✨','🎉','💬','👀','🚀','✅','❌','⚠️','🎯','📎','🔗','🔒','🔓'
+];
+
+const emojiPicker = document.getElementById('emoji-picker');
+const messageInput = document.getElementById('message-input');
+
+// Рендерим кнопки с правильным шрифтом
+emojiPicker.innerHTML = emojiList.map(e =>
+    `<button type="button" class="emoji-btn" title="${e}">${e}</button>`
+).join('');
+
+// Открытие/закрытие панели
+document.getElementById('emoji-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    emojiPicker.classList.toggle('d-none');
+});
+
+// Вставка эмодзи в позицию курсора
+document.querySelectorAll('.emoji-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const start = messageInput.selectionStart;
+        const end = messageInput.selectionEnd;
+        const text = messageInput.value;
+        messageInput.value = text.substring(0, start) + btn.textContent + text.substring(end);
+        messageInput.focus();
+        messageInput.selectionStart = messageInput.selectionEnd = start + btn.textContent.length;
+        emojiPicker.classList.add('d-none');
+    });
+});
+
+// Закрытие при клике вне панели
+document.addEventListener('click', () => emojiPicker.classList.add('d-none'));
+
+// 🔹 2. ОТОБРАЖЕНИЕ ВЫБРАННОГО ФАЙЛА
+document.getElementById('file-input').addEventListener('change', function() {
+    if (this.files.length > 0) {
+        messageInput.placeholder = `📎 ${this.files[0].name}`;
+    } else {
+        messageInput.placeholder = 'Сообщение...';
+    }
+});
+
+// 🔹 3. ОТПРАВКА СООБЩЕНИЙ (AJAX + ФАЙЛЫ)
 document.addEventListener('DOMContentLoaded', function() {
-    var form = document.getElementById('chat-form');
+    const form = document.getElementById('chat-form');
     if (!form) return;
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        var btn = form.querySelector('button[type="submit"]');
-        var input = form.querySelector('input[name="content"]');
-        var csrf = form.querySelector('[name=csrfmiddlewaretoken]');
-        var data = new FormData(form);
 
-        btn.disabled = true; btn.textContent = '⏳';
+        const btn = document.getElementById('send-btn');
+        const csrf = form.querySelector('[name=csrfmiddlewaretoken]');
+        const formData = new FormData(form);
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳';
 
         fetch(form.action, {
             method: 'POST',
-            body: data,
+            body: formData,
             headers: { 'X-CSRFToken': csrf ? csrf.value : '' }
         })
-        .then(function(r) { return r.json(); })
-        .then(function(json) {
+        .then(r => r.json())
+        .then(json => {
             if (json.status === 'ok') {
-                input.value = '';
-                location.reload(); // Простая перезагрузка — работает всегда
+                messageInput.value = '';
+                document.getElementById('file-input').value = '';
+                messageInput.placeholder = 'Сообщение...';
+                console.log('✅ Отправлено');
             } else {
                 alert('Ошибка: ' + (json.message || json.error || 'Неизвестная'));
             }
         })
-        .catch(function(err) {
-            console.error('Fetch error:', err);
-            form.submit(); // Фолбэк
+        .catch(err => {
+            console.error('❌ Send error:', err);
+            form.submit();
         })
-        .finally(function() {
-            btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-fill"></i>';
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send-fill"></i>';
         });
     });
 });
+
+// 🔹 4. АВТООБНОВЛЕНИЕ ВХОДЯЩИХ (каждые 2 сек)
+setInterval(() => {
+    const container = document.getElementById('messages-container');
+    if (!container || window.location.href.indexOf('friend_id=') === -1) return;
+
+    fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const newDoc = parser.parseFromString(html, 'text/html');
+            const newContainer = newDoc.getElementById('messages-container');
+
+            if (newContainer && container.innerHTML !== newContainer.innerHTML) {
+                container.innerHTML = newContainer.innerHTML;
+                container.scrollTop = container.scrollHeight;
+                console.log(' Новые сообщения');
+            }
+        })
+        .catch(() => {});
+}, 2000);
+
+// Автопрокрутка при загрузке
+const container = document.getElementById('messages-container');
+if (container) container.scrollTop = container.scrollHeight;
 </script>
 {% endblock %}

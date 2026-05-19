@@ -224,33 +224,39 @@
 
         /* ==================== ЭМОДЗИ ПИКЕР ==================== */
         #emoji-picker {
-            position: absolute;
-            bottom: 80px;
-            right: 20px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            padding: 10px;
-            z-index: 1000;
-            max-width: 300px;
-            max-height: 250px;
-            overflow-y: auto;
-        }
+    display: grid;
+    grid-template-columns: repeat(10, 1fr); /* 10 эмодзи в ряд */
+    gap: 8px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
 
-        .emoji-btn {
-            min-width: 40px;
-            height: 40px;
-            font-size: 22px;
-            padding: 4px;
-            border-radius: 8px;
-            transition: all 0.2s;
-        }
+.emoji-btn {
+    font-size: 1.8rem; /* Крупнее */
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    line-height: 1;
+}
 
-        .emoji-btn:hover {
-            background: #f0f0f0;
-            transform: scale(1.2);
-        }
+.emoji-btn:hover {
+    background: #e2e6ea;
+    transform: scale(1.15);
+    border-color: #adb5bd;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Скроллбар для панели */
+#emoji-picker::-webkit-scrollbar { width: 6px; }
+#emoji-picker::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+#emoji-picker::-webkit-scrollbar-track { background: transparent; }
 
         /* ==================== КАРТОЧКИ ==================== */
         .card-modern {
