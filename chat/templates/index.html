@@ -5,44 +5,39 @@
 <div class="container-fluid p-0" style="height: calc(100vh - 56px);">
 
     {% if not active_friend %}
-    <!-- ================= СПИСОК ЧАТОВ ================= -->
+    <!-- ===== СПИСОК ЛИЧНЫХ ЧАТОВ ===== -->
     <div class="h-100 overflow-auto bg-white">
         <div class="p-3 border-bottom bg-light sticky-top">
             <h5 class="mb-0 fw-bold">💬 Чаты</h5>
         </div>
 
         {% if conversations %}
-            {% for conversation in conversations %}
-            {% if conversation.id != request.user.id %}
-            <a href="?friend_id={{ conversation.id }}" class="text-decoration-none text-dark d-block">
+            {% for conv in conversations %}
+            {% if conv.id != request.user.id %}
+            <a href="?friend_id={{ conv.id }}" class="text-decoration-none text-dark d-block">
                 <div class="d-flex align-items-center p-3 border-bottom hover-bg">
-                    <img src="{% if conversation.avatar %}{{ conversation.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                    <img src="{% if conv.avatar %}{{ conv.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
                          class="rounded-circle me-3"
-                         alt="{{ conversation.username }}"
-                         style="width: 48px; height: 48px; object-fit: cover; flex-shrink: 0;">
-                    <div class="flex-grow-1 overflow-hidden">
-                        <h6 class="mb-1 text-truncate fw-semibold">{{ conversation.username }}</h6>
+                         style="width: 48px; height: 48px; object-fit: cover;">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">{{ conv.username }}</h6>
                         <small class="text-muted">Нажмите, чтобы написать</small>
                     </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
                 </div>
             </a>
             {% endif %}
             {% endfor %}
         {% else %}
-            <div class="text-center py-5 text-muted px-3">
-                <div class="mb-3" style="font-size: 3rem; opacity: 0.5;">👥</div>
-                <h5 class="fw-bold">У вас пока нет чатов</h5>
-                <p class="small">Начните общение с кем-нибудь из пользователей</p>
-                <a href="{% url 'users_catalog' %}" class="btn btn-primary mt-2">
-                    <i class="bi bi-people me-2"></i>Найти пользователей
-                </a>
+            <div class="text-center py-5 text-muted">
+                <div style="font-size: 3rem;">👥</div>
+                <h5>Нет чатов</h5>
+                <a href="{% url 'users_catalog' %}" class="btn btn-primary mt-2">Найти пользователей</a>
             </div>
         {% endif %}
     </div>
 
     {% else %}
-    <!-- ================= ОКНО ЧАТА ================= -->
+    <!-- ===== ОКНО ЛИЧНОГО ЧАТА ===== -->
     <div class="d-flex flex-column h-100 bg-light">
         <!-- Шапка -->
         <div class="bg-white border-bottom py-2 px-4 d-flex align-items-center shadow-sm">
@@ -52,73 +47,87 @@
             <img src="{% if active_friend.avatar %}{{ active_friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
                  class="rounded-circle me-3"
                  style="width: 40px; height: 40px; object-fit: cover;">
-            <div>
-                <h6 class="mb-0 fw-bold">{{ active_friend.username }}</h6>
-                <small class="text-muted">в сети</small>
-            </div>
+            <h6 class="mb-0 fw-bold">{{ active_friend.username }}</h6>
         </div>
 
         <!-- Сообщения -->
         <div class="flex-grow-1 overflow-auto p-4" id="messages-container">
-            {% for message in messages %}
-            <div class="d-flex mb-3 {% if message.sender == request.user %}justify-content-end{% endif %}">
-                <div class="rounded-3 p-3 shadow-sm position-relative"
+            {% for msg in messages %}
+            <div class="d-flex mb-3 {% if msg.sender == request.user %}justify-content-end{% endif %}">
+                <div class="rounded-3 p-3 shadow-sm"
                      style="max-width: 75%; word-wrap: break-word;
-                            background-color: {% if message.sender == request.user %}#0d6efd{% else %}#ffffff{% endif %};
-                            color: {% if message.sender == request.user %}#ffffff{% else %}#212529{% endif %};">
-                    {% if message.content %}
-                    <p class="mb-1 lh-base">{{ message.content|linebreaksbr }}</p>
-                    {% endif %}
-                    <small class="d-block text-end mt-1" style="font-size: 0.7rem; opacity: 0.8;">
-                        {{ message.created_at|date:"H:i" }}
+                            background: {% if msg.sender == request.user %}#0d6efd{% else %}#fff{% endif %};
+                            color: {% if msg.sender == request.user %}#fff{% else %}#212529{% endif %};">
+                    {% if msg.content %}<p class="mb-1">{{ msg.content|linebreaksbr }}</p>{% endif %}
+                    <small style="font-size: 0.7rem; opacity: 0.8; float: right;">
+                        {{ msg.created_at|date:"H:i" }}
                     </small>
                 </div>
             </div>
             {% empty %}
             <div class="text-center text-muted py-5">
-                <div style="font-size: 3rem; opacity: 0.5;">💬</div>
-                <p class="mt-2 fw-semibold">Нет сообщений</p>
-                <p class="small">Напишите первым, чтобы начать диалог!</p>
+                <div style="font-size: 3rem;">💬</div>
+                <p>Нет сообщений</p>
             </div>
             {% endfor %}
         </div>
 
-        <!-- Поле ввода -->
-        <div class="bg-white border-top p-3">
-            <form method="post" action="{% url 'api_send' %}" class="w-100">
-                {% csrf_token %}
-                <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
-                <div class="input-group input-group-lg">
-                    <input type="text" name="content" class="form-control border-0 bg-light"
-                           placeholder="Введите сообщение..." required autocomplete="off"
-                           style="border-radius: 20px 0 0 20px; padding-left: 20px;">
-                    <button type="submit" class="btn btn-primary px-4" style="border-radius: 0 20px 20px 0;">
-                        <i class="bi bi-send-fill"></i>
-                    </button>
-                </div>
-            </form>
-        </div>
+        <!-- Форма отправки -->
+        <form id="chat-form" method="POST" action="{% url 'api_send' %}" class="w-100">
+            {% csrf_token %}
+            <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+            <!-- УБРАЛ group_id, чтобы не было ошибок -->
+            <div class="input-group input-group-lg">
+                <input type="text" name="content" class="form-control border-0 bg-light"
+                       placeholder="Сообщение..." required autocomplete="off">
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+        </form>
     </div>
     {% endif %}
 </div>
+{% endblock %}
 
-<!-- СТИЛИ И СКРИПТЫ -->
-<style>
-    .hover-bg:hover { background-color: #f8f9fa; transition: 0.2s; }
-    #messages-container { scroll-behavior: smooth; }
-    /* Убираем лишние отступы на мобильных */
-    @media (max-width: 768px) {
-        .rounded-3 { max-width: 85% !important; }
-    }
-</style>
-
+{% block scripts %}
 <script>
-    // Автопрокрутка к последнему сообщению при открытии чата
-    {% if messages %}
-    document.addEventListener('DOMContentLoaded', function() {
-        const container = document.getElementById('messages-container');
-        container.scrollTop = container.scrollHeight;
+console.log('💬 Chat script loaded');
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('chat-form');
+    if (!form) return;
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        var input = form.querySelector('input[name="content"]');
+        var csrf = form.querySelector('[name=csrfmiddlewaretoken]');
+        var data = new FormData(form);
+
+        btn.disabled = true; btn.textContent = '⏳';
+
+        fetch(form.action, {
+            method: 'POST',
+            body: data,
+            headers: { 'X-CSRFToken': csrf ? csrf.value : '' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+            if (json.status === 'ok') {
+                input.value = '';
+                location.reload(); // Простая перезагрузка — работает всегда
+            } else {
+                alert('Ошибка: ' + (json.message || json.error || 'Неизвестная'));
+            }
+        })
+        .catch(function(err) {
+            console.error('Fetch error:', err);
+            form.submit(); // Фолбэк
+        })
+        .finally(function() {
+            btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-fill"></i>';
+        });
     });
-    {% endif %}
+});
 </script>
 {% endblock %}

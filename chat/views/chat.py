@@ -35,4 +35,5 @@ def main_chat(request):
         'conversations': conversations,
         'active_friend': active_friend,
         'messages': messages_list,
+        'active_group': None,
     })

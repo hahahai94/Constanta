@@ -2,86 +2,89 @@
 {% load static %}
 
 {% block content %}
-<div class="container">
+<div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-5">
-            <div class="card shadow-sm">
-                <div class="card-body p-5">
-                    <!-- ЗАГОЛОВОК -->
-                    {% if type == 'reg' %}
-                        <h2 class="text-center mb-4">🔐 Регистрация</h2>
-                    {% else %}
-                        <h2 class="text-center mb-4">🔑 Вход</h2>
-                    {% endif %}
+        <div class="col-md-5 col-lg-4">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-body p-4 p-md-5">
 
-                    <!-- СООБЩЕНИЯ ОБ ОШИБКАХ -->
+                    <!-- Заголовок -->
+                    <h3 class="text-center mb-4 fw-bold">
+                        {% if type == 'reg' %}🔐 Регистрация{% else %}🔑 Вход{% endif %}
+                    </h3>
+
+                    <!-- Сообщения об ошибках / успехе -->
                     {% if messages %}
                         {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
                         {% endfor %}
                     {% endif %}
 
-                    <!-- ФОРМА -->
-                    <form method="post">
+                    <!-- Форма -->
+                    <form method="post" novalidate>
                         {% csrf_token %}
-
-                        {% if form.errors %}
-                            <div class="alert alert-danger">
-                                {% for field, errors in form.errors.items %}
-                                    {% for error in errors %}
-                                        <div>{{ error }}</div>
-                                    {% endfor %}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
 
                         {% if type == 'reg' %}
                             <!-- ПОЛЯ РЕГИСТРАЦИИ -->
                             <div class="mb-3">
-                                <label class="form-label">Имя пользователя</label>
-                                <input type="text" name="username" class="form-control"
-                                       value="{{ form.username.value|default:'' }}" required>
+                                <label class="form-label fw-semibold">Имя пользователя</label>
+                                <input type="text" name="username" class="form-control form-control-lg"
+                                       value="{{ form.username.value|default:'' }}" required
+                                       placeholder="Придумайте логин" minlength="3" maxlength="150">
+                                <small class="text-muted">3-150 символов, только буквы, цифры и @/./+/-/_</small>
                             </div>
+
                             <div class="mb-3">
-                                <label class="form-label">Пароль</label>
-                                <input type="password" name="password1" class="form-control" required>
+                                <label class="form-label fw-semibold">Пароль</label>
+                                <input type="password" name="password1" class="form-control form-control-lg"
+                                       required placeholder="Минимум 8 символов" minlength="8">
+                                <small class="text-muted">Не используйте простые пароли</small>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Подтвердите пароль</label>
-                                <input type="password" name="password2" class="form-control" required>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Подтвердите пароль</label>
+                                <input type="password" name="password2" class="form-control form-control-lg"
+                                       required placeholder="Повторите пароль">
                             </div>
-                            <button type="submit" name="register" class="btn btn-primary w-100 mb-3">
+
+                            <button type="submit" name="register" class="btn btn-primary btn-lg w-100 mb-3">
                                 Зарегистрироваться
                             </button>
+
                             <div class="text-center">
-                                <a href="{% url 'auth' %}?mode=login" class="text-decoration-none">
-                                    Уже есть аккаунт? Войти
-                                </a>
+                                <span class="text-muted">Уже есть аккаунт?</span>
+                                <a href="{% url 'auth' %}?mode=login" class="fw-semibold text-decoration-none">Войти</a>
                             </div>
+
                         {% else %}
                             <!-- ПОЛЯ ВХОДА -->
                             <div class="mb-3">
-                                <label class="form-label">Имя пользователя</label>
-                                <input type="text" name="username" class="form-control"
-                                       value="{{ form.username.value|default:'' }}" required>
+                                <label class="form-label fw-semibold">Имя пользователя</label>
+                                <input type="text" name="username" class="form-control form-control-lg"
+                                       value="{{ form.username.value|default:'' }}" required
+                                       placeholder="Введите ваш логин">
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Пароль</label>
-                                <input type="password" name="password" class="form-control" required>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Пароль</label>
+                                <input type="password" name="password" class="form-control form-control-lg"
+                                       required placeholder="Введите ваш пароль">
                             </div>
-                            <button type="submit" class="btn btn-primary w-100 mb-3">
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
                                 Войти
                             </button>
+
                             <div class="text-center">
-                                <a href="{% url 'auth' %}?mode=reg" class="text-decoration-none">
-                                    Нет аккаунта? Зарегистрироваться
-                                </a>
+                                <span class="text-muted">Нет аккаунта?</span>
+                                <a href="{% url 'auth' %}?mode=reg" class="fw-semibold text-decoration-none">Зарегистрироваться</a>
                             </div>
                         {% endif %}
                     </form>
+
                 </div>
             </div>
         </div>

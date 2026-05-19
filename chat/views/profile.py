@@ -8,18 +8,42 @@ from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from chat.forms import ChangeUsernameForm, ChangePasswordForm
 
+
 @login_required
 def profile_view(request):
     """Страница профиля"""
     user = request.user
     if request.method == 'POST':
-        user.nick = request.POST.get('nick', user.nick).strip()
-        user.email = request.POST.get('email', user.email).strip()
+        new_nick = request.POST.get('nick', '').strip()
+        new_email = request.POST.get('email', '').strip()
+
+        # Собираем список полей, которые реально нужно обновить
+        update_fields = []
+
+        # Ник: сохраняем только если он не пустой и отличается от текущего
+        if new_nick and user.nick != new_nick:
+            user.nick = new_nick
+            update_fields.append('nick')
+
+        # Email: сохраняем если изменился
+        if new_email and user.email != new_email:
+            user.email = new_email
+            update_fields.append('email')
+
+        # Аватар: сохраняем если загружен файл
         if request.FILES.get('avatar'):
-            user.avatar = request.FILES.get('avatar')
-        user.save()
-        messages.success(request, '✅ Профиль обновлён!')
+            user.avatar = request.FILES['avatar']
+            update_fields.append('avatar')
+
+        # Обновляем в БД ТОЛЬКО изменённые поля
+        if update_fields:
+            user.save(update_fields=update_fields)
+            messages.success(request, '✅ Профиль обновлён!')
+        else:
+            messages.info(request, 'ℹ️ Изменений не найдено')
+
         return redirect('profile')
+
     return render(request, 'profile.html', {'user': user})
 
 @login_required

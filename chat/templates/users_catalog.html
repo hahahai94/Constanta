@@ -18,12 +18,17 @@
         {% for user in users %}
         <div class="col-md-6 col-lg-4">
             <div class="card-modern d-flex align-items-center p-3">
-                <img src="{{ user.get_avatar_url }}" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                <!-- 🔹 ИСПРАВЛЕННАЯ АВАТАРКА -->
+                <img src="{% if user.avatar %}{{ user.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                     class="rounded-circle me-3"
+                     alt="{{ user.username }}"
+                     style="width: 60px; height: 60px; object-fit: cover;">
+
                 <div class="flex-grow-1 min-width-0">
-                    <h5 class="mb-1 text-truncate">{{ user.get_display_name }}</h5>
+                    <h5 class="mb-1 text-truncate">{{ user.get_display_name|default:user.username }}</h5>
                     <small class="text-muted d-block">@{{ user.username }}</small>
 
-                    <!-- 🔹 КНОПКА НАПИСАТЬ (ведёт на главный чат) -->
+                    <!-- 🔹 КНОПКА НАПИСАТЬ -->
                     <a href="{% url 'main' %}?friend_id={{ user.id }}" class="btn-grad grad-blue mt-2" style="padding: 6px 12px; font-size: 13px;">💬 Написать</a>
                 </div>
             </div>
