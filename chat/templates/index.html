@@ -51,59 +51,102 @@
         </div>
 
         <!-- Сообщения -->
-        <div class="flex-grow-1 overflow-auto p-4" id="messages-container">
-            {% for msg in messages %}
-            <div class="d-flex mb-3 {% if msg.sender == request.user %}justify-content-end{% endif %}">
-                <div class="rounded-3 p-3 shadow-sm"
-                     style="max-width: 75%; word-wrap: break-word;
-                            background: {% if msg.sender == request.user %}#0d6efd{% else %}#fff{% endif %};
-                            color: {% if msg.sender == request.user %}#fff{% else %}#212529{% endif %};">
-                    {% if msg.content %}<p class="mb-1">{{ msg.content|linebreaksbr }}</p>{% endif %}
-                    <small style="font-size: 0.7rem; opacity: 0.8; float: right;">
-                        {{ msg.created_at|date:"H:i" }}
-                    </small>
-                </div>
-            </div>
-            {% empty %}
-            <div class="text-center text-muted py-5">
-                <div style="font-size: 3rem;">💬</div>
-                <p>Нет сообщений</p>
-            </div>
-            {% endfor %}
-        </div>
+<div class="flex-grow-1 overflow-auto p-4" id="messages-container">
+    {% for msg in messages %}
+    <div class="d-flex mb-3 {% if msg.sender == request.user %}justify-content-end{% endif %}">
+        <div class="rounded-3 p-3 shadow-sm"
+             style="max-width: 75%; word-wrap: break-word;
+                    background: {% if msg.sender == request.user %}#0d6efd{% else %}#fff{% endif %};
+                    color: {% if msg.sender == request.user %}#fff{% else %}#212529{% endif %};">
 
-        <!-- Форма отправки -->
+            <!-- 🔹 ЕСЛИ ЕСТЬ КАРТИНКА -->
+            {% if msg.attachment_type == 'image' and msg.attachment %}
+                <div class="mb-2">
+                    <img src="{% url 'download_attachment' msg.id %}"
+                         class="img-fluid rounded"
+                         alt="Image"
+                         style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                </div>
+            {% endif %}
+
+            <!-- 🔹 ЕСЛИ ЕСТЬ ФАЙЛ (не картинка) -->
+{% if msg.attachment_type == 'file' and msg.attachment %}
+    <div class="mb-2 p-2 rounded" style="background: rgba(255,255,255,0.1);">
+        <a href="{% url 'download_attachment' msg.id %}" target="_blank" class="text-decoration-none" style="color: inherit;">
+            <i class="bi bi-file-earmark"></i> {{ msg.attachment_original_name|default:"Файл" }}
+            {% if msg.attachment_size %}
+                <small class="d-block opacity-75">{{ msg.attachment_size|filesizeformat }}</small>
+            {% endif %}
+        </a>
+    </div>
+{% endif %}
+
+            <!-- 🔹 ЕСЛИ ЕСТЬ АУДИО -->
+            {% if msg.attachment_type == 'voice' and msg.attachment %}
+                <div class="mb-2">
+                    <audio controls class="w-100">
+                        <source src="{% url 'download_attachment' msg.id %}" type="audio/mpeg">
+                        Ваш браузер не поддерживает аудио.
+                    </audio>
+                </div>
+            {% endif %}
+
+            <!-- 🔹 ТЕКСТ СООБЩЕНИЯ -->
+            {% if msg.content %}
+                <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
+            {% endif %}
+
+            <!-- Время -->
+            <small style="font-size: 0.7rem; opacity: 0.8; float: right; margin-top: 5px;">
+                {{ msg.created_at|date:"H:i" }}
+            </small>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+        <div style="font-size: 3rem;">💬</div>
+        <p>Нет сообщений</p>
+    </div>
+    {% endfor %}
+</div>
+
         <div class="position-relative">
     <form id="chat-form" method="POST" action="{% url 'api_send' %}" class="w-100" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
 
         <div class="input-group input-group-lg">
-            <!-- Кнопка Эмодзи -->
-            <button type="button" class="btn btn-outline-secondary" id="emoji-btn" title="Вставить эмодзи">😊</button>
+            <!-- Эмодзи -->
+            <button type="button" class="btn btn-outline-secondary" id="emoji-btn">😊</button>
 
-            <!-- Поле ввода -->
+            <!-- Поле ввода (БЕЗ required!) -->
             <input type="text" name="content" id="message-input" class="form-control border-0 bg-light"
-                   placeholder="Сообщение..." required autocomplete="off">
+                   placeholder="Сообщение..." autocomplete="off">
 
-            <!-- Кнопка Файл (скрытый input) -->
+            <!-- ✅ ТЕГ ФАЙЛА (висит рядом и не исчезает) -->
+            <span id="file-tag" class="d-none align-items-center bg-light px-2 text-muted small"
+                  style="border: 1px solid #dee2e6; border-left: 0; white-space: nowrap; font-size: 0.9rem;">
+                📎 <span id="file-tag-name"></span>
+                <button type="button" class="btn-close btn-close-sm ms-1" id="remove-file-btn" style="font-size: 8px;"></button>
+            </span>
+
+            <!-- Скрепка -->
             <label class="btn btn-outline-secondary" title="Прикрепить файл">
                 <i class="bi bi-paperclip"></i>
                 <input type="file" name="attachment" id="file-input" class="d-none"
                        accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.zip">
             </label>
 
-            <!-- Кнопка Отправить -->
+            <!-- Отправить -->
             <button type="submit" class="btn btn-primary px-4" id="send-btn">
                 <i class="bi bi-send-fill"></i>
             </button>
         </div>
     </form>
 
-    <!-- Панель Эмодзи -->
-            <div id="emoji-picker" class="d-none position-absolute bg-white border rounded shadow p-3"
-                 style="bottom: 100%; left: 0; width: 400px; max-height: 350px; overflow-y: auto; z-index: 1050; margin-bottom: 12px;">
-            </div>
+    <!-- Панель Эмодзи (Большая) -->
+        <div id="emoji-picker" class="d-none position-absolute bg-white border rounded shadow p-3"
+            style="bottom: 100%; left: 0; width: 650px; max-height: 80vh; overflow-y: auto; z-index: 1050; margin-bottom: 12px;">
         </div>
     </div>
     {% endif %}
@@ -112,11 +155,11 @@
 
 {% block scripts %}
 <script>
-console.log('💬 Chat v2: Emoji + Files + Polling');
+console.log('💬 Chat v3: Files + Emoji + Fixes');
 
 // ✅ Нормальный набор (только широко поддерживаемые Unicode-эмодзи)
 const emojiList = [
-    '😀','😃','😄','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','😘',
+    '😃','😄','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','😘',
     '😋','😛','😜','😝','🤑','🤔','🤐','😐','😑','😶','😏','😒',
     '🙄','😬','😌','😔','😪','😴','😷','🤒','🤢','🤮','🥶','😵','🤠',
     '😎','🤓','🧐','😕','😟','😮','😲','😳','🥺','😢','😭','😱','😤','😠',
@@ -129,43 +172,50 @@ const emojiList = [
 const emojiPicker = document.getElementById('emoji-picker');
 const messageInput = document.getElementById('message-input');
 
-// Рендерим кнопки с правильным шрифтом
-emojiPicker.innerHTML = emojiList.map(e =>
-    `<button type="button" class="emoji-btn" title="${e}">${e}</button>`
-).join('');
+emojiPicker.innerHTML = emojiList.map(e => `<button type="button" class="emoji-btn m-1">${e}</button>`).join('');
 
-// Открытие/закрытие панели
 document.getElementById('emoji-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     emojiPicker.classList.toggle('d-none');
 });
 
-// Вставка эмодзи в позицию курсора
 document.querySelectorAll('.emoji-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const start = messageInput.selectionStart;
-        const end = messageInput.selectionEnd;
         const text = messageInput.value;
-        messageInput.value = text.substring(0, start) + btn.textContent + text.substring(end);
+        messageInput.value = text.substring(0, start) + btn.textContent + text.substring(messageInput.selectionEnd);
         messageInput.focus();
         messageInput.selectionStart = messageInput.selectionEnd = start + btn.textContent.length;
         emojiPicker.classList.add('d-none');
     });
 });
 
-// Закрытие при клике вне панели
 document.addEventListener('click', () => emojiPicker.classList.add('d-none'));
 
-// 🔹 2. ОТОБРАЖЕНИЕ ВЫБРАННОГО ФАЙЛА
-document.getElementById('file-input').addEventListener('change', function() {
+// === 2. ФАЙЛЫ (Новая логика) ===
+const fileInput = document.getElementById('file-input');
+const fileTag = document.getElementById('file-tag');
+const fileTagName = document.getElementById('file-tag-name');
+const removeFileBtn = document.getElementById('remove-file-btn');
+
+fileInput.addEventListener('change', function() {
     if (this.files.length > 0) {
-        messageInput.placeholder = `📎 ${this.files[0].name}`;
+        fileTagName.textContent = this.files[0].name;
+        fileTag.classList.remove('d-none');
+        fileTag.classList.add('d-flex');
     } else {
-        messageInput.placeholder = 'Сообщение...';
+        fileTag.classList.add('d-none');
+        fileTag.classList.remove('d-flex');
     }
 });
 
-// 🔹 3. ОТПРАВКА СООБЩЕНИЙ (AJAX + ФАЙЛЫ)
+removeFileBtn.addEventListener('click', function() {
+    fileInput.value = '';
+    fileTag.classList.add('d-none');
+    fileTag.classList.remove('d-flex');
+});
+
+// === 3. ОТПРАВКА (AJAX) ===
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('chat-form');
     if (!form) return;
@@ -176,6 +226,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const btn = document.getElementById('send-btn');
         const csrf = form.querySelector('[name=csrfmiddlewaretoken]');
         const formData = new FormData(form);
+
+        // ✅ ПРОВЕРКА: нельзя отправить пустоту (ни текста, ни файла)
+        if (!messageInput.value.trim() && fileInput.files.length === 0) {
+            messageInput.placeholder = "⚠️ Напишите что-нибудь или выберите файл";
+            setTimeout(() => messageInput.placeholder = "Сообщение...", 2000);
+            return;
+        }
 
         btn.disabled = true;
         btn.innerHTML = '⏳';
@@ -189,8 +246,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(json => {
             if (json.status === 'ok') {
                 messageInput.value = '';
-                document.getElementById('file-input').value = '';
-                messageInput.placeholder = 'Сообщение...';
+                fileInput.value = '';
+                fileTag.classList.add('d-none');
                 console.log('✅ Отправлено');
             } else {
                 alert('Ошибка: ' + (json.message || json.error || 'Неизвестная'));
@@ -207,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// 🔹 4. АВТООБНОВЛЕНИЕ ВХОДЯЩИХ (каждые 2 сек)
+// === 4. АВТООБНОВЛЕНИЕ ===
 setInterval(() => {
     const container = document.getElementById('messages-container');
     if (!container || window.location.href.indexOf('friend_id=') === -1) return;
@@ -222,13 +279,11 @@ setInterval(() => {
             if (newContainer && container.innerHTML !== newContainer.innerHTML) {
                 container.innerHTML = newContainer.innerHTML;
                 container.scrollTop = container.scrollHeight;
-                console.log(' Новые сообщения');
             }
         })
         .catch(() => {});
 }, 2000);
 
-// Автопрокрутка при загрузке
 const container = document.getElementById('messages-container');
 if (container) container.scrollTop = container.scrollHeight;
 </script>

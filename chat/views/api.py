@@ -8,6 +8,9 @@ import json, hashlib, os
 from datetime import datetime
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+import os
 
 
 @login_required
@@ -159,3 +162,29 @@ def api_heartbeat(request):
         request.user.save(update_fields=['last_seen'])
         return JsonResponse({'status': 'ok'})
     return JsonResponse({'status': 'failed'}, status=400)
+
+
+@login_required
+def download_attachment(request, message_id):
+    """Скачивание файла с оригинальным именем"""
+    msg = get_object_or_404(Message, id=message_id)
+
+    if not msg.attachment:
+        return redirect('main')
+
+    # Проверка прав доступа (только участники диалога/группы)
+    if msg.sender != request.user and msg.receiver != request.user:
+        if msg.group:
+            if not GroupMember.objects.filter(group=msg.group, user=request.user).exists():
+                return redirect('main')
+        else:
+            return redirect('main')
+
+    # Открываем файл
+    file_path = msg.attachment.path if hasattr(msg.attachment, 'path') else msg.attachment.name
+    original_name = msg.attachment_original_name or os.path.basename(file_path)
+
+    # Отдаём файл с правильным заголовком
+    response = FileResponse(open(file_path, 'rb'), as_attachment=True)
+    response['Content-Disposition'] = f'attachment; filename="{original_name}"'
+    return response

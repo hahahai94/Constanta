@@ -32,6 +32,7 @@ urlpatterns = [
     # ⚡ API
     path('api/send/', views.send_message, name='api_send'),
     path('api/heartbeat/', views.api_heartbeat, name='api_heartbeat'),
+    path('download/<uuid:message_id>/', views.download_attachment, name='download_attachment'),
 ]
 
 # 🔹 Раздача медиа (только для разработки)
