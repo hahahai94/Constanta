@@ -329,6 +329,10 @@
                 </button>
             </form>
 
+            <div class="d-flex justify-content-end mt-1 px-2">
+                <small id="char-counter" class="text-muted" style="font-size: 0.8rem;">0 / 280</small>
+            </div>
+
             <!-- Панель Эмодзи -->
             <div id="emoji-picker"></div>
         </div>
@@ -629,5 +633,31 @@ window.addMember = (username) => {
 // Прокрутка вниз
 document.getElementById('messages-container').scrollTop =
     document.getElementById('messages-container').scrollHeight;
+
+
+// 🔒 Ограничение символов
+const MAX_CHARS = 280;
+const msgInput = document.getElementById('message-input');
+const charCounter = document.getElementById('char-counter');
+const submitBtn = document.getElementById('send-btn');
+
+function updateCharCounter() {
+    const len = msgInput.value.length;
+    charCounter.textContent = `${len} / ${MAX_CHARS}`;
+
+    if (len > MAX_CHARS) {
+        charCounter.className = 'text-danger fw-bold';
+        submitBtn.disabled = true;
+    } else if (len > MAX_CHARS * 0.9) {
+        charCounter.className = 'text-warning fw-bold';
+        submitBtn.disabled = false;
+    } else {
+        charCounter.className = 'text-muted';
+        submitBtn.disabled = false;
+    }
+}
+
+msgInput.addEventListener('input', updateCharCounter);
+msgInput.addEventListener('paste', () => setTimeout(updateCharCounter, 0));
 </script>
 {% endblock %}
