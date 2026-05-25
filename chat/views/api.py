@@ -1,16 +1,17 @@
-from django.shortcuts import get_object_or_404
+import os
+import json
+import hashlib
+from datetime import datetime
+
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.core.files.storage import default_storage
 from django.db.models import Q
+from django.http import JsonResponse, FileResponse
+from django.shortcuts import get_object_or_404, redirect
+
 from chat.models import User, Group, Message, GroupMember
 from chat.utils import parse_mentions, create_notification
-import json, hashlib, os
-from datetime import datetime
-from django.conf import settings
-from django.core.files.storage import default_storage
-from django.http import FileResponse
-from django.shortcuts import get_object_or_404
-import os
 
 
 @login_required
@@ -44,7 +45,7 @@ def send_message(request):
             for chunk in attachment.chunks():
                 hash_obj.update(chunk)
             attachment_hash = hash_obj.hexdigest()
-            attachment.seek(0)  # Сброс указателя для сохранения
+            attachment.seek(0)
 
             ext = os.path.splitext(attachment.name)[1].lower()
             subdir = attachment_hash[:2]
@@ -66,7 +67,7 @@ def send_message(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': f'Ошибка файла: {str(e)}'}, status=500)
 
-    #  Парсинг упоминаний
+    # 🔹 Парсинг упоминаний
     parsed_content = content
     mentions_json = '[]'
     mentioned_ids = []
@@ -79,7 +80,7 @@ def send_message(request):
                 parsed_content, mentioned_ids = parse_mentions(content, receiver=None)
             mentions_json = json.dumps(mentioned_ids)
         except Exception:
-            parsed_content = content  # Фолбэк, если парсер упадёт
+            parsed_content = content
 
     # 🔹 Ответ на сообщение
     reply_msg = None
@@ -101,17 +102,16 @@ def send_message(request):
                 mentions=mentions_json,
                 reply_to=reply_msg
             )
-            # Уведомление получателю
             if receiver != request.user:
                 try:
                     create_notification(
                         user=receiver, notification_type='message',
                         title=f'Новое сообщение от {request.user.username}',
-                        message=content[:100] if content else ' Вложение',
+                        message=content[:100] if content else '📎 Вложение',
                         url=f'/?friend_id={request.user.id}', related_message=msg
                     )
                 except Exception:
-                    pass  # Не ломать отправку из-за уведомлений
+                    pass
 
         elif group_id:
             group = get_object_or_404(Group, id=group_id)
@@ -127,7 +127,6 @@ def send_message(request):
                     mentions=mentions_json,
                     reply_to=reply_msg
                 )
-                # Уведомления для упомянутых
                 if mentioned_ids:
                     for uid in mentioned_ids:
                         if uid != request.user.id:
@@ -146,7 +145,6 @@ def send_message(request):
         else:
             return JsonResponse({'status': 'error', 'message': 'Не указан получатель'}, status=400)
 
-        # ✅ УСПЕХ: возвращаем только JSON
         return JsonResponse({'status': 'ok'})
 
     except Exception as e:
@@ -166,13 +164,13 @@ def api_heartbeat(request):
 
 @login_required
 def download_attachment(request, message_id):
-    """Скачивание файла с оригинальным именем"""
+    """Скачивание файла с оригинальным именем (ID — UUID)"""
     msg = get_object_or_404(Message, id=message_id)
 
     if not msg.attachment:
         return redirect('main')
 
-    # Проверка прав доступа (только участники диалога/группы)
+    # 🔒 Проверка прав доступа
     if msg.sender != request.user and msg.receiver != request.user:
         if msg.group:
             if not GroupMember.objects.filter(group=msg.group, user=request.user).exists():
@@ -180,11 +178,144 @@ def download_attachment(request, message_id):
         else:
             return redirect('main')
 
-    # Открываем файл
     file_path = msg.attachment.path if hasattr(msg.attachment, 'path') else msg.attachment.name
     original_name = msg.attachment_original_name or os.path.basename(file_path)
 
-    # Отдаём файл с правильным заголовком
-    response = FileResponse(open(file_path, 'rb'), as_attachment=True)
-    response['Content-Disposition'] = f'attachment; filename="{original_name}"'
-    return response
+    try:
+        response = FileResponse(open(file_path, 'rb'), as_attachment=True)
+        response['Content-Disposition'] = f'attachment; filename="{original_name}"'
+        return response
+    except FileNotFoundError:
+        return JsonResponse({'status': 'error', 'message': 'Файл не найден'}, status=404)
+
+
+@login_required
+def api_set_role(request):
+    """API: смена роли участника группы (только для владельца)"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        group_id = data.get('group_id')
+        user_id = data.get('user_id')
+        new_role = data.get('role')
+    except Exception:
+        return JsonResponse({'status': 'error', 'message': 'Неверный JSON'}, status=400)
+
+    if new_role not in ('member', 'admin'):
+        return JsonResponse({'status': 'error', 'message': 'Недопустимая роль'}, status=400)
+
+    group = get_object_or_404(Group, id=group_id)
+    target_user = get_object_or_404(User, id=user_id)
+
+    # 🔒 Только владелец может менять роли
+    if group.owner != request.user:
+        return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
+
+    # Нельзя менять роль самому владельцу
+    if target_user == group.owner:
+        return JsonResponse({'status': 'error', 'message': 'Нельзя менять роль владельца'}, status=400)
+
+    membership, created = GroupMember.objects.get_or_create(
+        group=group, user=target_user,
+        defaults={'role': new_role}
+    )
+    if not created:
+        membership.role = new_role
+        membership.save(update_fields=['role'])
+
+    return JsonResponse({'status': 'ok'})
+
+
+@login_required
+def api_remove_member(request):
+    """API: удаление участника из группы (владелец или админ, но не сам владелец)"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        group_id = data.get('group_id')
+        user_id = data.get('user_id')
+    except Exception:
+        return JsonResponse({'status': 'error', 'message': 'Неверный JSON'}, status=400)
+
+    group = get_object_or_404(Group, id=group_id)
+    target_user = get_object_or_404(User, id=user_id)
+
+    # 🔒 Права: владелец или админ группы
+    if group.owner != request.user:
+        requester_member = GroupMember.objects.filter(group=group, user=request.user, role='admin').first()
+        if not requester_member:
+            return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
+
+    # Нельзя удалить владельца группы
+    if target_user == group.owner:
+        return JsonResponse({'status': 'error', 'message': 'Нельзя удалить владельца'}, status=400)
+
+    # Админ не может удалить другого админа (только владелец может)
+    if group.owner != request.user:
+        target_member = GroupMember.objects.filter(group=group, user=target_user, role='admin').first()
+        if target_member:
+            return JsonResponse({'status': 'error', 'message': 'Только владелец может удалять админов'}, status=403)
+
+    GroupMember.objects.filter(group=group, user=target_user).delete()
+    return JsonResponse({'status': 'ok'})
+
+
+@login_required
+def api_add_member(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error'}, status=405)
+
+    data = json.loads(request.body)
+    group = get_object_or_404(Group, id=data['group_id'])
+
+    if group.owner != request.user:
+        return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
+
+    try:
+        user = User.objects.get(username=data['username'])
+        GroupMember.objects.get_or_create(group=group, user=user)
+        return JsonResponse({'status': 'ok'})
+    except User.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Пользователь не найден'})
+
+
+@login_required
+def api_update_group(request, group_id):
+    """API: обновление настроек группы (название, описание, аватарка)"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
+
+    group = get_object_or_404(Group, id=group_id)
+
+    # 🔒 Только владелец может менять настройки
+    if group.owner != request.user:
+        return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
+
+    try:
+        # Текстовые поля
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        if not name:
+            return JsonResponse({'status': 'error', 'message': 'Название обязательно'}, status=400)
+
+        group.name = name
+        group.description = description
+
+        # Загрузка новой аватарки
+        if 'avatar' in request.FILES:
+            # Удаляем старую аватарку если есть
+            if group.avatar:
+                group.avatar.delete()
+            group.avatar = request.FILES['avatar']
+
+        group.save()
+
+        return JsonResponse({'status': 'ok'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

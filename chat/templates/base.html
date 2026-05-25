@@ -371,6 +371,111 @@
         }
     </style>
 
+    <style>
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --message-own: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --message-other: #f8f9fa;
+}
+
+/* Общие стили для сообщений */
+.message-bubble {
+    max-width: 70%;
+    padding: 12px 18px;
+    border-radius: 18px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.2s;
+}
+
+.message-own {
+    background: var(--message-own);
+    color: white;
+    margin-left: auto;
+}
+
+.message-other {
+    background: var(--message-other);
+    color: #212529;
+    margin-right: auto;
+}
+
+/* Аватарки */
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e0e0e0;
+    transition: all 0.2s;
+}
+
+.avatar:hover {
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+/* Кнопки */
+.btn-gradient-primary {
+    background: var(--primary-gradient);
+    border: none;
+    color: white;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-gradient-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+.btn-gradient-secondary {
+    background: var(--secondary-gradient);
+    border: none;
+    color: white;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-gradient-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
+    color: white;
+}
+
+/* Панель эмодзи */
+.emoji-btn {
+    font-size: 1.6rem;
+    padding: 6px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+}
+
+.emoji-btn:hover {
+    background: #e2e6ea;
+    transform: scale(1.15);
+    border-color: #adb5bd;
+}
+
+/* Файлы */
+.file-tag {
+    display: inline-flex;
+    align-items: center;
+    background: #e7f1ff;
+    color: #0d6efd;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    margin-right: 10px;
+}
+</style>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">

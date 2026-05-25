@@ -8,10 +8,20 @@
             <div class="card-modern">
                 <!-- 🔹 Шапка профиля -->
                 <div class="text-center mb-4">
-                    <img src="{{ user.get_avatar_url }}" class="rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover; border: 4px solid #f0f0f0;">
-                    <h3>{{ user.get_display_name }}</h3>
-                    <p class="text-muted">@{{ user.username }}</p>
-                </div>
+    <div class="position-relative d-inline-block">
+        <img src="{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+             class="rounded-circle shadow" style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #667eea;">
+        <label for="avatar-upload" class="position-absolute"
+               style="bottom: 10px; right: 10px; background: rgba(102, 126, 234, 0.95);
+                      color: white; width: 40px; height: 40px; border-radius: 50%;
+                      display: flex; align-items: center; justify-content: center;
+                      cursor: pointer; border: 3px solid white;">
+            <i class="bi bi-camera-fill"></i>
+            <input type="file" id="avatar-upload" class="d-none" accept="image/*">
+        </label>
+    </div>
+    <small class="text-muted d-block mt-2">Нажмите на камеру, чтобы изменить аватарку</small>
+</div>
 
                 <!-- 🔹 Форма редактирования -->
                 <form method="post" enctype="multipart/form-data">
@@ -27,10 +37,6 @@
                         <input type="email" name="email" class="form-control-modern" value="{{ user.email|default:'' }}">
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">🖼️ Аватарка</label>
-                        <input type="file" name="avatar" class="form-control-modern" accept="image/*">
-                    </div>
 
                     <button type="submit" class="btn-grad grad-purple w-100">💾 Сохранить изменения</button>
                 </form>
@@ -55,3 +61,24 @@
     </div>
 </div>
 {% endblock %}
+
+.avatar-upload-overlay {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(102, 126, 234, 0.95);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 3px solid white;
+}
+
+.avatar-upload-overlay:hover {
+    background: #764ba2;
+    transform: scale(1.1);
+}

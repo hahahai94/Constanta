@@ -33,6 +33,10 @@ urlpatterns = [
     path('api/send/', views.send_message, name='api_send'),
     path('api/heartbeat/', views.api_heartbeat, name='api_heartbeat'),
     path('download/<uuid:message_id>/', views.download_attachment, name='download_attachment'),
+    path('api/set-role/', views.api_set_role, name='api_set_role'),
+    path('api/remove-member/', views.api_remove_member, name='api_remove_member'),
+    path('api/add-member/', views.api_add_member, name='api_add_member'),
+    path('groups/<uuid:group_id>/settings/', views.api_update_group, name='api_update_group'),
 ]
 
 # 🔹 Раздача медиа (только для разработки)

@@ -34,6 +34,14 @@ def group_chat(request, group_id):
         group=group, is_deleted=False
     ).order_by('created_at')[:50]
 
+    # 🔑 Проверка прав
+    is_owner = group.owner == request.user
+    is_admin = GroupMember.objects.filter(
+        group=group,
+        user=request.user,
+        role='admin'  # ← проверь как у тебя называется роль админа
+    ).exists()
+
     return render(request, 'group_chat.html', {
         'group': group,
         'members': members,
