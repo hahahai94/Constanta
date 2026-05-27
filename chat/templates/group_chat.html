@@ -68,6 +68,7 @@
         border-radius: 18px;
         margin-bottom: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        position: relative;
     }
     .message-own {
         background: var(--message-own);
@@ -110,7 +111,6 @@
         transform: scale(1.1);
     }
 
-    /* Панель эмодзи */
     #emoji-picker {
         display: none;
         grid-template-columns: repeat(8, 1fr);
@@ -146,7 +146,6 @@
         border-color: #adb5bd;
     }
 
-    /* Тег файла */
     .file-tag {
         display: inline-flex;
         align-items: center;
@@ -166,11 +165,95 @@
         padding: 0;
         font-size: 1rem;
     }
+
+    /* Стили для ответов */
+    .reply-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(255,255,255,0.2);
+        border: none;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+        font-size: 14px;
+    }
+    .message-bubble:hover .reply-btn {
+        opacity: 1;
+    }
+    .reply-btn:hover {
+        background: rgba(255,255,255,0.4);
+    }
+
+    .reply-quote {
+        background: rgba(0,0,0,0.05);
+        border-left: 3px solid #667eea;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .message-own .reply-quote {
+        background: rgba(255,255,255,0.15);
+        border-left-color: rgba(255,255,255,0.8);
+    }
+    .reply-quote-author {
+        font-weight: 600;
+        color: #667eea;
+        display: block;
+        margin-bottom: 2px;
+    }
+    .message-own .reply-quote-author {
+        color: rgba(255,255,255,0.9);
+    }
+    .reply-quote-text {
+        color: #666;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+    .message-own .reply-quote-text {
+        color: rgba(255,255,255,0.8);
+    }
+
+    .reply-panel {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 10px 15px;
+        display: none;
+    }
+    .reply-panel.active {
+        display: block;
+    }
+    .reply-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+    .reply-panel-author {
+        font-weight: 600;
+        color: #667eea;
+    }
+    .reply-panel-text {
+        color: #666;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 </style>
 
 <div class="d-flex" style="height: calc(100vh - 56px);">
-
-    <!-- ===== ЛЕВАЯ ПАНЕЛЬ ===== -->
     <div class="chat-sidebar">
         <div class="p-3 border-bottom">
             <a href="{% url 'profile' %}" class="btn btn-gradient-primary btn-sm w-100 mb-2 rounded-pill">
@@ -239,7 +322,6 @@
         {% endif %}
     </div>
 
-    <!-- ===== ОСНОВНАЯ ОБЛАСТЬ ЧАТА ===== -->
     <div class="chat-main">
         <div class="bg-white border-bottom p-3 d-flex align-items-center shadow-sm">
             <img src="{% if group.avatar %}{{ group.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
@@ -250,18 +332,44 @@
             </div>
         </div>
 
-        <!-- Сообщения -->
+        <!-- Панель ответа -->
+        <div id="reply-panel" class="reply-panel">
+            <div class="reply-panel-header">
+                <div>
+                    <span class="reply-panel-author" id="reply-author"></span>
+                    <span class="reply-panel-text" id="reply-text"></span>
+                </div>
+                <button type="button" class="btn-close" onclick="cancelReply()"></button>
+            </div>
+        </div>
+
         <div class="flex-grow-1 overflow-auto p-4" id="messages-container" style="background: #f5f7fa;">
             {% for msg in messages %}
             <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3">
                 <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
+                    <!-- Кнопка ответа -->
+                    <button type="button" class="reply-btn" onclick="startReply('{{ msg.id }}', '{{ msg.sender.username }}', '{{ msg.content|escapejs|default:"📎 Вложение" }}')">
+                        ↩️
+                    </button>
 
-                    <!-- Картинка -->
+                    <!-- Цитата ответа -->
+                    {% if msg.reply_to %}
+                    <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
+                        <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>
+                        <span class="reply-quote-text">{{ msg.reply_to.content|default:"📎 Вложение" }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if msg.sender != request.user %}
+                        <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #764ba2;">
+                            {{ msg.sender.username }}
+                        </div>
+                    {% endif %}
+
                     {% if msg.attachment_type == 'image' and msg.attachment %}
                         <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
                     {% endif %}
 
-                    <!-- Файл -->
                     {% if msg.attachment_type == 'file' and msg.attachment %}
                         <a href="{% url 'download_attachment' msg.id %}" class="text-decoration-none d-block mb-2 p-2 rounded"
                            style="background: rgba(0,0,0,0.1); color: inherit;">
@@ -273,7 +381,6 @@
                         </a>
                     {% endif %}
 
-                    <!-- Аудио -->
                     {% if msg.attachment_type == 'voice' and msg.attachment %}
                         <audio controls class="w-100 mb-2">
                             <source src="{{ msg.attachment.url }}">
@@ -283,6 +390,7 @@
                     {% if msg.content %}
                         <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
                     {% endif %}
+
                     <small style="font-size: 0.75rem; opacity: 0.7; display: block; text-align: right; margin-top: 5px;">
                         {{ msg.created_at|date:"H:i" }}
                     </small>
@@ -297,24 +405,20 @@
             {% endfor %}
         </div>
 
-        <!-- Поле ввода -->
         <div class="bg-white border-top p-3 position-relative">
-            <!-- Тег файла -->
             <div id="file-tag-container"></div>
 
             <form id="chat-form" method="POST" action="{% url 'api_send' %}" class="d-flex gap-2 align-items-center" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="group_id" value="{{ group.id }}">
+                <input type="hidden" name="reply_to_id" id="reply-to-id" value="">
 
-                <!-- Эмодзи -->
                 <button type="button" class="btn btn-light rounded-circle" style="width: 40px; height: 40px; flex-shrink: 0;"
                         id="emoji-btn" title="Эмодзи">😊</button>
 
-                <!-- Поле ввода -->
                 <input type="text" name="content" id="message-input" class="form-control rounded-pill px-4"
                        placeholder="Написать сообщение..." style="background: #f0f2f5; border: none;">
 
-                <!-- Скрепка (файл) -->
                 <label for="file-upload" class="btn btn-light rounded-circle mb-0"
                        style="width: 40px; height: 40px; flex-shrink: 0; cursor: pointer;" title="Прикрепить файл">
                     <i class="bi bi-paperclip"></i>
@@ -322,24 +426,17 @@
                 <input type="file" id="file-upload" class="d-none" name="attachment"
                        accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z">
 
-                <!-- Отправить -->
                 <button type="submit" class="btn btn-gradient-primary rounded-circle"
                         style="width: 45px; height: 45px; flex-shrink: 0;" id="send-btn">
                     <i class="bi bi-send-fill"></i>
                 </button>
             </form>
 
-            <div class="d-flex justify-content-end mt-1 px-2">
-                <small id="char-counter" class="text-muted" style="font-size: 0.8rem;">0 / 280</small>
-            </div>
-
-            <!-- Панель Эмодзи -->
             <div id="emoji-picker"></div>
         </div>
     </div>
 </div>
 
-<!-- Модальное окно: Настройки -->
 <div class="modal fade" id="settingsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -379,7 +476,6 @@
     </div>
 </div>
 
-<!-- Модальное окно: Добавить участника -->
 <div class="modal fade" id="addModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -403,26 +499,23 @@
 
 {% block scripts %}
 <script>
-console.log('💬 Group Chat Ultimate v2');
+console.log('💬 Group Chat Ultimate v3 - С ответами');
 
-// ===== 1. ПАНЕЛЬ ЭМОДЗИ =====
+// ===== 1. ЭМОДЗИ =====
 const emojiList = [
-    '😃','😄','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','😘',
-    '😋','😛','😜','😝','🤑','🤔','🤐','😐','😑','😶','😏','😒',
-    '🙄','😬','😌','😔','😪','😴','😷','🤒','🤢','🤮','🥶','😵','🤠',
-    '😎','🤓','🧐','😕','😟','😮','😲','😳','🥺','😢','😭','😱','😤','😠',
-    '👻','💀','☠️','💩','👽','🤖','👹','👺','🙈','🙉','🙊','💥','💫','💨','👋',
-    '🤚','🖐️','✋','🖖','👌','🤏','✌️','🤟','🤘','🤙','👈','👉','👆','🖕',
-    '👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','❤️',
-    '🔥','⭐','✨','🎉','💬','👀','🚀','✅','❌','⚠️','🎯','📎','🔗','🔒','🔓'
+    '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','🥰','','🤩','','😗',
+    '😋','😛','😜','😝','🤑','','🤐','','😑','😶','😏','😒','','😬','😌','😔',
+    '😪','😴','😷','🤒','🤢','','','😵','','😎','','🧐','','😟','😮','😲',
+    '😳','','😢','😭','😱','😤','😠','👻','','☠️','','👽','','👹','','🙈',
+    '🙉','🙊','💫','💨','👋','','🖐️','✋','🖖','👌','🤏','✌️','🤟','🤘','🤙','👈',
+    '👉','','🖕','','☝️','','👎','','👊','','🤜','','🙌','👐','🤲','',
+    '','💪','❤️','🔥','⭐','✨','🎉','','👀','','✅','❌','⚠️','🎯','📎','','🔒',''
 ];
 
 const emojiPicker = document.getElementById('emoji-picker');
 const messageInput = document.getElementById('message-input');
 
-emojiPicker.innerHTML = emojiList.map(e =>
-    `<button type="button" class="emoji-btn" data-emoji="${e}">${e}</button>`
-).join('');
+emojiPicker.innerHTML = emojiList.map(e => `<button type="button" class="emoji-btn" data-emoji="${e}">${e}</button>`).join('');
 
 document.getElementById('emoji-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -447,7 +540,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ===== 2. ПРИКРЕПЛЕНИЕ ФАЙЛОВ =====
+// ===== 2. ФАЙЛЫ =====
 const fileUpload = document.getElementById('file-upload');
 const fileTagContainer = document.getElementById('file-tag-container');
 
@@ -464,7 +557,33 @@ fileUpload.addEventListener('change', function() {
     }
 });
 
-// ===== 3. ОТПРАВКА СООБЩЕНИЙ =====
+// ===== 3. ОТВЕТЫ НА СООБЩЕНИЯ =====
+window.startReply = function(msgId, author, text) {
+    document.getElementById('reply-to-id').value = msgId;
+    document.getElementById('reply-author').textContent = author + ':';
+    document.getElementById('reply-text').textContent = text.length > 60 ? text.substring(0, 60) + '...' : text;
+    document.getElementById('reply-panel').classList.add('active');
+    messageInput.focus();
+};
+
+window.cancelReply = function() {
+    document.getElementById('reply-to-id').value = '';
+    document.getElementById('reply-panel').classList.remove('active');
+    messageInput.focus();
+};
+
+window.scrollToMessage = function(msgId) {
+    const element = document.querySelector(`[data-message-id="${msgId}"]`);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.style.background = 'rgba(102, 126, 234, 0.2)';
+        setTimeout(() => {
+            element.style.background = '';
+        }, 2000);
+    }
+};
+
+// ===== 4. ОТПРАВКА СООБЩЕНИЙ =====
 document.getElementById('chat-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
@@ -490,6 +609,7 @@ document.getElementById('chat-form').addEventListener('submit', function(e) {
                 messageInput.value = '';
                 fileUpload.value = '';
                 fileTagContainer.innerHTML = '';
+                cancelReply();
             } else {
                 alert('Ошибка: ' + (d.message || d.error || 'Неизвестная'));
             }
@@ -504,7 +624,7 @@ document.getElementById('chat-form').addEventListener('submit', function(e) {
         });
 });
 
-// ===== 4. АВТООБНОВЛЕНИЕ =====
+// ===== 5. АВТООБНОВЛЕНИЕ =====
 setInterval(() => {
     const container = document.getElementById('messages-container');
     fetch(location.href, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
@@ -522,7 +642,7 @@ setInterval(() => {
         .catch(() => {});
 }, 2000);
 
-// ===== 5. УПРАВЛЕНИЕ УЧАСТНИКАМИ =====
+// ===== 6. УПРАВЛЕНИЕ =====
 window.changeRole = (uid, role) => {
     const roleName = role === 'admin' ? 'администратором' : 'обычным участником';
     if (!confirm(`Сделать пользователя ${roleName}?`)) return;
@@ -559,7 +679,6 @@ window.removeMember = (uid) => {
     });
 };
 
-// ===== 6. СОХРАНЕНИЕ НАСТРОЕК =====
 window.saveGroupSettings = () => {
     const name = document.getElementById('group-name-input').value.trim();
     const desc = document.getElementById('group-desc-input').value.trim();
@@ -591,7 +710,6 @@ window.saveGroupSettings = () => {
     });
 };
 
-// Превью аватарки
 document.getElementById('avatar-upload').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (file) {
@@ -601,63 +719,32 @@ document.getElementById('avatar-upload').addEventListener('change', function(e) 
     }
 });
 
-// ===== 7. ДОБАВЛЕНИЕ УЧАСТНИКА =====
 document.getElementById('add-member-input').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
         const username = this.value.trim();
-        if (username) addMember(username);
+        if (username) {
+            fetch('{% url "api_add_member" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ group_id: '{{ group.id }}', username: username })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'ok') {
+                    alert('✅ Участник добавлен!');
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + (d.message || d.error || 'Не удалось добавить'));
+                }
+            });
+        }
     }
 });
 
-window.addMember = (username) => {
-    fetch('{% url "api_add_member" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ group_id: '{{ group.id }}', username: username })
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.status === 'ok') {
-            alert('✅ Участник добавлен!');
-            location.reload();
-        } else {
-            alert('Ошибка: ' + (d.message || d.error || 'Не удалось добавить'));
-        }
-    });
-};
-
-// Прокрутка вниз
-document.getElementById('messages-container').scrollTop =
-    document.getElementById('messages-container').scrollHeight;
-
-
-// 🔒 Ограничение символов
-const MAX_CHARS = 280;
-const msgInput = document.getElementById('message-input');
-const charCounter = document.getElementById('char-counter');
-const submitBtn = document.getElementById('send-btn');
-
-function updateCharCounter() {
-    const len = msgInput.value.length;
-    charCounter.textContent = `${len} / ${MAX_CHARS}`;
-
-    if (len > MAX_CHARS) {
-        charCounter.className = 'text-danger fw-bold';
-        submitBtn.disabled = true;
-    } else if (len > MAX_CHARS * 0.9) {
-        charCounter.className = 'text-warning fw-bold';
-        submitBtn.disabled = false;
-    } else {
-        charCounter.className = 'text-muted';
-        submitBtn.disabled = false;
-    }
-}
-
-msgInput.addEventListener('input', updateCharCounter);
-msgInput.addEventListener('paste', () => setTimeout(updateCharCounter, 0));
+document.getElementById('messages-container').scrollTop = document.getElementById('messages-container').scrollHeight;
 </script>
 {% endblock %}

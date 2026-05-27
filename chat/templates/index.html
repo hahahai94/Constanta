@@ -2,306 +2,302 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid p-0" style="height: calc(100vh - 56px);">
+<style>
+    /* Фиксируем высоту на весь экран и убираем прокрутку страницы */
+    html, body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden; /* Запрещаем скролл всей страницы */
+    }
 
-    {% if not active_friend %}
-    <!-- ===== СПИСОК ЛИЧНЫХ ЧАТОВ ===== -->
-    <div class="h-100 overflow-auto bg-white">
-        <div class="p-3 border-bottom bg-light sticky-top">
-            <h5 class="mb-0 fw-bold">💬 Чаты</h5>
+    .message-bubble {
+        max-width: 70%;
+        padding: 12px 18px;
+        border-radius: 18px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        position: relative;
+    }
+    .message-own {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        margin-left: auto;
+    }
+    .message-other {
+        background: white;
+        color: #212529;
+        margin-right: auto;
+    }
+
+    /* Кнопка ответа */
+    .reply-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(255,255,255,0.2);
+        border: none;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+        font-size: 14px;
+        color: inherit;
+    }
+    .message-bubble:hover .reply-btn { opacity: 1; }
+    .reply-btn:hover { background: rgba(255,255,255,0.4); }
+
+    /* Цитата ответа */
+    .reply-quote {
+        background: rgba(0,0,0,0.05);
+        border-left: 3px solid #667eea;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .message-own .reply-quote {
+        background: rgba(255,255,255,0.15);
+        border-left-color: rgba(255,255,255,0.8);
+    }
+    .reply-quote-author { font-weight: 600; color: #667eea; display: block; margin-bottom: 2px; }
+    .message-own .reply-quote-author { color: rgba(255,255,255,0.9); }
+    .reply-quote-text { color: #666; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .message-own .reply-quote-text { color: rgba(255,255,255,0.8); }
+
+    /* Панель ответа */
+    .reply-panel {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 10px 15px;
+        display: none;
+    }
+    .reply-panel.active { display: block; }
+    .reply-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .reply-panel-author { font-weight: 600; color: #667eea; }
+    .reply-panel-text { color: #666; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Стили для списка чатов */
+    .chat-item { transition: background 0.2s; cursor: pointer; }
+    .chat-item:hover { background: #f8f9fa; }
+    .chat-item.active { background: #e9ecef; }
+</style>
+
+<!-- Главный контейнер на всю высоту экрана (минус шапка 56px) -->
+<div class="d-flex" style="height: calc(100vh - 56px); overflow: hidden;">
+
+    <!-- Левая панель (Список чатов) -->
+    <div class="bg-white border-end d-flex flex-column" style="width: 350px; min-width: 350px;">
+        <div class="p-3 border-bottom bg-white">
+            <h5 class="mb-0 fw-bold">Чаты</h5>
         </div>
 
-        {% if conversations %}
-            {% for conv in conversations %}
-            {% if conv.id != request.user.id %}
-            <a href="?friend_id={{ conv.id }}" class="text-decoration-none text-dark d-block">
-                <div class="d-flex align-items-center p-3 border-bottom hover-bg">
-                    <img src="{% if conv.avatar %}{{ conv.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
-                         class="rounded-circle me-3"
-                         style="width: 48px; height: 48px; object-fit: cover;">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1">{{ conv.username }}</h6>
-                        <small class="text-muted">Нажмите, чтобы написать</small>
-                    </div>
+        <!-- Список чатов с прокруткой -->
+        <div class="flex-grow-1 overflow-auto">
+            {% for chat in chats %}
+            <a href="?friend_id={{ chat.friend.id }}"
+               class="chat-item d-flex align-items-center p-3 text-decoration-none text-dark {% if active_friend and active_friend.id == chat.friend.id %}active{% endif %}">
+                <img src="{% if chat.friend.avatar %}{{ chat.friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                     class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                <div class="flex-grow-1 min-width-0">
+                    <h6 class="mb-1 text-truncate fw-bold">{{ chat.friend.get_display_name|default:chat.friend.username }}</h6>
+                    {% if chat.last_message %}
+                    <small class="text-muted text-truncate d-block">{{ chat.last_message.content|truncatewords:5 }}</small>
+                    {% else %}
+                    <small class="text-muted">Начните общение...</small>
+                    {% endif %}
                 </div>
             </a>
-            {% endif %}
-            {% endfor %}
-        {% else %}
-            <div class="text-center py-5 text-muted">
-                <div style="font-size: 3rem;">👥</div>
-                <h5>Нет чатов</h5>
-                <a href="{% url 'users_catalog' %}" class="btn btn-primary mt-2">Найти пользователей</a>
+            {% empty %}
+            <div class="text-center text-muted p-4 mt-5">
+                <i class="bi bi-chat-square-text" style="font-size: 2rem;"></i>
+                <p class="mt-2">У вас пока нет чатов</p>
             </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Основная область чата -->
+    <div class="flex-grow-1 d-flex flex-column bg-light position-relative" style="height: 100%;">
+        {% if active_friend %}
+        <!-- Шапка чата -->
+        <div class="bg-white border-bottom p-3 d-flex align-items-center shadow-sm">
+            <img src="{% if active_friend.avatar %}{{ active_friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                 class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;">
+            <div>
+                <h6 class="mb-0 fw-bold">{{ active_friend.get_display_name|default:active_friend.username }}</h6>
+                <small class="text-muted">{% if active_friend.is_online %} Онлайн{% else %}Офлайн{% endif %}</small>
+            </div>
+        </div>
+
+        <!-- Панель ответа -->
+        <div id="reply-panel" class="reply-panel">
+            <div class="reply-panel-header">
+                <div>
+                    <span class="reply-panel-author" id="reply-author"></span>
+                    <span class="reply-panel-text" id="reply-text"></span>
+                </div>
+                <button type="button" class="btn-close" onclick="cancelReply()"></button>
+            </div>
+        </div>
+
+        <!-- Сообщения (скролл только здесь!) -->
+        <div class="flex-grow-1 overflow-auto p-4" id="messages-container" style="background: #f5f7fa;">
+            {% for msg in messages %}
+            <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3">
+                <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
+                    <!-- Кнопка ответа -->
+                    <button type="button" class="reply-btn" onclick="startReply('{{ msg.id }}', '{{ msg.sender.username }}', '{{ msg.content|escapejs|default:"📎 Вложение" }}')">
+                        ↩️
+                    </button>
+
+                    <!-- Цитата ответа -->
+                    {% if msg.reply_to %}
+                    <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
+                        <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>
+                        <span class="reply-quote-text">{{ msg.reply_to.content|default:"📎 Вложение" }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if msg.attachment_type == 'image' and msg.attachment %}
+                        <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
+                    {% endif %}
+
+                    {% if msg.content %}
+                        <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
+                    {% endif %}
+
+                    <small style="font-size: 0.75rem; opacity: 0.7; display: block; text-align: right; margin-top: 5px;">
+                        {{ msg.created_at|date:"H:i" }}
+                    </small>
+                </div>
+            </div>
+            {% empty %}
+            <!-- Если сообщений нет, показываем по центру -->
+            <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                <div class="text-center">
+                    <i class="bi bi-chat-square-text" style="font-size: 4rem; opacity: 0.3;"></i>
+                    <p class="mt-3 fs-5">Нет сообщений</p>
+                    <small>Напишите первое сообщение!</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Поле ввода (всегда внизу) -->
+        <div class="bg-white border-top p-3">
+            <form id="chat-form" method="POST" action="{% url 'api_send' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+                <input type="hidden" name="reply_to_id" id="reply-to-id" value="">
+
+                <div class="input-group">
+                    <input type="text" name="content" id="message-input" class="form-control rounded-pill border-0 bg-light px-4" placeholder="Написать сообщение..." required style="box-shadow: none;">
+                    <button type="submit" class="btn btn-primary rounded-circle ms-2" style="width: 45px; height: 45px;">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <!-- Если чат не выбран -->
+        <div class="d-flex align-items-center justify-content-center h-100 text-muted bg-light">
+            <div class="text-center">
+                <i class="bi bi-chat-square-text" style="font-size: 5rem; opacity: 0.3;"></i>
+                <p class="mt-3 fs-4">Выберите чат для начала общения</p>
+            </div>
+        </div>
         {% endif %}
     </div>
-
-    {% else %}
-    <!-- ===== ОКНО ЛИЧНОГО ЧАТА ===== -->
-    <div class="d-flex flex-column h-100 bg-light">
-        <!-- Шапка -->
-        <div class="bg-white border-bottom py-2 px-4 d-flex align-items-center shadow-sm">
-            <a href="?" class="btn btn-sm btn-outline-secondary me-3 rounded-pill">
-                <i class="bi bi-arrow-left"></i>
-            </a>
-            <img src="{% if active_friend.avatar %}{{ active_friend.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
-                 class="rounded-circle me-3"
-                 style="width: 40px; height: 40px; object-fit: cover;">
-            <h6 class="mb-0 fw-bold">{{ active_friend.username }}</h6>
-        </div>
-
-        <!-- Сообщения -->
-<div class="flex-grow-1 overflow-auto p-4" id="messages-container">
-    {% for msg in messages %}
-    <div class="d-flex mb-3 {% if msg.sender == request.user %}justify-content-end{% endif %}">
-        <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
-
-            <!-- Картинка -->
-            {% if msg.attachment_type == 'image' and msg.attachment %}
-                <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
-            {% endif %}
-
-            <!-- Файл -->
-            {% if msg.attachment_type == 'file' and msg.attachment %}
-                <a href="{% url 'download_attachment' msg.id %}" class="text-decoration-none d-block mb-2 p-2 rounded"
-                   style="background: rgba(0,0,0,0.1); color: inherit;">
-                    <i class="bi bi-file-earmark me-1"></i>
-                    {{ msg.attachment_original_name|default:"Файл" }}
-                    {% if msg.attachment_size %}
-                        <small class="d-block opacity-75">{{ msg.attachment_size|filesizeformat }}</small>
-                    {% endif %}
-                </a>
-            {% endif %}
-
-            <!-- Аудио -->
-            {% if msg.attachment_type == 'voice' and msg.attachment %}
-                <audio controls class="w-100 mb-2">
-                    <source src="{{ msg.attachment.url }}">
-                </audio>
-            {% endif %}
-
-            {% if msg.content %}
-                <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
-            {% endif %}
-            <small style="font-size: 0.75rem; opacity: 0.7; display: block; text-align: right; margin-top: 5px;">
-                {{ msg.created_at|date:"H:i" }}
-            </small>
-        </div>
-    </div>
-    {% empty %}
-    <div class="text-center text-muted py-5">
-        <i class="bi bi-chat-square-text" style="font-size: 4rem; opacity: 0.3;"></i>
-        <p class="mt-3">Нет сообщений</p>
-        <small>Напишите первое сообщение!</small>
-    </div>
-    {% endfor %}
 </div>
-
-        <div class="position-relative">
-    <form id="chat-form" method="POST" action="{% url 'api_send' %}" class="w-100" enctype="multipart/form-data">
-        {% csrf_token %}
-        <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
-
-        <div class="input-group input-group-lg">
-            <!-- Эмодзи -->
-            <button type="button" class="btn btn-outline-secondary" id="emoji-btn">😊</button>
-
-            <!-- Поле ввода (БЕЗ required!) -->
-            <input type="text" name="content" id="message-input" class="form-control border-0 bg-light"
-                   placeholder="Сообщение..." autocomplete="off">
-
-            <!-- ✅ ТЕГ ФАЙЛА (висит рядом и не исчезает) -->
-            <span id="file-tag" class="d-none align-items-center bg-light px-2 text-muted small"
-                  style="border: 1px solid #dee2e6; border-left: 0; white-space: nowrap; font-size: 0.9rem;">
-                📎 <span id="file-tag-name"></span>
-                <button type="button" class="btn-close btn-close-sm ms-1" id="remove-file-btn" style="font-size: 8px;"></button>
-            </span>
-
-            <!-- Скрепка -->
-            <label class="btn btn-outline-secondary" title="Прикрепить файл">
-                <i class="bi bi-paperclip"></i>
-                <input type="file" name="attachment" id="file-input" class="d-none"
-                       accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.zip">
-            </label>
-
-            <!-- Отправить -->
-            <button type="submit" class="btn btn-primary px-4" id="send-btn">
-                <i class="bi bi-send-fill"></i>
-            </button>
-        </div>
-    </form>
-
-    <div class="d-flex justify-content-end mt-1 px-2">
-        <small id="char-counter" class="text-muted" style="font-size: 0.8rem;">0 / 280</small>
-    </div>
-
-    <!-- Панель Эмодзи (Большая) -->
-        <div id="emoji-picker" class="d-none position-absolute bg-white border rounded shadow p-3"
-            style="bottom: 100%; left: 0; width: 650px; max-height: 80vh; overflow-y: auto; z-index: 1050; margin-bottom: 12px;">
-        </div>
-    </div>
-    {% endif %}
-</div>
-{% endblock %}
 
 {% block scripts %}
 <script>
-console.log('💬 Chat v3: Files + Emoji + Fixes');
+// Управление ответами
+window.startReply = function(msgId, author, text) {
+    document.getElementById('reply-to-id').value = msgId;
+    document.getElementById('reply-author').textContent = author + ':';
+    document.getElementById('reply-text').textContent = text.length > 60 ? text.substring(0, 60) + '...' : text;
+    document.getElementById('reply-panel').classList.add('active');
+    document.getElementById('message-input').focus();
+};
 
-// ✅ Нормальный набор (только широко поддерживаемые Unicode-эмодзи)
-const emojiList = [
-    '😃','😄','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','😘',
-    '😋','😛','😜','😝','🤑','🤔','🤐','😐','😑','😶','😏','😒',
-    '🙄','😬','😌','😔','😪','😴','😷','🤒','🤢','🤮','🥶','😵','🤠',
-    '😎','🤓','🧐','😕','😟','😮','😲','😳','🥺','😢','😭','😱','😤','😠',
-    '👻','💀','☠️','💩','👽','🤖','👹','👺','🙈','🙉','🙊','💥','💫','💨','👋',
-    '🤚','🖐️','✋','🖖','👌','🤏','✌️','🤟','🤘','🤙','👈','👉','👆','🖕',
-    '👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','❤️',
-    '🔥','⭐','✨','🎉','💬','👀','🚀','✅','❌','⚠️','🎯','📎','🔗','🔒','🔓'
-];
+window.cancelReply = function() {
+    document.getElementById('reply-to-id').value = '';
+    document.getElementById('reply-panel').classList.remove('active');
+    document.getElementById('message-input').focus();
+};
 
-const emojiPicker = document.getElementById('emoji-picker');
-const messageInput = document.getElementById('message-input');
-
-emojiPicker.innerHTML = emojiList.map(e => `<button type="button" class="emoji-btn m-1">${e}</button>`).join('');
-
-document.getElementById('emoji-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    emojiPicker.classList.toggle('d-none');
-});
-
-document.querySelectorAll('.emoji-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const start = messageInput.selectionStart;
-        const text = messageInput.value;
-        messageInput.value = text.substring(0, start) + btn.textContent + text.substring(messageInput.selectionEnd);
-        messageInput.focus();
-        messageInput.selectionStart = messageInput.selectionEnd = start + btn.textContent.length;
-        emojiPicker.classList.add('d-none');
-    });
-});
-
-document.addEventListener('click', () => emojiPicker.classList.add('d-none'));
-
-// === 2. ФАЙЛЫ (Новая логика) ===
-const fileInput = document.getElementById('file-input');
-const fileTag = document.getElementById('file-tag');
-const fileTagName = document.getElementById('file-tag-name');
-const removeFileBtn = document.getElementById('remove-file-btn');
-
-fileInput.addEventListener('change', function() {
-    if (this.files.length > 0) {
-        fileTagName.textContent = this.files[0].name;
-        fileTag.classList.remove('d-none');
-        fileTag.classList.add('d-flex');
-    } else {
-        fileTag.classList.add('d-none');
-        fileTag.classList.remove('d-flex');
+window.scrollToMessage = function(msgId) {
+    const element = document.querySelector(`[data-message-id="${msgId}"]`);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.style.background = 'rgba(102, 126, 234, 0.2)';
+        setTimeout(() => { element.style.background = ''; }, 2000);
     }
-});
+};
 
-removeFileBtn.addEventListener('click', function() {
-    fileInput.value = '';
-    fileTag.classList.add('d-none');
-    fileTag.classList.remove('d-flex');
-});
+// Отправка формы
+document.getElementById('chat-form')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const btn = this.querySelector('button[type="submit"]');
 
-// === 3. ОТПРАВКА (AJAX) ===
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('chat-form');
-    if (!form) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
 
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const btn = document.getElementById('send-btn');
-        const csrf = form.querySelector('[name=csrfmiddlewaretoken]');
-        const formData = new FormData(form);
-
-        // ✅ ПРОВЕРКА: нельзя отправить пустоту (ни текста, ни файла)
-        if (!messageInput.value.trim() && fileInput.files.length === 0) {
-            messageInput.placeholder = "⚠️ Напишите что-нибудь или выберите файл";
-            setTimeout(() => messageInput.placeholder = "Сообщение...", 2000);
-            return;
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'ok') {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (d.message || d.error || 'Неизвестная'));
         }
-
-        btn.disabled = true;
-        btn.innerHTML = '⏳';
-
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRFToken': csrf ? csrf.value : '' }
-        })
-        .then(r => r.json())
-        .then(json => {
-            if (json.status === 'ok') {
-                messageInput.value = '';
-                fileInput.value = '';
-                fileTag.classList.add('d-none');
-                console.log('✅ Отправлено');
-            } else {
-                alert('Ошибка: ' + (json.message || json.error || 'Неизвестная'));
-            }
-        })
-        .catch(err => {
-            console.error('❌ Send error:', err);
-            form.submit();
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-send-fill"></i>';
-        });
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('Ошибка соединения');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill"></i>';
     });
 });
 
-// === 4. АВТООБНОВЛЕНИЕ ===
-setInterval(() => {
-    const container = document.getElementById('messages-container');
-    if (!container || window.location.href.indexOf('friend_id=') === -1) return;
+// Автообновление
+if (!window.autoRefreshInterval) {
+    window.autoRefreshInterval = setInterval(() => {
+        const container = document.getElementById('messages-container');
+        if (!container || !window.location.search.includes('friend_id=')) return;
 
-    fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const newDoc = parser.parseFromString(html, 'text/html');
-            const newContainer = newDoc.getElementById('messages-container');
-
-            if (newContainer && container.innerHTML !== newContainer.innerHTML) {
-                container.innerHTML = newContainer.innerHTML;
-                container.scrollTop = container.scrollHeight;
-            }
-        })
-        .catch(() => {});
-}, 2000);
-
-const container = document.getElementById('messages-container');
-if (container) container.scrollTop = container.scrollHeight;
-
-
-// 🔒 Ограничение символов
-const MAX_CHARS = 280;
-const msgInput = document.getElementById('message-input');
-const charCounter = document.getElementById('char-counter');
-const submitBtn = document.getElementById('send-btn');
-
-function updateCharCounter() {
-    const len = msgInput.value.length;
-    charCounter.textContent = `${len} / ${MAX_CHARS}`;
-
-    if (len > MAX_CHARS) {
-        charCounter.className = 'text-danger fw-bold';
-        submitBtn.disabled = true;
-    } else if (len > MAX_CHARS * 0.9) {
-        charCounter.className = 'text-warning fw-bold';
-        submitBtn.disabled = false;
-    } else {
-        charCounter.className = 'text-muted';
-        submitBtn.disabled = false;
-    }
+        fetch(window.location.href, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+            .then(r => r.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const newDoc = parser.parseFromString(html, 'text/html');
+                const newContainer = newDoc.getElementById('messages-container');
+                if (newContainer && container.innerHTML !== newContainer.innerHTML) {
+                    const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+                    container.innerHTML = newContainer.innerHTML;
+                    if (wasAtBottom) container.scrollTop = container.scrollHeight;
+                }
+            })
+            .catch(() => {});
+    }, 2000);
 }
 
-msgInput.addEventListener('input', updateCharCounter);
-msgInput.addEventListener('paste', () => setTimeout(updateCharCounter, 0));
+// Прокрутка вниз при загрузке
+const container = document.getElementById('messages-container');
+if (container) container.scrollTop = container.scrollHeight;
 </script>
+{% endblock %}
 {% endblock %}

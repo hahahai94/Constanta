@@ -1,14 +1,15 @@
-import csv
-import os
-from django.contrib import admin, messages
-from django.contrib.auth.models import User
+from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.contrib.sessions.models import Session
-from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
-from django.db.models import Count, Q
-from django.contrib.admin import AdminSite
+from django.contrib.sessions.models import Session
+from django.http import HttpResponse
+from django.contrib.admin.sites import AdminSite
+from django.contrib import messages
+import csv, os
+
+User = get_user_model()
 
 from .models import Group, Message, GroupMember
 

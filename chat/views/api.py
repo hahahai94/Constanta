@@ -4,26 +4,21 @@ import hashlib
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
-from django.http import JsonResponse, FileResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-
 from chat.models import User, Group, Message, GroupMember
 
-# Безопасный импорт утилит (если файла utils нет, код не упадет)
+# Безопасный импорт утилит
 try:
     from chat.utils import parse_mentions, create_notification
 except ImportError:
-    def parse_mentions(text, **kwargs):
-        return text, []
-
-
-    def create_notification(**kwargs):
-        pass
+    def parse_mentions(text, **kwargs): return text, []
+    def create_notification(**kwargs): pass
 
 
 @login_required
 def send_message(request):
-    """Отправка сообщения (личного или группового) с лимитом символов"""
+    """API: отправка сообщения с поддержкой ответов"""
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
 
@@ -31,100 +26,44 @@ def send_message(request):
     group_id = request.POST.get('group_id')
     content = request.POST.get('content', '').strip()
     attachment = request.FILES.get('attachment')
+    reply_to_id = request.POST.get('reply_to_id')
 
-    # 🔒 ОГРАНИЧЕНИЕ ПО СИМВОЛАМ (500 символов)
+    # 🔒 Лимит символов
     MAX_CHARS = 500
     if len(content) > MAX_CHARS:
-        return JsonResponse({'status': 'error', 'message': f'Сообщение слишком длинное (макс. {MAX_CHARS} символов)'},
-                            status=400)
+        return JsonResponse({'status': 'error', 'message': f'Слишком длинное (макс. {MAX_CHARS})'}, status=400)
 
     if not content and not attachment:
-        return JsonResponse({'status': 'error', 'message': 'Сообщение пустое'}, status=400)
+        return JsonResponse({'status': 'error', 'message': 'Пустое сообщение'}, status=400)
 
-    # 🔹 Обработка файлов
-    upload_path = None
-    attachment_type = 'none'
-    attachment_hash = ''
-    attachment_original_name = ''
-    attachment_size = 0
+    # 🔹 Привязка к ответу
+    reply_msg = None
+    if reply_to_id:
+        reply_msg = Message.objects.filter(id=reply_to_id).first()
 
-    if attachment:
-        try:
-            if attachment.size > 50 * 1024 * 1024:
-                return JsonResponse({'status': 'error', 'message': 'Файл слишком большой (>50МБ)'}, status=400)
-
-            hash_obj = hashlib.sha256()
-            for chunk in attachment.chunks():
-                hash_obj.update(chunk)
-            attachment_hash = hash_obj.hexdigest()
-            attachment.seek(0)
-
-            ext = os.path.splitext(attachment.name)[1].lower()
-            subdir = attachment_hash[:2]
-            filename = f"{attachment_hash}{ext}"
-            upload_path = os.path.join('attachments', subdir, filename)
-
-            if attachment.content_type.startswith('image/'):
-                attachment_type = 'image'
-            elif attachment.content_type.startswith('audio/'):
-                attachment_type = 'voice'
-            else:
-                attachment_type = 'file'
-
-            attachment_size = attachment.size
-            attachment_original_name = attachment.name
-
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, 'attachments', subdir), exist_ok=True)
-            default_storage.save(upload_path, attachment)
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': f'Ошибка файла: {str(e)}'}, status=500)
-
-    # 🔹 Парсинг упоминаний
-    parsed_content = content
-    mentions_json = '[]'
-    mentioned_ids = []
-    if content:
-        try:
-            if group_id:
-                group = get_object_or_404(Group, id=group_id)
-                parsed_content, mentioned_ids = parse_mentions(content, group=group)
-            elif friend_id:
-                parsed_content, mentioned_ids = parse_mentions(content, receiver=None)
-            mentions_json = json.dumps(mentioned_ids)
-        except Exception:
-            parsed_content = content
-
-    # 🔹 Сохранение в БД
+    # 🔹 Создание сообщения
     try:
         if friend_id:
             receiver = get_object_or_404(User, id=friend_id)
             msg = Message.objects.create(
                 sender=request.user, receiver=receiver, group=None,
-                content=parsed_content,
-                attachment=upload_path if upload_path else None,
-                attachment_hash=attachment_hash,
-                attachment_original_name=attachment_original_name,
-                attachment_type=attachment_type,
-                attachment_size=attachment_size,
-                mentions=mentions_json
+                content=content,
+                attachment=attachment,
+                reply_to=reply_msg  # ← ВОТ ЭТО
             )
         elif group_id:
             group = get_object_or_404(Group, id=group_id)
             if GroupMember.objects.filter(group=group, user=request.user).exists():
                 msg = Message.objects.create(
                     sender=request.user, receiver=None, group=group,
-                    content=parsed_content,
-                    attachment=upload_path if upload_path else None,
-                    attachment_hash=attachment_hash,
-                    attachment_original_name=attachment_original_name,
-                    attachment_type=attachment_type,
-                    attachment_size=attachment_size,
-                    mentions=mentions_json
+                    content=content,
+                    attachment=attachment,
+                    reply_to=reply_msg  # ← И ЗДЕСЬ
                 )
             else:
-                return JsonResponse({'status': 'error', 'message': 'Вы не участник группы'}, status=403)
+                return JsonResponse({'status': 'error', 'message': 'Не в группе'}, status=403)
         else:
-            return JsonResponse({'status': 'error', 'message': 'Не указан получатель'}, status=400)
+            return JsonResponse({'status': 'error', 'message': 'Нет получателя'}, status=400)
 
         return JsonResponse({'status': 'ok'})
 

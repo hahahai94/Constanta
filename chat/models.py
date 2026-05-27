@@ -74,7 +74,7 @@ class Message(models.Model):
         null=True,
         blank=True,
         related_name='replies',
-        verbose_name="Ответ на сообщение"
+        verbose_name="Ответ на"
     )
 
     # 🔹 Вложения с хешированием
