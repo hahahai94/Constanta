@@ -7,6 +7,7 @@ from django.contrib.sessions.models import Session
 from django.http import HttpResponse
 from django.contrib.admin.sites import AdminSite
 from django.contrib import messages
+from .models import BannedIP
 import csv, os
 
 User = get_user_model()
@@ -119,7 +120,38 @@ class UltimateUserAdmin(BaseUserAdmin):
             GroupMember.objects.get_or_create(group=default_group, user=user)
         self.message_user(request, f"✅ {queryset.count()} пользователей добавлены в 'Общий чат'", messages.SUCCESS)
 
-    actions = ['hard_delete_users', 'export_users_csv', 'reset_passwords', 'assign_default_group']
+    @admin.register(BannedIP)
+    class BannedIPAdmin(admin.ModelAdmin):
+        list_display = ('ip_address', 'reason', 'banned_at', 'banned_by')
+        search_fields = ('ip_address', 'reason')
+        list_filter = ('banned_at', 'banned_by')
+        readonly_fields = ('banned_at', 'banned_by')
+
+        def save_model(self, request, obj, form, change):
+            if not obj.pk:
+                obj.banned_by = request.user
+            super().save_model(request, obj, form, change)
+
+    # 🔧 Добавляем быстрое действие в админку пользователей
+    @admin.action(description="🚫 Забанить IP текущего запроса")
+    def ban_current_ip(modeladmin, request, queryset):
+        ip = request.META.get('HTTP_X_FORWARDED_FOR')
+        if ip:
+            ip = ip.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+
+        if BannedIP.objects.filter(ip_address=ip).exists():
+            modeladmin.message_user(request, f"⚠️ IP {ip} уже в бане", level='warning')
+        else:
+            BannedIP.objects.create(
+                ip_address=ip,
+                reason="Забанено через админку (UserAdmin)",
+                banned_by=request.user
+            )
+            modeladmin.message_user(request, f"✅ IP {ip} успешно заблокирован", level='success')
+
+    actions = ['hard_delete_users', 'export_users_csv', 'reset_passwords', 'assign_default_group', 'ban_current_ip']
 
 
 # ==============================================================================

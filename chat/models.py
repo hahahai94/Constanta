@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
@@ -262,3 +263,25 @@ class Notification(models.Model):
             'group_add': '📁',
         }
         return icons.get(self.notification_type, '🔔')
+
+
+
+class BannedIP(models.Model):
+    ip_address = models.GenericIPAddressField(unique=True, verbose_name="IP-Адрес")
+    reason = models.TextField(blank=True, verbose_name="Причина бана")
+    banned_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата бана")
+    banned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='banned_ips',
+        verbose_name="Забанил админ"
+    )
+
+    class Meta:
+        verbose_name = "Заблокированный IP"
+        verbose_name_plural = "Заблокированные IP"
+        ordering = ['-banned_at']
+
+    def __str__(self):
+        return f"🚫 {self.ip_address}"
