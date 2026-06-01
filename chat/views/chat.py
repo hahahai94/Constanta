@@ -2,30 +2,33 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from chat.models import User, Message
+from django.contrib.auth import get_user_model
+from chat.models import Message
+
+User = get_user_model()
 
 
 @login_required
 def main_chat(request):
     user = request.user
 
-    # 1️⃣ Получаем пользователей, с кем была переписка
-    conversations = User.objects.filter(
+    from django.db.models import OuterRef, Subquery
+
+    last_msg_subq = Message.objects.filter(
+        Q(sender=user, receiver=OuterRef('id')) |
+        Q(sender=OuterRef('id'), receiver=user)
+    ).order_by('-created_at').values('id')[:1]
+
+    chat_users = User.objects.filter(
         Q(sent_messages__receiver=user) | Q(received_messages__sender=user)
-    ).exclude(id=user.id).distinct()
+    ).exclude(id=user.id).distinct().annotate(
+        last_msg_id=Subquery(last_msg_subq)
+    )
 
-    # 2️⃣ Формируем структуру, которую ждёт шаблон: {'friend': user, 'last_message': msg}
-    chats = []
-    for friend in conversations:
-        last_msg = Message.objects.filter(
-            Q(sender=user, receiver=friend) |
-            Q(sender=friend, receiver=user)
-        ).order_by('-created_at').first()
+    last_msg_ids = [u.last_msg_id for u in chat_users if u.last_msg_id]
+    last_messages = {m.id: m for m in Message.objects.filter(id__in=last_msg_ids)}
 
-        chats.append({
-            'friend': friend,
-            'last_message': last_msg
-        })
+    chats = [{'friend': u, 'last_message': last_messages.get(u.last_msg_id)} for u in chat_users]
 
     friend_id = request.GET.get('friend_id')
     active_friend = None

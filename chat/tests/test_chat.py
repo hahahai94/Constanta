@@ -1,7 +1,10 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
-from chat.models import User, Message
+from django.contrib.auth import get_user_model
+from chat.models import Message
+
+User = get_user_model()
 import io
 
 

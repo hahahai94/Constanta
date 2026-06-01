@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card-modern p-4">
+                <div class="text-center mb-4">
+                    <h3>🔤 Сменить логин</h3>
+                    <p class="text-muted">Введите новый username для вашего аккаунта</p>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger mb-3">
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Новый логин</label>
+                        <input type="text" name="username" class="form-control-modern" 
+                               value="{{ form.username.value|default:'' }}" 
+                               placeholder="Латиница, цифры, подчёркивание" required>
+                    </div>
+
+                    <button type="submit" class="btn-grad grad-blue w-100 mb-2">💾 Сохранить</button>
+                    <a href="{% url 'profile' %}" class="btn btn-light w-100">↩️ Отмена</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

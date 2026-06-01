@@ -1,7 +1,10 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from chat.models import Group, GroupMember, Message, User
+from django.contrib.auth import get_user_model
+from chat.models import Group, GroupMember, Message
+
+User = get_user_model()
 
 
 @login_required
@@ -24,7 +27,7 @@ def group_chat(request, group_id):
         messages.error(request, 'Вы не участник этой группы')
         return redirect('groups')
 
-    is_owner = (group.owner == request.user)
+    is_owner = group.owner == request.user
     is_admin = (membership.role == 'admin') or is_owner
 
     members = GroupMember.objects.filter(group=group).select_related('user').order_by(
@@ -33,14 +36,6 @@ def group_chat(request, group_id):
     messages_qs = Message.objects.filter(
         group=group, is_deleted=False
     ).order_by('created_at')[:50]
-
-    # 🔑 Проверка прав
-    is_owner = group.owner == request.user
-    is_admin = GroupMember.objects.filter(
-        group=group,
-        user=request.user,
-        role='admin'  # ← проверь как у тебя называется роль админа
-    ).exists()
 
     return render(request, 'group_chat.html', {
         'group': group,

@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .user-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        border: 1px solid #f0f0f0;
+    }
+    .user-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+        border-color: #667eea;
+    }
+    .user-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #e8f0fe;
+        transition: all 0.2s;
+    }
+    .user-card:hover .user-avatar {
+        border-color: #667eea;
+        transform: scale(1.05);
+    }
+    .user-name {
+        font-weight: 600;
+        font-size: 1.05rem;
+        margin-bottom: 2px;
+        color: #2d3748;
+    }
+    .user-username {
+        color: #718096;
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+    }
+    .btn-write {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-write:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        color: white;
+    }
+    .search-bar {
+        background: white;
+        border-radius: 16px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        margin-bottom: 24px;
+        border: 1px solid #f0f0f0;
+    }
+    .search-bar input {
+        border: none;
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 12px 16px;
+        width: 100%;
+        font-size: 0.95rem;
+    }
+    .search-bar input:focus {
+        outline: 2px solid #667eea;
+        background: white;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #a0aec0;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        opacity: 0.3;
+        margin-bottom: 16px;
+    }
+</style>
+
+<div class="container py-4">
+    <!--  Поиск -->
+    <div class="search-bar">
+        <form method="get" action="{% url 'users_catalog' %}" class="d-flex gap-2">
+            <input type="text" name="q" class="form-control" placeholder="🔍 Поиск по имени или нику..." value="{{ query }}">
+            <button type="submit" class="btn btn-gradient-primary px-4">Найти</button>
+        </form>
+    </div>
+
+    <!--  Список пользователей -->
+    <div class="row g-3">
+        {% for user in users %}
+        {% if user != request.user %}
+        <div class="col-sm-6 col-lg-4">
+            <div class="user-card">
+                <div class="d-flex align-items-center">
+                    <img src="{% if user.avatar %}{{ user.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                         class="user-avatar me-3" alt="{{ user.username }}">
+                    <div class="flex-grow-1">
+                        <div class="user-name">{{ user.get_display_name|default:user.username }}</div>
+                        <div class="user-username">@{{ user.username }}</div>
+                        <a href="{% url 'main' %}?friend_id={{ user.id }}" class="btn-write">
+                            <i class="bi bi-chat-left-fill"></i> Написать
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% empty %}
+        <div class="col-12">
+            <div class="empty-state">
+                <i class="bi bi-people"></i>
+                <h4>Пользователи не найдены</h4>
+                <p>Попробуйте изменить запрос или зарегистрируйте новых участников</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

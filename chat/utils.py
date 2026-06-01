@@ -90,6 +90,9 @@ def parse_mentions(content, group=None, receiver=None):
             content
         )
 
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
     # 🔹 Обработка @username
     pattern = r'@(\w+)'
     matches = re.findall(pattern, content)
@@ -97,8 +100,6 @@ def parse_mentions(content, group=None, receiver=None):
     for username in matches:
         if username == 'all':
             continue  # Уже обработали
-
-        from .models import User
         try:
             user = User.objects.get(username=username)
             if user.id not in mentioned_user_ids:
@@ -141,8 +142,7 @@ def format_mention_content(content):
 # ==================== УВЕДОМЛЕНИЯ ====================
 
 def create_notification(user, notification_type, title, message, url='', related_message=None):
-    """Создать уведомление для пользователя"""
-    from .models import Notification
+    from users.models import Notification
     Notification.objects.create(
         user=user,
         notification_type=notification_type,

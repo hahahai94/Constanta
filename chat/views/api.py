@@ -1,12 +1,13 @@
 import os
 import json
-import hashlib
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.core.files.storage import default_storage
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from chat.models import User, Group, Message, GroupMember
+from django.http import FileResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib.auth import get_user_model
+from chat.models import Group, Message, GroupMember
+
+User = get_user_model()
 
 # Безопасный импорт утилит
 try:
@@ -36,6 +37,19 @@ def send_message(request):
     if not content and not attachment:
         return JsonResponse({'status': 'error', 'message': 'Пустое сообщение'}, status=400)
 
+    # 🔹 Определение типа вложения
+    attachment_type = 'none'
+    if attachment:
+        if attachment.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
+            return JsonResponse({'status': 'error', 'message': 'Файл слишком большой'}, status=400)
+        content_type = attachment.content_type or ''
+        if content_type.startswith('image/'):
+            attachment_type = 'image'
+        elif content_type.startswith('audio/'):
+            attachment_type = 'voice'
+        else:
+            attachment_type = 'file'
+
     # 🔹 Привязка к ответу
     reply_msg = None
     if reply_to_id:
@@ -49,7 +63,8 @@ def send_message(request):
                 sender=request.user, receiver=receiver, group=None,
                 content=content,
                 attachment=attachment,
-                reply_to=reply_msg  # ← ВОТ ЭТО
+                attachment_type=attachment_type,
+                reply_to=reply_msg
             )
         elif group_id:
             group = get_object_or_404(Group, id=group_id)
@@ -58,7 +73,8 @@ def send_message(request):
                     sender=request.user, receiver=None, group=group,
                     content=content,
                     attachment=attachment,
-                    reply_to=reply_msg  # ← И ЗДЕСЬ
+                    attachment_type=attachment_type,
+                    reply_to=reply_msg
                 )
             else:
                 return JsonResponse({'status': 'error', 'message': 'Не в группе'}, status=403)

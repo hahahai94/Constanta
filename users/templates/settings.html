@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card" style="max-width: 500px; margin: auto;">
+        <div class="card-header">
+            <h4>{% if type == 'username' %}📝 Сменить логин{% else %}🔐 Сменить пароль{% endif %}</h4>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-success w-100">Сохранить</button>
+            </form>
+        </div>
+        <div class="card-footer">
+            <a href="{% url 'profile' %}" class="btn btn-secondary">← Назад в профиль</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

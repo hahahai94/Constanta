@@ -1,17 +1,16 @@
-# chat/views/auth.py
+# users/views/auth.py
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
-from chat.forms import RegistrationForm
+from users.forms import RegistrationForm
 
 
 def auth_view(request):
     mode = request.GET.get('mode', 'login')
 
     if request.method == 'POST':
-        #  РЕГИСТРАЦИЯ
         if mode == 'reg' or 'register' in request.POST:
             form = RegistrationForm(request.POST)
             if form.is_valid():
@@ -24,8 +23,6 @@ def auth_view(request):
                     for error in errors:
                         messages.error(request, f'{field}: {error}')
                 mode = 'reg'
-
-        # 🔹 ВХОД
         else:
             form = AuthenticationForm(request, data=request.POST)
             if form.is_valid():
@@ -41,7 +38,6 @@ def auth_view(request):
             else:
                 messages.error(request, '❌ Проверьте правильность ввода')
 
-    # 🔹 ПОДГОТОВКА ФОРМ
     if mode == 'reg':
         form = RegistrationForm()
     else:

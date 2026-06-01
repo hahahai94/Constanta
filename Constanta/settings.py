@@ -45,9 +45,9 @@ DEBUG = env.bool('DEBUG', default=True)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
     '127.0.0.1',
     '1.1.1.71',
-    'http://1.1.1.71',
     '192.168.1.67',
-    'http://192.168.1.67'
+    'localhost',
+    'testserver',
 ])
 
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'chat.apps.ChatConfig',
+    'users.apps.UsersConfig',
 ]
 
 MIDDLEWARE = [
@@ -75,7 +76,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'chat.middleware.IPBanMiddleware',
+    'users.middleware.IPBanMiddleware',
 ]
 
 ROOT_URLCONF = 'Constanta.urls'
@@ -174,9 +175,8 @@ USE_TZ = True
 # TODO: Внедрить compress
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_DIRS = [BASE_DIR / 'Constanta' / 'static']
 
-AUTH_USER_MODEL = 'chat.User'
+AUTH_USER_MODEL = 'users.User'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -185,11 +185,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 FILE_UPLOAD_MAX_MEMORY_SIZE = env.int('FILE_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024)
 DATA_UPLOAD_MAX_MEMORY_SIZE = env.int('DATA_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024)
 
-
-# Для дефолтной аватарки
-STATICFILES_DIRS = [BASE_DIR / 'static']
-
-
 LOGIN_URL = '/auth/'  # ← Наш кастомный URL входа
 LOGIN_REDIRECT_URL = '/main/'  # Куда перенаправлять после входа
 LOGOUT_REDIRECT_URL = '/auth/'  # Куда после выхода
@@ -197,8 +192,8 @@ LOGOUT_REDIRECT_URL = '/auth/'  # Куда после выхода
 # TODO: Это выглядит как костыль, у Django итак есть система авторизации из коробки
 # TODO: is_muted ( ну типо мягкий бан ) и is_active ( полный бан )
 AUTHENTICATION_BACKENDS = [
-    'chat.backends.CustomAuthBackend',  # ← Наш кастомный (первым!)
-    'django.contrib.auth.backends.ModelBackend',  # ← Стандартный
+    'users.backends.CustomAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
 ]
 
 
