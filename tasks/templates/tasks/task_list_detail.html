@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .task-item {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        border: 1px solid #f0f0f0;
+        transition: all 0.2s;
+    }
+    .task-item:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .task-item.done {
+        opacity: 0.65;
+    }
+    .task-item.done .task-title {
+        text-decoration: line-through;
+        color: #6c757d;
+    }
+    .task-check {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid #dee2e6;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+    .task-check:hover {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.1);
+    }
+    .task-check.checked {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: transparent;
+        color: white;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="{% url 'task_lists' %}" class="btn btn-outline-secondary rounded-pill px-3 me-2">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <span class="fw-bold fs-4">{{ task_list.name }}</span>
+            {% if task_list.description %}
+            <small class="text-muted d-block mt-1">{{ task_list.description }}</small>
+            {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                <i class="bi bi-plus-lg me-2"></i>Задача
+            </button>
+            <form method="post" action="{% url 'delete_task_list' task_list.id %}" class="d-inline" onsubmit="return confirm('Удалить весь список с задачами?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger rounded-pill px-3">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if tasks %}
+    <div class="d-flex flex-column gap-2">
+        {% for task in tasks %}
+        <div class="task-item {% if task.is_done %}done{% endif %}">
+            <div class="d-flex align-items-center gap-3">
+                <form method="post" action="{% url 'task_list_detail' task_list.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_task">
+                    <input type="hidden" name="task_id" value="{{ task.id }}">
+                    <button type="submit" class="task-check {% if task.is_done %}checked{% endif %}" style="background: none; border: none; padding: 0;">
+                        {% if task.is_done %}<i class="bi bi-check" style="font-size: 14px; color: white;"></i>{% endif %}
+                    </button>
+                </form>
+                <div class="flex-grow-1">
+                    <div class="task-title fw-medium">{{ task.title }}</div>
+                    {% if task.description %}
+                    <small class="text-muted">{{ task.description }}</small>
+                    {% endif %}
+                </div>
+                <small class="text-muted">{{ task.created_at|date:"d.m" }}</small>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="dropdown" style="width: 32px; height: 32px;">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editTaskModal{{ task.id }}">
+                            <i class="bi bi-pencil me-2"></i>Редактировать
+                        </button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="post" action="{% url 'task_list_detail' task_list.id %}" class="d-inline" onsubmit="return confirm('Удалить задачу?')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_task">
+                                <input type="hidden" name="task_id" value="{{ task.id }}">
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="bi bi-trash me-2"></i>Удалить
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="editTaskModal{{ task.id }}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Редактировать задачу</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="post" action="{% url 'task_list_detail' task_list.id %}">
+                        <div class="modal-body p-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="edit_task">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Название</label>
+                                <input type="text" name="title" class="form-control" value="{{ task.title }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Описание</label>
+                                <textarea name="description" class="form-control" rows="2">{{ task.description }}</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-check2-square" style="font-size: 4rem; opacity: 0.3;"></i>
+        <p class="mt-3 fs-5">Здесь пока нет задач</p>
+        <button class="btn btn-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+            Добавить первую задачу
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Новая задача</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'task_list_detail' task_list.id %}">
+                <div class="modal-body p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_task">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Название</label>
+                        <input type="text" name="title" class="form-control" placeholder="Что нужно сделать?" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Описание</label>
+                        <textarea name="description" class="form-control" rows="2" placeholder="Подробности (необязательно)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Добавить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

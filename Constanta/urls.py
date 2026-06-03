@@ -8,6 +8,7 @@ urlpatterns = [
     path(os.environ.get('ADMIN_URL', 'admin/'), admin.site.urls),
     path('', include('users.urls')),
     path('', include('chat.urls')),
+    path('tasks/', include('tasks.urls')),
 ]
 
 if settings.DEBUG:

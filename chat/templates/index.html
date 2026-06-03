@@ -70,7 +70,61 @@
     .reply-quote-text { color: #666; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .message-own .reply-quote-text { color: rgba(255,255,255,0.8); }
 
-    /* Панель ответа */
+    #emoji-picker {
+        display: none;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 4px;
+        padding: 12px;
+        max-height: 280px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        position: absolute;
+        bottom: 70px;
+        left: 20px;
+        width: 320px;
+        z-index: 1050;
+    }
+    #emoji-picker.active { display: grid; }
+    .emoji-btn {
+        font-size: 1.6rem;
+        padding: 6px;
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+        line-height: 1;
+        font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    }
+    .emoji-btn:hover {
+        background: #e2e6ea;
+        transform: scale(1.15);
+        border-color: #adb5bd;
+    }
+
+    .file-tag {
+        display: inline-flex;
+        align-items: center;
+        background: #e7f1ff;
+        color: #0d6efd;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        margin-right: 10px;
+    }
+    .file-tag button {
+        background: none;
+        border: none;
+        color: #0d6efd;
+        cursor: pointer;
+        margin-left: 6px;
+        padding: 0;
+        font-size: 1rem;
+    }
+
     .reply-panel {
         background: #f8f9fa;
         border-bottom: 1px solid #dee2e6;
@@ -93,8 +147,11 @@
 
     <!-- Левая панель (Список чатов) -->
     <div class="bg-white border-end d-flex flex-column" style="width: 350px; min-width: 350px;">
-        <div class="p-3 border-bottom bg-white">
+        <div class="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">Чаты</h5>
+            <a href="{% url 'task_lists' %}" class="btn btn-sm btn-outline-secondary rounded-pill" title="Мои задачи">
+                <i class="bi bi-list-task"></i>
+            </a>
         </div>
 
         <!-- Список чатов с прокруткой -->
@@ -168,6 +225,23 @@
                         <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
                     {% endif %}
 
+                    {% if msg.attachment_type == 'file' and msg.attachment %}
+                        <a href="{% url 'download_attachment' msg.id %}" class="text-decoration-none d-block mb-2 p-2 rounded"
+                           style="background: rgba(0,0,0,0.1); color: inherit;">
+                            <i class="bi bi-file-earmark me-1"></i>
+                            {{ msg.attachment_original_name|default:"Файл" }}
+                            {% if msg.attachment_size %}
+                                <small class="d-block opacity-75">{{ msg.attachment_size|filesizeformat }}</small>
+                            {% endif %}
+                        </a>
+                    {% endif %}
+
+                    {% if msg.attachment_type == 'voice' and msg.attachment %}
+                        <audio controls class="w-100 mb-2">
+                            <source src="{{ msg.attachment.url }}">
+                        </audio>
+                    {% endif %}
+
                     {% if msg.content %}
                         <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
                     {% endif %}
@@ -190,19 +264,35 @@
         </div>
 
         <!-- Поле ввода (всегда внизу) -->
-        <div class="bg-white border-top p-3">
+        <div class="bg-white border-top p-3 position-relative">
+            <div id="file-tag-container"></div>
+
             <form id="chat-form" method="POST" action="{% url 'api_send' %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
                 <input type="hidden" name="reply_to_id" id="reply-to-id" value="">
 
-                <div class="input-group">
-                    <input type="text" name="content" id="message-input" class="form-control rounded-pill border-0 bg-light px-4" placeholder="Написать сообщение..." required style="box-shadow: none;">
-                    <button type="submit" class="btn btn-primary rounded-circle ms-2" style="width: 45px; height: 45px;">
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-light rounded-circle" style="width: 40px; height: 40px; flex-shrink: 0;"
+                            id="emoji-btn" title="Эмодзи">😊</button>
+
+                    <input type="text" name="content" id="message-input" class="form-control rounded-pill px-4 flex-grow-1"
+                           placeholder="Написать сообщение..." style="background: #f0f2f5; border: none;">
+
+                    <label for="file-upload" class="btn btn-light rounded-circle mb-0"
+                           style="width: 40px; height: 40px; flex-shrink: 0; cursor: pointer;" title="Прикрепить файл">
+                        <i class="bi bi-paperclip"></i>
+                    </label>
+                    <input type="file" id="file-upload" class="d-none" name="attachment"
+                           accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z">
+
+                    <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px; flex-shrink: 0;" id="send-btn">
                         <i class="bi bi-send-fill"></i>
                     </button>
                 </div>
             </form>
+
+            <div id="emoji-picker"></div>
         </div>
         {% else %}
         <!-- Если чат не выбран -->
@@ -218,19 +308,97 @@
 
 {% block scripts %}
 <script>
-// Управление ответами
+const emojiList = [
+    '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','🤩','😘','😗',
+    '😋','😛','😜','😝','🤑','🤗','🤭','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬',
+    '😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯',
+    '🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','😮','😲','😳','🥺','😢','😭','😱',
+    '😤','😡','🤬','👻','💀','☠️','👽','🤖','🎃','🙈','🙉','🙊','💫','💨','💣',
+    '👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆',
+    '🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏',
+    '💪','🦵','🦶','👂','🦻','👃','🧠','🦷','👀','👅','👄',
+    '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','🔥','⭐','✨','💥','💯','💢',
+    '💬','💭','💤','🎉','🎊','🎈','🎁','🎀','🎯','🎲','🎭',
+    '💻','📱','📞','📟','📠','🔋','💡','🔦','📖','📕','📗','📘','📙','📚','📰',
+    '💰','💴','💵','💶','💷','💸','📧','📨','📩','📥','📦',
+    '✅','❌','❓','❔','❕','❗','➕','➖','➗','♠️','♥️','♦️','♣️',
+    '🔇','🔈','🔉','🔊','📢','📣','🔔','🎵','🎶','🎼','🎤','🎧','🎷','🎸','🎹','🎺',
+    '⚽','⚾','🏀','🏐','🎾','🎳','🏓','🏸','🥊','🥋','🎿','🏂',
+    '🏋️','🤼','🤸','🏄','🏊','🤽','🚣','🚵','🚴',
+    '☀️','🌞','⭐','🌟','🌙','☁️','⛅','🌈','⚡','💧','❄️','🌊','🔥','🌪️',
+    '🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍈','🍒','🍑','🥭','🍍',
+    '🍅','🍆','🥑','🥦','🥒','🌽','🥕','🍞','🥖','🧀','🥚','🍳','🥓','🍗','🍖',
+    '🌭','🍔','🍟','🍕','🌮','🌯','🥗','🍝','🍜','🍲','🍛','🍣','🍱','🍤',
+    '🍦','🍰','🎂','🍭','🍬','🍫','🍿','🍩','🍪','☕','🍵','🧃','🥤','🍺','🍻','🥂',
+    '🍷','🥃','🍸','🍹','🍾','🥄','🔪',
+    '🌍','🌎','🌏','🏔️','🏖️','🏜️','🏝️','🏞️','🏟️','🏛️','🏠','🏡','🏢','🏣',
+    '🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🏰','🗼','🗽','⛪','🕌','🕍',
+    '🌁','🌃','🏙️','🌄','🌅','🌆','🌇','🌉','🎠','🎡','🎢',
+    '🚂','🚃','🚄','🚅','🚆','🚇','🚈','🚉','🚊','🚌','🚍','🚎','🚐','🚑','🚒',
+    '🚓','🚔','🚕','🚖','🚗','🚘','🚙','🚚','🚛','🚜','🚲','🛴','🛹',
+    '🚨','🚥','🚦','🛑','🚧','⚓','⛵','🚤','🚢','✈️','🚁','🚀','🛸',
+    '🏁','🚩','🎌'
+];
+
+// ===== ЭМОДЗИ =====
+const emojiPicker = document.getElementById('emoji-picker');
+const messageInput = document.getElementById('message-input');
+
+emojiPicker.innerHTML = emojiList.map(e => `<button type="button" class="emoji-btn" data-emoji="${e}">${e}</button>`).join('');
+
+document.getElementById('emoji-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    emojiPicker.classList.toggle('active');
+});
+
+emojiPicker.addEventListener('click', (e) => {
+    if (e.target.classList.contains('emoji-btn')) {
+        const emoji = e.target.dataset.emoji;
+        const start = messageInput.selectionStart;
+        const text = messageInput.value;
+        messageInput.value = text.substring(0, start) + emoji + text.substring(messageInput.selectionEnd);
+        messageInput.focus();
+        messageInput.selectionStart = messageInput.selectionEnd = start + emoji.length;
+        emojiPicker.classList.remove('active');
+    }
+});
+
+document.addEventListener('click', (e) => {
+    if (!emojiPicker.contains(e.target) && e.target.id !== 'emoji-btn') {
+        emojiPicker.classList.remove('active');
+    }
+});
+
+// ===== ФАЙЛЫ =====
+const fileUpload = document.getElementById('file-upload');
+const fileTagContainer = document.getElementById('file-tag-container');
+
+fileUpload.addEventListener('change', function() {
+    fileTagContainer.innerHTML = '';
+    if (this.files.length > 0) {
+        const file = this.files[0];
+        const sizeKB = (file.size / 1024).toFixed(1);
+        const tag = document.createElement('div');
+        tag.className = 'file-tag mb-2';
+        tag.innerHTML = `📎 <span style="margin: 0 5px;">${file.name}</span> <small>(${sizeKB} КБ)</small>
+                         <button type="button" onclick="this.parentElement.remove(); document.getElementById('file-upload').value='';">×</button>`;
+        fileTagContainer.appendChild(tag);
+    }
+});
+
+// ===== ОТВЕТЫ =====
 window.startReply = function(msgId, author, text) {
     document.getElementById('reply-to-id').value = msgId;
     document.getElementById('reply-author').textContent = author + ':';
     document.getElementById('reply-text').textContent = text.length > 60 ? text.substring(0, 60) + '...' : text;
     document.getElementById('reply-panel').classList.add('active');
-    document.getElementById('message-input').focus();
+    messageInput.focus();
 };
 
 window.cancelReply = function() {
     document.getElementById('reply-to-id').value = '';
     document.getElementById('reply-panel').classList.remove('active');
-    document.getElementById('message-input').focus();
+    messageInput.focus();
 };
 
 window.scrollToMessage = function(msgId) {
@@ -242,23 +410,33 @@ window.scrollToMessage = function(msgId) {
     }
 };
 
-// Отправка формы
+// ===== ОТПРАВКА =====
 document.getElementById('chat-form')?.addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
-    const btn = this.querySelector('button[type="submit"]');
+    const textContent = messageInput.value.trim();
+    const hasFile = fileUpload.files.length > 0;
 
+    if (!textContent && !hasFile) {
+        messageInput.placeholder = '⚠️ Введите текст или прикрепите файл';
+        setTimeout(() => messageInput.placeholder = 'Написать сообщение...', 2000);
+        return;
+    }
+
+    formData.set('content', textContent);
+
+    const btn = document.getElementById('send-btn');
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
 
-    fetch(this.action, {
-        method: 'POST',
-        body: formData
-    })
+    fetch(this.action, { method: 'POST', body: formData })
     .then(r => r.json())
     .then(d => {
         if (d.status === 'ok') {
-            location.reload();
+            messageInput.value = '';
+            fileUpload.value = '';
+            fileTagContainer.innerHTML = '';
+            cancelReply();
         } else {
             alert('Ошибка: ' + (d.message || d.error || 'Неизвестная'));
         }
@@ -273,7 +451,7 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
     });
 });
 
-// Автообновление
+// ===== АВТООБНОВЛЕНИЕ =====
 if (!window.autoRefreshInterval) {
     window.autoRefreshInterval = setInterval(() => {
         const container = document.getElementById('messages-container');

@@ -3,6 +3,7 @@ from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from datetime import timedelta
 
 
 class User(AbstractUser):
@@ -10,6 +11,12 @@ class User(AbstractUser):
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True, default='')
     last_seen = models.DateTimeField(null=True, blank=True, verbose_name="Последний вход")
+
+    @property
+    def is_online(self):
+        if not self.last_seen:
+            return False
+        return timezone.now() - self.last_seen < timedelta(minutes=3)
 
     ban_reason = models.TextField(blank=True, default='Нарушение правил')
     banned_at = models.DateTimeField(null=True, blank=True)
@@ -36,21 +43,6 @@ class User(AbstractUser):
         if self.avatar:
             return self.avatar.url
         return '/static/default_avatar.png'
-
-
-class Friendship(models.Model):
-    user = models.ForeignKey(User, related_name='friends', on_delete=models.CASCADE)
-    friend = models.ForeignKey(User, related_name='friends_of', on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'friends'
-        unique_together = ('user', 'friend')
-        verbose_name = 'Дружба'
-        verbose_name_plural = 'Друзья'
-
-    def __str__(self):
-        return f"{self.user.username} -> {self.friend.username}"
 
 
 class AdminLog(models.Model):

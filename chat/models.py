@@ -1,6 +1,25 @@
 import uuid
+import os
+import hashlib
+from datetime import datetime
 from django.conf import settings
 from django.db import models
+
+
+def _file_hash(file_obj, user_id):
+    content = file_obj.read()
+    file_obj.seek(0)
+    ts = datetime.now().isoformat()
+    return hashlib.sha256(f"{content.hex()}{user_id}{ts}".encode('utf-8')).hexdigest()
+
+
+def _attachment_upload_to(instance, filename):
+    if instance.attachment_hash:
+        h = instance.attachment_hash
+    else:
+        h = _file_hash(instance.attachment, instance.sender.id)
+    ext = os.path.splitext(filename)[1].lower()
+    return os.path.join('attachments', h[:2], f"{h}{ext}")
 
 
 class Message(models.Model):
@@ -28,7 +47,7 @@ class Message(models.Model):
         ('file', 'Файл'),
         ('voice', 'Голосовое'),
     ], default='none')
-    attachment = models.FileField(upload_to='attachments/', null=True, blank=True)
+    attachment = models.FileField(upload_to=_attachment_upload_to, null=True, blank=True)
     attachment_hash = models.CharField(max_length=64, blank=True, default='')  # SHA256 хеш
     attachment_original_name = models.CharField(max_length=255, blank=True, default='')  # Оригинальное имя
     attachment_size = models.BigIntegerField(default=0)
@@ -58,7 +77,6 @@ class Message(models.Model):
         return None
 
     def get_attachment_name(self):
-        # Возвращаем оригинальное имя если есть, иначе имя файла
         if self.attachment_original_name:
             return self.attachment_original_name
         if self.attachment:
@@ -66,9 +84,16 @@ class Message(models.Model):
         return None
 
     def save(self, *args, **kwargs):
-        # Автоматическое сохранение оригинального имени при первом сохранении
-        if self.attachment and not self.attachment_original_name:
-            self.attachment_original_name = self.attachment.name.split('/')[-1]
+        if self.attachment:
+            if not self.attachment_hash:
+                self.attachment_hash = _file_hash(self.attachment, self.sender.id)
+            if not self.attachment_original_name:
+                self.attachment_original_name = self.attachment.name
+            if not self.attachment_size:
+                try:
+                    self.attachment_size = self.attachment.size
+                except Exception:
+                    pass
         super().save(*args, **kwargs)
 
 

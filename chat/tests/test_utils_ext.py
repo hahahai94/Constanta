@@ -1,9 +1,10 @@
+import io
+import os
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from chat.models import Message
 from chat.utils import get_file_upload_path, get_file_hash_from_path, get_original_filename_from_hash
-import io
 
 User = get_user_model()
 
@@ -15,7 +16,7 @@ class UtilsPathTests(TestCase):
             sender = type('obj', (object,), {'id': 1})()
 
         path = get_file_upload_path(FakeInstance(), 'test.pdf', file_hash='a1b2c3d4')
-        self.assertIn('a1/', path)  # uses first 2 chars of hash as subdir
+        self.assertIn(os.path.join('attachments', 'a1'), path)  # uses first 2 chars of hash as subdir
         self.assertIn('a1b2c3d4', path)
         self.assertTrue(path.endswith('.pdf'))
 

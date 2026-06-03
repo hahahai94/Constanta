@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from users.models import BannedIP, Friendship, AdminLog, Notification
+from users.models import BannedIP, AdminLog, Notification
 from users.forms import RegistrationForm, ChangeUsernameForm, ProfileForm
 from users.backends import CustomAuthBackend
 from users.middleware import IPBanMiddleware
@@ -34,11 +34,6 @@ class UserModelTests(TestCase):
 
     def test_get_avatar_url_default(self):
         self.assertEqual(self.user.get_avatar_url(), '/static/default_avatar.png')
-
-    def test_friendship_creation(self):
-        friend = User.objects.create_user(username='friend1', password='pass456')
-        friendship = Friendship.objects.create(user=self.user, friend=friend)
-        self.assertEqual(str(friendship), 'testuser -> friend1')
 
     def test_banned_ip(self):
         banned = BannedIP.objects.create(ip_address='10.0.0.1', reason='spam')
