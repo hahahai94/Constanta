@@ -106,7 +106,7 @@
         <div class="col-sm-6 col-lg-4">
             <div class="user-card">
                 <div class="d-flex align-items-center">
-                    <img src="{% if user.avatar %}{{ user.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                    <img src="{{ user.get_avatar_url }}"
                          class="user-avatar me-3" alt="{{ user.username }}">
                     <div class="flex-grow-1">
                         <div class="user-name">{{ user.get_display_name|default:user.username }}</div>

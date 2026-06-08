@@ -2,6 +2,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 
@@ -42,7 +43,7 @@ class User(AbstractUser):
     def get_avatar_url(self):
         if self.avatar:
             return self.avatar.url
-        return '/static/default_avatar.png'
+        return settings.STATIC_URL + 'default_avatar.png'
 
 
 class AdminLog(models.Model):

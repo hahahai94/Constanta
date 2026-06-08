@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import models
 
 
+
 def _file_hash(file_obj, user_id):
     content = file_obj.read()
     file_obj.seek(0)
@@ -120,7 +121,7 @@ class Group(models.Model):
     def get_avatar_url(self):
         if self.avatar:
             return self.avatar.url
-        return '/static/default_group_avatar.png'
+        return settings.STATIC_URL + 'default_group_avatar.png'
 
     def is_owner(self, user):
         return self.owner == user

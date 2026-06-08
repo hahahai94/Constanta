@@ -265,7 +265,7 @@
         </div>
 
         <div class="p-4 text-center border-bottom">
-            <img src="{% if group.avatar %}{{ group.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+            <img src="{{ group.get_avatar_url }}"
                  class="rounded-circle mb-3 shadow"
                  style="width: 100px; height: 100px; object-fit: cover; border: 4px solid #667eea;">
             <h5 class="fw-bold mb-1">{{ group.name }}</h5>
@@ -281,7 +281,7 @@
             </div>
             {% for member in members %}
             <div class="participant-item d-flex align-items-center p-3">
-                <img src="{% if member.user.avatar %}{{ member.user.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                <img src="{{ member.user.get_avatar_url }}"
                      class="rounded-circle me-3" style="width: 40px; height: 40px; object-fit: cover;">
                 <div class="flex-grow-1">
                     <div class="fw-bold mb-1">{{ member.user.username }}</div>
@@ -324,7 +324,7 @@
 
     <div class="chat-main">
         <div class="bg-white border-bottom p-3 d-flex align-items-center shadow-sm">
-            <img src="{% if group.avatar %}{{ group.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+            <img src="{{ group.get_avatar_url }}"
                  class="rounded-circle me-3 shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
             <div>
                 <h6 class="mb-0 fw-bold">{{ group.name }}</h6>
@@ -447,7 +447,7 @@
             <div class="modal-body p-4">
                 <div class="text-center mb-4">
                     <div class="avatar-upload-wrapper">
-                        <img src="{% if group.avatar %}{{ group.avatar.url }}{% else %}{% static 'img/default_avatar.png' %}{% endif %}"
+                        <img src="{{ group.get_avatar_url }}"
                              id="modal-avatar-preview"
                              class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #667eea;">
                         <label for="avatar-upload" class="avatar-upload-overlay" title="Изменить аватарку">
