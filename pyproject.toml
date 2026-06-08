@@ -2,8 +2,9 @@
 name = "constanta"
 version = "0.1.0"
 description = "Messenger on Django"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 dependencies = [
+<<<<<<< Updated upstream
     "django>=5.2,<5.3",
     "environs>=11,<12",
     "marshmallow>=3,<4",
@@ -11,4 +12,11 @@ dependencies = [
     "dj-database-url>=2,<3",
     "psycopg2-binary>=2.9,<3",
     "whitenoise>=6.12.0",
+=======
+    "dj-database-url>=3.1.2",
+    "django",
+    "environs",
+    "marshmallow",
+    "pillow",
+>>>>>>> Stashed changes
 ]
