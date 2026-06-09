@@ -8,10 +8,20 @@ from django.db import models
 
 
 def _file_hash(file_obj, user_id):
-    content = file_obj.read()
+    hasher = hashlib.sha256()
+    if hasattr(file_obj, 'chunks'):
+        for chunk in file_obj.chunks():
+            hasher.update(chunk)
+    else:
+        while True:
+            chunk = file_obj.read(65536)
+            if not chunk:
+                break
+            hasher.update(chunk)
     file_obj.seek(0)
     ts = datetime.now().isoformat()
-    return hashlib.sha256(f"{content.hex()}{user_id}{ts}".encode('utf-8')).hexdigest()
+    hasher.update(f"{user_id}{ts}".encode('utf-8'))
+    return hasher.hexdigest()
 
 
 def _attachment_upload_to(instance, filename):

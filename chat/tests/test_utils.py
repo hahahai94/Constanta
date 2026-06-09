@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from chat.utils import generate_file_hash, parse_mentions, format_mention_content, create_notification
 from chat.models import Group, GroupMember
 from django.contrib.auth import get_user_model
@@ -23,6 +23,36 @@ class UtilsHashTests(TestCase):
         f.seek(0)
         h2 = generate_file_hash(f, user_id=2, timestamp='t1')
         self.assertNotEqual(h1, h2)
+
+    def test_generate_file_hash_without_timestamp(self):
+        fake_file = io.BytesIO(b'auto timestamp')
+        h = generate_file_hash(fake_file, user_id=1)
+        self.assertEqual(len(h), 64)
+
+    def test_generate_file_hash_no_chunks(self):
+        class FakeFile:
+            def __init__(self, data):
+                self._data = data
+                self._pos = 0
+            def seek(self, pos):
+                self._pos = pos
+            def read(self, size=65536):
+                chunk = self._data[self._pos:self._pos+size]
+                self._pos += len(chunk)
+                return chunk
+
+        f = FakeFile(b'read-based content')
+        h = generate_file_hash(f, user_id=1, timestamp='fixed')
+        self.assertEqual(len(h), 64)
+
+    def test_generate_file_hash_with_chunks(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        f = SimpleUploadedFile("test.txt", b"chunked content", content_type="text/plain")
+        h1 = generate_file_hash(f, user_id=1, timestamp='chunk')
+        f.seek(0)
+        h2 = generate_file_hash(f, user_id=1, timestamp='chunk')
+        self.assertEqual(h1, h2)
+        self.assertEqual(len(h1), 64)
 
 
 class UtilsMentionTests(TestCase):
@@ -49,13 +79,23 @@ class UtilsMentionTests(TestCase):
         text, ids = parse_mentions('@all')
         self.assertEqual(ids, [])
 
+    def test_parse_mention_all_in_group_multiple_members(self):
+        group = Group.objects.create(name='G2', owner=self.sender)
+        u2 = User.objects.create_user(username='another_user', password='123')
+        GroupMember.objects.create(group=group, user=self.user, role='member')
+        GroupMember.objects.create(group=group, user=u2, role='member')
+        text, ids = parse_mentions('@all check', group=group)
+        self.assertIn(self.user.id, ids)
+        self.assertIn(u2.id, ids)
+        self.assertEqual(len(ids), 2)
+
     def test_format_mention_content(self):
         raw = '<span class="mention mention-all">@all</span>'
         result = format_mention_content(raw)
         self.assertIn('mention-all', result)
 
 
-class UtilsNotificationTests(TestCase):
+class UtilsNotificationTests(TransactionTestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='notif_user', password='123')
 

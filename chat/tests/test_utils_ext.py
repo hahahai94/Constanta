@@ -20,6 +20,15 @@ class UtilsPathTests(TestCase):
         self.assertIn('a1b2c3d4', path)
         self.assertTrue(path.endswith('.pdf'))
 
+    def test_get_file_upload_path_no_hash(self):
+        class FakeInstance:
+            attachment = io.BytesIO(b'data')
+            sender = type('obj', (object,), {'id': 1})()
+
+        path = get_file_upload_path(FakeInstance(), 'doc.txt')
+        self.assertIn(os.path.join('attachments'), path)
+        self.assertTrue(path.endswith('.txt'))
+
     def test_get_file_hash_from_path(self):
         result = get_file_hash_from_path('attachments/a1/a1b2c3d4e5.pdf')
         self.assertEqual(result, 'a1b2c3d4e5')

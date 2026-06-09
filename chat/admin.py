@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.http import HttpResponse
 from django.contrib import messages
+from django.db.models import Count
 from chat.models import Group, Message, GroupMember
 import csv, os
 
@@ -42,6 +43,12 @@ class UltimateGroupAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     inlines = [GroupMembersInline, GroupMessagesInline]
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            _member_count=Count('members', distinct=True),
+            _message_count=Count('messages', distinct=True),
+        )
+
     def avatar_preview(self, obj):
         if obj.avatar:
             return format_html(
@@ -52,14 +59,16 @@ class UltimateGroupAdmin(admin.ModelAdmin):
     avatar_preview.short_description = "Фото"
 
     def member_count(self, obj):
-        return GroupMember.objects.filter(group=obj).count()
+        return getattr(obj, '_member_count', obj.members.count())
 
     member_count.short_description = "Участников"
+    member_count.admin_order_field = '_member_count'
 
     def message_count(self, obj):
-        return Message.objects.filter(group=obj).count()
+        return getattr(obj, '_message_count', obj.messages.count())
 
     message_count.short_description = "Сообщений"
+    message_count.admin_order_field = '_message_count'
 
     @admin.action(description="Удалить группу и файлы")
     def hard_delete_groups(self, request, queryset):
@@ -75,9 +84,10 @@ class UltimateGroupAdmin(admin.ModelAdmin):
         response['Content-Disposition'] = 'attachment; filename="group_members.csv"'
         writer = csv.writer(response)
         writer.writerow(['Группа', 'Пользователь', 'Роль', 'Дата вступления'])
-        for group in queryset:
-            for member in GroupMember.objects.filter(group=group):
-                writer.writerow([group.name, member.user.username, member.role, member.joined_at])
+        group_ids = list(queryset.values_list('id', flat=True))
+        members = GroupMember.objects.filter(group_id__in=group_ids).select_related('group', 'user')
+        for member in members:
+            writer.writerow([member.group.name, member.user.username, member.role, member.joined_at])
         return response
 
     actions = ['hard_delete_groups', 'export_group_members']

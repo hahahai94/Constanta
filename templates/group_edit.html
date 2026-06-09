@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block body_class %}content-page{% endblock %}
-{% block container_class %}container{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -14,7 +13,7 @@
                 {% csrf_token %}
                 
                 <div class="mb-3 text-center">
-                    <img src="{{ group.get_avatar_url }}" 
+                    <img id="avatar-preview" src="{{ group.get_avatar_url }}" 
                          class="rounded-circle mb-2" 
                          style="width: 120px; height: 120px; object-fit: cover;">
                 </div>
@@ -32,7 +31,7 @@
                 
                 <div class="mb-3">
                     <label class="form-label">🖼️ Новая аватарка</label>
-                    <input type="file" name="avatar" class="form-control" accept="image/*">
+                    <input type="file" name="avatar" id="avatar-upload" class="form-control" accept="image/*">
                     <small class="text-muted">Оставьте пустым, чтобы не менять</small>
                 </div>
                 
@@ -54,4 +53,17 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('avatar-upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => document.getElementById('avatar-preview').src = e.target.result;
+        reader.readAsDataURL(file);
+    }
+});
+</script>
 {% endblock %}

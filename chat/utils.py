@@ -17,16 +17,19 @@ def generate_file_hash(file, user_id, timestamp=None):
     """
     if timestamp is None:
         timestamp = datetime.now().isoformat()
-
-    # Читаем содержимое файла
-    file_content = file.read()
-    file.seek(0)  # Возвращаем указатель в начало
-
-    # Создаём хеш из содержимого + метаданных
-    hash_input = f"{file_content.hex()}{user_id}{timestamp}".encode('utf-8')
-    file_hash = hashlib.sha256(hash_input).hexdigest()
-
-    return file_hash
+    hasher = hashlib.sha256()
+    if hasattr(file, 'chunks'):
+        for chunk in file.chunks():
+            hasher.update(chunk)
+    else:
+        while True:
+            chunk = file.read(65536)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    file.seek(0)
+    hasher.update(f"{user_id}{timestamp}".encode('utf-8'))
+    return hasher.hexdigest()
 
 
 def get_file_upload_path(instance, filename, file_hash=None):
@@ -78,12 +81,11 @@ def parse_mentions(content, group=None, receiver=None):
     """
     mentioned_user_ids = []
 
-    # 🔹 Обработка @all (только для групп)
+    # Обработка @all (только для групп)
     if group and '@all' in content:
         from .models import GroupMember
         members = GroupMember.objects.filter(group=group).values_list('user_id', flat=True)
         mentioned_user_ids.extend(members)
-        # Заменяем @all на HTML
         content = re.sub(
             r'@all\b',
             '<span class="mention mention-all">@all</span>',
@@ -91,28 +93,29 @@ def parse_mentions(content, group=None, receiver=None):
         )
 
     from django.contrib.auth import get_user_model
+    from django.utils.html import format_html
     User = get_user_model()
 
-    # 🔹 Обработка @username
+    # Обработка @username
     pattern = r'@(\w+)'
     matches = re.findall(pattern, content)
+    usernames = [m for m in matches if m != 'all']
 
-    for username in matches:
-        if username == 'all':
-            continue  # Уже обработали
-        try:
-            user = User.objects.get(username=username)
-            if user.id not in mentioned_user_ids:
+    if usernames:
+        users_map = {u.username: u for u in User.objects.filter(username__in=usernames)}
+        for username in usernames:
+            user = users_map.get(username)
+            if user and user.id not in mentioned_user_ids:
                 mentioned_user_ids.append(user.id)
-
-            # Заменяем @username на HTML с ссылкой
-            content = re.sub(
-                f'@{username}\\b',
-                f'<a href="/user/{username}/" class="mention" target="_blank">@{username}</a>',
-                content
-            )
-        except User.DoesNotExist:
-            pass
+                link = format_html(
+                    '<a href="/user/{}/" class="mention" target="_blank">@{}</a>',
+                    username, username
+                )
+                content = re.sub(
+                    f'@{username}\\b',
+                    str(link),
+                    content
+                )
 
     return content, list(set(mentioned_user_ids))
 
@@ -143,11 +146,12 @@ def format_mention_content(content):
 
 def create_notification(user, notification_type, title, message, url='', related_message=None):
     from users.models import Notification
-    Notification.objects.create(
+    from django.db import transaction
+    transaction.on_commit(lambda: Notification.objects.create(
         user=user,
         notification_type=notification_type,
         title=title,
         message=message,
         url=url,
         related_message=related_message
-    )
+    ))

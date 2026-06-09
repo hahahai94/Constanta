@@ -1,5 +1,6 @@
 from django.http import HttpResponseForbidden
 from django.conf import settings
+from django.utils.html import escape
 from users.models import BannedIP
 
 
@@ -21,7 +22,7 @@ class IPBanMiddleware:
             return HttpResponseForbidden(
                 "<h1>Доступ запрещён</h1>"
                 "<p>Ваш IP-адрес заблокирован администрацией Constanta.</p>"
-                f"<p><small>IP: {ip}</small></p>"
+                f"<p><small>IP: {escape(ip)}</small></p>"
             )
 
         return self.get_response(request)

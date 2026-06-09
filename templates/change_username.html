@@ -3,6 +3,14 @@
 
 {% block content %}
 <div class="container py-5">
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card-modern p-4">
@@ -26,9 +34,14 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Новый логин</label>
-                        <input type="text" name="username" class="form-control-modern" 
+                        <input type="text" name="username" class="form-control-modern{% if form.username.errors %} is-invalid{% endif %}" 
                                value="{{ form.username.value|default:'' }}" 
                                placeholder="Латиница, цифры, подчёркивание" required>
+                        {% if form.username.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.username.errors %}{{ error }}{% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
 
                     <button type="submit" class="btn-grad grad-blue w-100 mb-2">💾 Сохранить</button>

@@ -148,3 +148,61 @@ class GroupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         gm = GroupMember.objects.get(group=group, user=self.member)
         self.assertEqual(gm.role, 'admin')
+
+    def test_create_group_get(self):
+        response = self.client.get(reverse('create_group'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_create_group_limit_reached(self):
+        from django.conf import settings
+        for i in range(settings.MAX_GROUPS_PER_USER):
+            g = Group.objects.create(name=f'G{i}', owner=self.owner)
+            GroupMember.objects.create(group=g, user=self.owner, role='owner')
+        response = self.client.post(reverse('create_group'), {'name': 'Overflow'})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Group.objects.filter(name='Overflow').exists())
+
+    def test_edit_group_not_owner(self):
+        group = Group.objects.create(name='Original', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        self.client.login(username='worker', password='123')
+        response = self.client.post(reverse('edit_group', args=[group.id]), {'name': 'Hacked'})
+        self.assertEqual(response.status_code, 302)
+        group.refresh_from_db()
+        self.assertEqual(group.name, 'Original')
+
+    def test_edit_group_with_avatar(self):
+        group = Group.objects.create(name='Av Group', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        avatar = SimpleUploadedFile("av.png", b"avatar", content_type="image/png")
+        response = self.client.post(reverse('edit_group', args=[group.id]), {
+            'name': 'Updated', 'avatar': avatar
+        })
+        self.assertEqual(response.status_code, 302)
+        group.refresh_from_db()
+        self.assertEqual(group.name, 'Updated')
+
+    def test_add_member_not_admin(self):
+        group = Group.objects.create(name='Locked', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        self.client.login(username='worker', password='123')
+        other = User.objects.create_user(username='newguy2', password='123')
+        response = self.client.post(reverse('add_member', args=[group.id]), {'username': 'newguy2'})
+        self.assertEqual(response.status_code, 302)
+
+    def test_add_member_already_exists(self):
+        group = Group.objects.create(name='Existing Group', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        response = self.client.post(reverse('add_member', args=[group.id]), {
+            'username': 'worker'
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def test_change_role_protect_owner(self):
+        group = Group.objects.create(name='Owner Protected', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        response = self.client.get(reverse('change_role', args=[group.id, self.owner.id, 'member']))
+        self.assertRedirects(response, reverse('group_chat', args=[group.id]))
+        gm = GroupMember.objects.get(group=group, user=self.owner)
+        self.assertEqual(gm.role, 'owner')

@@ -1,13 +1,15 @@
-from django.test import TestCase, RequestFactory
+from django.test import TestCase, RequestFactory, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import BannedIP, AdminLog, Notification
-from users.forms import RegistrationForm, ChangeUsernameForm, ProfileForm
+from users.forms import RegistrationForm, ChangeUsernameForm, ProfileForm, ChangePasswordForm
 from users.backends import CustomAuthBackend
 from users.middleware import IPBanMiddleware
-from users.views import auth_view, logout_view, profile_view, users_catalog, change_username
+from users.views import auth_view, logout_view, profile_view, users_catalog, change_username, change_password, password_done
+from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -60,6 +62,27 @@ class UserModelTests(TestCase):
         self.user.save()
         self.assertEqual(self.user.banned_by, admin_user)
 
+    def test_user_is_online(self):
+        self.user.last_seen = timezone.now() - timedelta(minutes=1)
+        self.assertTrue(self.user.is_online)
+
+    def test_user_is_offline(self):
+        self.user.last_seen = timezone.now() - timedelta(minutes=5)
+        self.assertFalse(self.user.is_online)
+
+    def test_get_avatar_url_with_avatar(self):
+        file = SimpleUploadedFile("avatar.png", b"x", content_type="image/png")
+        self.user.avatar = file
+        self.user.save()
+        self.assertTrue(self.user.get_avatar_url().startswith('/media/'))
+
+    def test_notification_str(self):
+        notification = Notification.objects.create(
+            user=self.user, notification_type='mention',
+            title='Test', message='Hello'
+        )
+        self.assertIn('mention', str(notification))
+
 
 class CustomAuthBackendTests(TestCase):
     def test_user_can_authenticate_always(self):
@@ -77,6 +100,36 @@ class IPBanMiddlewareTests(TestCase):
         request.META['REMOTE_ADDR'] = '127.0.0.1'
         response = IPBanMiddleware(lambda r: None)(request)
         self.assertIsNone(response)
+
+    @override_settings(DEBUG=False)
+    def test_middleware_bans_ip(self):
+        BannedIP.objects.create(ip_address='10.0.0.99', reason='test')
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '10.0.0.99'
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(DEBUG=False)
+    def test_middleware_allows_clean_ip(self):
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertIsNone(response)
+
+    @override_settings(DEBUG=False)
+    def test_middleware_x_forwarded_for(self):
+        request = self.factory.get('/')
+        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99, 10.0.0.1'
+        BannedIP.objects.create(ip_address='10.0.0.99', reason='proxy')
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertEqual(response.status_code, 403)
+
+    def test_middleware_banned_ip_in_debug(self):
+        BannedIP.objects.create(ip_address='10.0.0.88', reason='test')
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '10.0.0.88'
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertEqual(response.status_code, 403)
 
 
 class RegistrationFormTests(TestCase):
@@ -97,8 +150,21 @@ class RegistrationFormTests(TestCase):
         self.assertFalse(form.is_valid())
 
 
+class ChangeUsernameFormTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='existing', password='pass123')
+
+    def test_change_username_already_taken(self):
+        User.objects.create_user(username='taken', password='pass123')
+        form = ChangeUsernameForm(data={'username': 'taken'}, user=self.user)
+        self.assertFalse(form.is_valid())
+        self.assertIn('занят', str(form.errors))
+
+
 class AuthViewTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
         User.objects.create_user(username='loginuser', password='pass123')
 
     def test_login_get(self):
@@ -142,6 +208,23 @@ class AuthViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class RateLimitTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_rate_limit_blocked(self):
+        for _ in range(5):
+            self.client.post('/auth/', {
+                'username': 'nobody', 'password': 'wrong'
+            })
+        response = self.client.post('/auth/', {
+            'username': 'nobody', 'password': 'wrong'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'много попыток')
+
+
 class ProfileViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -165,6 +248,11 @@ class ProfileViewTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, 'new@test.com')
 
+    def test_profile_form_errors(self):
+        other = User.objects.create_user(username='nick_taken', password='pass123', nick='taken')
+        response = self.client.post('/profile/', {'nick': 'taken'})
+        self.assertEqual(response.status_code, 302)
+
     def test_change_username(self):
         response = self.client.post('/profile/change-username/', {
             'username': 'changedname'
@@ -172,6 +260,18 @@ class ProfileViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.user.refresh_from_db()
         self.assertEqual(self.user.username, 'changedname')
+
+    def test_change_username_get(self):
+        response = self.client.get('/profile/change-username/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_change_password_get(self):
+        response = self.client.get('/profile/change-password/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_password_done(self):
+        response = self.client.get('/profile/password-done/')
+        self.assertEqual(response.status_code, 200)
 
     def test_users_catalog(self):
         User.objects.create_user(username='otheruser', password='pass456')

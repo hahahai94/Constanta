@@ -7,15 +7,13 @@ env.read_env()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = env('SECRET_KEY')
-DEBUG = env.bool('DEBUG', default=True)
+DEBUG = env.bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
-    '127.0.0.1', '1.1.1.71', '192.168.1.67', 'localhost', 'testserver',
+    '127.0.0.1', 'localhost', 'testserver',
 ])
 
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
-    'http://1.1.1.71', 'http://192.168.1.67'
-])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -24,6 +22,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'chat.apps.ChatConfig',
     'users.apps.UsersConfig',
     'tasks',
@@ -31,7 +30,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'Constanta.middleware.CSPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -139,9 +140,28 @@ CACHES = {
     }
 }
 
-SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=1209600)
+SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=86400)
 SESSION_SAVE_EVERY_REQUEST = env.bool('SESSION_SAVE_EVERY_REQUEST', default=False)
 MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+
+# 🔒 Безопасность cookie
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
+CORS_ALLOW_CREDENTIALS = True
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 MAX_FRIENDS_PER_USER = env.int('MAX_FRIENDS_PER_USER', default=500)
 MAX_GROUPS_PER_USER = env.int('MAX_GROUPS_PER_USER', default=50)

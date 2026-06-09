@@ -30,7 +30,7 @@ class AuthAndProfileTests(TestCase):
             'password': 'WRONG_PASSWORD'
         })
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Проверьте правильность ввода')
+        self.assertContains(response, 'Пожалуйста, введите правильные')
 
     def test_registration_success(self):
         """Тест: Регистрация нового юзера"""

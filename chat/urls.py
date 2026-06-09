@@ -1,6 +1,4 @@
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
@@ -22,7 +20,3 @@ urlpatterns = [
     path('api/add-member/', views.api_add_member, name='api_add_member'),
     path('groups/<uuid:group_id>/settings/', views.api_update_group, name='api_update_group'),
 ]
-
-# 🔹 Раздача медиа (только для разработки)
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

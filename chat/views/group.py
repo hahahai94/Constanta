@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from chat.models import Group, GroupMember, Message
 
 User = get_user_model()
@@ -10,10 +11,13 @@ User = get_user_model()
 @login_required
 def groups_list(request):
     """Список групп пользователя"""
-    memberships = GroupMember.objects.filter(
+    from django.core.paginator import Paginator
+    memberships_qs = GroupMember.objects.filter(
         user=request.user
     ).select_related('group').order_by('group__name')
-
+    paginator = Paginator(memberships_qs, 20)
+    page_number = request.GET.get('page', 1)
+    memberships = paginator.get_page(page_number)
     return render(request, 'groups.html', {'memberships': memberships})
 
 
@@ -52,6 +56,9 @@ def create_group(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
+            if Group.objects.filter(owner=request.user).count() >= settings.MAX_GROUPS_PER_USER:
+                messages.error(request, f'❌ Лимит групп ({settings.MAX_GROUPS_PER_USER})')
+                return redirect('groups')
             group = Group.objects.create(name=name, owner=request.user)
             GroupMember.objects.create(group=group, user=request.user, role='owner')
             messages.success(request, f'✅ Группа "{name}" создана!')
@@ -123,6 +130,9 @@ def change_role(request, group_id, user_id, new_role):
         return redirect('group_chat', group_id=group_id)
 
     target = get_object_or_404(GroupMember, group=group, user_id=user_id)
+    if target.user == group.owner:
+        messages.error(request, '🚫 Нельзя изменить роль владельца')
+        return redirect('group_chat', group_id=group_id)
     if new_role in ['member', 'admin']:
         target.role = new_role
         target.save()

@@ -1,26 +1,30 @@
+# users/forms.py
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordChangeForm
 from users.models import User
 
 
 class RegistrationForm(UserCreationForm):
-    nick = forms.CharField(max_length=50, required=False, label="Никнейм")
-
     class Meta:
         model = User
-        fields = ('username', 'password1', 'password2')
+        fields = ['username', 'nick', 'password1', 'password2']
 
-
-class LoginForm(AuthenticationForm):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].label = 'Логин'
+        self.fields['nick'].label = 'Никнейм'
+        self.fields['nick'].required = False
+        self.fields['password1'].label = 'Пароль'
+        self.fields['password2'].label = 'Повторите пароль'
 
 
 class ProfileForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['nick', 'bio', 'avatar']
+        fields = ['nick', 'email', 'avatar', 'bio']
         widgets = {
             'nick': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'avatar': forms.FileInput(attrs={'class': 'form-control'}),
         }
@@ -49,7 +53,3 @@ class ChangePasswordForm(PasswordChangeForm):
         label="Подтверждение пароля",
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
     )
-
-
-class AddFriendForm(forms.Form):
-    friend_username = forms.CharField(label="Никнейм или username", max_length=150)

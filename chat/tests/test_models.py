@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from chat.models import Message, Group, GroupMember
+from chat.models import Message, Group, GroupMember, _file_hash, _attachment_upload_to
 import io
+import os
+
 
 User = get_user_model()
 
@@ -76,6 +78,11 @@ class GroupModelTests(TestCase):
         group = Group.objects.create(name='No Avatar', owner=self.owner)
         self.assertEqual(group.get_avatar_url(), '/static/default_group_avatar.png')
 
+    def test_group_get_avatar_with_avatar(self):
+        file = SimpleUploadedFile("group_av.png", b"x", content_type="image/png")
+        group = Group.objects.create(name='Has Avatar', owner=self.owner, avatar=file)
+        self.assertTrue(group.get_avatar_url().startswith('/media/'))
+
     def test_is_owner(self):
         group = Group.objects.create(name='Owned', owner=self.owner)
         self.assertTrue(group.is_owner(self.owner))
@@ -113,6 +120,56 @@ class GroupModelTests(TestCase):
             sender=self.owner, group=group, content='Group hello'
         )
         self.assertIn('Group hello', str(msg))
+
+
+class FileHashTests(TestCase):
+    def test_file_hash_without_chunks(self):
+        class FakeFile:
+            def __init__(self, data):
+                self._data = data
+                self._pos = 0
+            def seek(self, pos):
+                self._pos = pos
+            def read(self, size=65536):
+                chunk = self._data[self._pos:self._pos+size]
+                self._pos += len(chunk)
+                return chunk
+
+        result = _file_hash(FakeFile(b'hash me'), user_id=1)
+        self.assertEqual(len(result), 64)
+
+    def test_attachment_upload_to_without_hash(self):
+        class FakeMsg:
+            attachment_hash = ''
+            attachment = SimpleUploadedFile("upload.txt", b"content")
+            sender = type('obj', (object,), {'id': 1})()
+
+        path = _attachment_upload_to(FakeMsg(), "upload.txt")
+        self.assertIn(os.path.join('attachments'), path)
+        self.assertTrue(path.endswith('.txt'))
+
+
+class MessageGetAttachmentNameTests(TestCase):
+    def setUp(self):
+        self.sender = User.objects.create_user(username='name_tester', password='123')
+
+    def test_get_attachment_name_with_attachment_only(self):
+        file = SimpleUploadedFile("onlyfile.pdf", b"pdf content", content_type="application/pdf")
+        msg = Message.objects.create(
+            sender=self.sender, receiver=self.sender,
+            content='Has file', attachment=file
+        )
+        msg.attachment_original_name = ''
+        name = msg.get_attachment_name()
+        self.assertIsNotNone(name)
+        self.assertIn('.pdf', name)
+
+    def test_get_attachment_name_no_attachment_no_name(self):
+        msg = Message.objects.create(
+            sender=self.sender, receiver=self.sender,
+            content='Nothing'
+        )
+        self.assertIsNone(msg.get_attachment_name())
 
 
 class MessageSaveTests(TestCase):

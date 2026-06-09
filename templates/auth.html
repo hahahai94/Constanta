@@ -26,6 +26,7 @@
                     <!-- Форма -->
                     <form method="post" novalidate>
                         {% csrf_token %}
+                        <input type="hidden" name="mode" value="{{ type }}">
 
                         {% if type == 'reg' %}
                             <!-- ПОЛЯ РЕГИСТРАЦИИ -->

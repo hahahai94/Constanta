@@ -3,6 +3,14 @@
 
 {% block content %}
 <div class="container py-4">
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>📁 Мои группы</h2>
         <button type="button" class="btn-grad grad-green" data-bs-toggle="modal" data-bs-target="#createGroupModal">➕ Создать группу</button>
@@ -32,6 +40,28 @@
         </div>
         {% endfor %}
     </div>
+
+    {% if memberships.paginator.num_pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if memberships.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page=1">&laquo;</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ memberships.previous_page_number }}">‹</a></li>
+            {% endif %}
+            {% for num in memberships.paginator.page_range %}
+                {% if num == memberships.number %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > memberships.number|add:'-3' and num < memberships.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+            {% if memberships.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ memberships.next_page_number }}">›</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ memberships.paginator.num_pages }}">&raquo;</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
 
 <!-- 🔹 МОДАЛКА СОЗДАНИЯ ГРУППЫ -->

@@ -116,9 +116,64 @@ class TaskViewTests(TestCase):
         self.client.post(reverse('delete_task_list', args=[self.list.id]))
         self.assertEqual(TaskList.objects.count(), 0)
 
+    def test_delete_task_list_get_redirect(self):
+        self.client.login(username='testuser', password='pass1234')
+        response = self.client.get(reverse('delete_task_list', args=[self.list.id]))
+        self.assertRedirects(response, reverse('task_lists'))
+        self.assertEqual(TaskList.objects.count(), 1)
+
     def test_cannot_access_other_users_list(self):
         other = User.objects.create_user(username='other', password='pass1234')
         other_list = TaskList.objects.create(name='Other', owner=other)
         self.client.login(username='testuser', password='pass1234')
         response = self.client.get(reverse('task_list_detail', args=[other_list.id]))
         self.assertEqual(response.status_code, 404)
+
+    def test_create_task_list_get(self):
+        self.client.login(username='testuser', password='pass1234')
+        response = self.client.get(reverse('create_task_list'))
+        self.assertRedirects(response, reverse('task_lists'))
+
+    def test_edit_task_list_get(self):
+        self.client.login(username='testuser', password='pass1234')
+        response = self.client.get(reverse('edit_task_list', args=[self.list.id]))
+        self.assertRedirects(response, reverse('task_lists'))
+
+    def test_edit_task_list_post(self):
+        self.client.login(username='testuser', password='pass1234')
+        response = self.client.post(reverse('edit_task_list', args=[self.list.id]), {
+            'name': 'Updated Name'
+        })
+        self.assertRedirects(response, reverse('task_lists'))
+        self.list.refresh_from_db()
+        self.assertEqual(self.list.name, 'Updated Name')
+
+    def test_edit_task_list_post_empty_name(self):
+        self.client.login(username='testuser', password='pass1234')
+        response = self.client.post(reverse('edit_task_list', args=[self.list.id]), {
+            'name': ''
+        })
+        self.assertRedirects(response, reverse('task_lists'))
+        self.list.refresh_from_db()
+        self.assertEqual(self.list.name, 'My List')
+
+    def test_add_task_empty_title(self):
+        self.client.login(username='testuser', password='pass1234')
+        response = self.client.post(reverse('task_list_detail', args=[self.list.id]), {
+            'action': 'add_task',
+            'title': '',
+        })
+        self.assertRedirects(response, reverse('task_list_detail', args=[self.list.id]))
+        self.assertEqual(Task.objects.count(), 0)
+
+    def test_edit_task_empty_title(self):
+        self.client.login(username='testuser', password='pass1234')
+        task = Task.objects.create(task_list=self.list, title='Old', created_by=self.user)
+        response = self.client.post(reverse('task_list_detail', args=[self.list.id]), {
+            'action': 'edit_task',
+            'task_id': task.id,
+            'title': '',
+        })
+        self.assertRedirects(response, reverse('task_list_detail', args=[self.list.id]))
+        task.refresh_from_db()
+        self.assertEqual(task.title, 'Old')

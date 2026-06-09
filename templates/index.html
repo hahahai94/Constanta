@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block content %}
+{% block extra_css %}
 <style>
     /* Фиксируем высоту на весь экран и убираем прокрутку страницы */
     html, body {
@@ -141,6 +141,9 @@
     .chat-item:hover { background: #f8f9fa; }
     .chat-item.active { background: #e9ecef; }
 </style>
+{% endblock %}
+
+{% block content %}
 
 <!-- Главный контейнер на всю высоту экрана (минус шапка 56px) -->
 <div class="d-flex" style="height: calc(100vh - 56px); overflow: hidden;">
@@ -206,7 +209,7 @@
         <!-- Сообщения (скролл только здесь!) -->
         <div class="flex-grow-1 overflow-auto p-4" id="messages-container" style="background: #f5f7fa;">
             {% for msg in messages %}
-            <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3">
+            <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3" data-message-id="{{ msg.id }}">
                 <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
                     <!-- Кнопка ответа -->
                     <button type="button" class="reply-btn" onclick="startReply('{{ msg.id }}', '{{ msg.sender.username }}', '{{ msg.content|escapejs|default:"📎 Вложение" }}')">

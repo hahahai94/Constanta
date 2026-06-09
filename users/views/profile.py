@@ -3,53 +3,43 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from users.models import User
-from users.forms import ChangeUsernameForm, ChangePasswordForm
+from users.forms import ChangeUsernameForm, ChangePasswordForm, ProfileForm
 
 
 @login_required
 def profile_view(request):
-    user = request.user
     if request.method == 'POST':
-        new_nick = request.POST.get('nick', '').strip()
-        new_email = request.POST.get('email', '').strip()
-
-        update_fields = []
-
-        if new_nick and user.nick != new_nick:
-            user.nick = new_nick
-            update_fields.append('nick')
-
-        if new_email and user.email != new_email:
-            user.email = new_email
-            update_fields.append('email')
-
-        if request.FILES.get('avatar'):
-            user.avatar = request.FILES['avatar']
-            update_fields.append('avatar')
-
-        if update_fields:
-            user.save(update_fields=update_fields)
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
             messages.success(request, 'Профиль обновлён!')
         else:
-            messages.info(request, 'Изменений не найдено')
-
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
         return redirect('profile')
 
-    return render(request, 'profile.html', {'user': user})
+    return render(request, 'profile.html', {'user': request.user})
 
 
 @login_required
 def users_catalog(request):
     from django.db.models import Q
+    from django.core.paginator import Paginator
     q = request.GET.get('q', '').strip()
     if q:
-        users = User.objects.filter(
+        users_qs = User.objects.filter(
             Q(username__icontains=q) | Q(nick__icontains=q) |
             Q(first_name__icontains=q) | Q(last_name__icontains=q)
-        ).exclude(id=request.user.id)
+        ).exclude(id=request.user.id).order_by('username')
     else:
-        users = User.objects.exclude(id=request.user.id)
+        users_qs = User.objects.exclude(id=request.user.id).order_by('username')
+    paginator = Paginator(users_qs, 20)
+    page_number = request.GET.get('page', 1)
+    users = paginator.get_page(page_number)
     return render(request, 'users_catalog.html', {'users': users, 'query': q})
 
 
