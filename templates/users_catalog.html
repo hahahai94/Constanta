@@ -112,8 +112,10 @@
                     <img src="{{ user.get_avatar_url }}"
                          class="user-avatar me-3" alt="{{ user.username }}">
                     <div class="flex-grow-1">
-                        <div class="user-name">{{ user.get_display_name|default:user.username }}</div>
-                        <div class="user-username">@{{ user.username }}</div>
+                        <a href="{% url 'public_profile' username=user.username %}" class="text-decoration-none">
+                            <div class="user-name">{{ user.get_display_name|default:user.username }}</div>
+                            <div class="user-username">@{{ user.username }}</div>
+                        </a>
                         <a href="{% url 'main' %}?friend_id={{ user.id }}" class="btn-write">
                             <i class="bi bi-chat-left-fill"></i> Написать
                         </a>

@@ -1,0 +1,22 @@
+# Constanta — Messenger on Django
+
+> Modern messenger with private chats, group chats, file sharing, and task lists.
+
+## Docs
+
+- README: https://github.com/hahahai94/Constanta
+- License: MIT
+- Stack: Django 6, Python 3.14, PostgreSQL, Bootstrap 5
+
+## Features
+
+- Private messaging with auto-polling every 2 seconds
+- Group chats with roles (creator, admin, member)
+- File sharing with attachment download
+- Task lists per user
+- User directory and profiles
+- Avatar upload (JPEG, PNG, GIF, WebP)
+
+## Project
+
+Constanta is a real-time messaging application built with Django. It uses server-side rendering with Django Templates and Bootstrap 5 for the frontend, and an auto-polling mechanism for real-time updates. File uploads are validated by magic bytes and hashed with SHA256 for deduplication.

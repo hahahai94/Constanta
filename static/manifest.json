@@ -1,0 +1,21 @@
+{
+  "name": "Constanta Messenger",
+  "short_name": "Constanta",
+  "description": "Современный мессенджер с групповыми чатами и задачами",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#667eea",
+  "icons": [
+    {
+      "src": "/static/default_avatar.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/default_avatar.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

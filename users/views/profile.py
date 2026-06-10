@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
 from users.models import User
 from users.forms import ChangeUsernameForm, ChangePasswordForm, ProfileForm
 
@@ -73,3 +74,9 @@ def change_password(request):
 
 def password_done(request):
     return render(request, 'password_done.html')
+
+
+@login_required
+def public_profile(request, username):
+    profile_user = get_object_or_404(User, username=username)
+    return render(request, 'public_profile.html', {'profile_user': profile_user})

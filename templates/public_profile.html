@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ profile_user.get_display_name }} — Constanta{% endblock %}
+
+{% block og_title %}{{ profile_user.get_display_name }} — Constanta Messenger{% endblock %}
+{% block og_description %}Профиль пользователя {{ profile_user.get_display_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card-modern text-center">
+        <img src="{{ profile_user.get_avatar_url }}"
+             class="rounded-circle shadow mb-3"
+             style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #667eea;"
+             alt="{{ profile_user.username }}">
+
+        <h4>{{ profile_user.get_display_name }}</h4>
+        <p class="text-muted">@{{ profile_user.username }}</p>
+
+        {% if profile_user.bio %}
+        <p class="text-muted">{{ profile_user.bio }}</p>
+        {% endif %}
+
+        <p class="small">
+          {% if profile_user.is_online %}
+          <span class="text-success">● Онлайн</span>
+          {% else %}
+          <span class="text-muted">● Был(а) {% if profile_user.last_seen %}{{ profile_user.last_seen|timesince }} назад{% else %}давно{% endif %}</span>
+          {% endif %}
+        </p>
+
+        {% if user.is_authenticated and profile_user != user %}
+        <a href="{% url 'main' %}?friend_id={{ profile_user.id }}" class="btn-grad grad-purple w-100 mt-3">
+          💬 Написать
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
