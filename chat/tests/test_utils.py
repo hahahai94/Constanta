@@ -1,5 +1,5 @@
 from django.test import TestCase, TransactionTestCase
-from chat.utils import generate_file_hash, parse_mentions, format_mention_content, create_notification
+from chat.utils import generate_file_hash, parse_mentions, create_notification
 from chat.models import Group, GroupMember
 from django.contrib.auth import get_user_model
 from users.models import Notification
@@ -88,12 +88,6 @@ class UtilsMentionTests(TestCase):
         self.assertIn(self.user.id, ids)
         self.assertIn(u2.id, ids)
         self.assertEqual(len(ids), 2)
-
-    def test_format_mention_content(self):
-        raw = '<span class="mention mention-all">@all</span>'
-        result = format_mention_content(raw)
-        self.assertIn('mention-all', result)
-
 
 class UtilsNotificationTests(TransactionTestCase):
     def setUp(self):

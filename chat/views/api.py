@@ -191,8 +191,9 @@ def api_add_member(request):
         username = data.get('username', '').strip()
 
         group = get_object_or_404(Group, id=group_id)
+        membership = GroupMember.objects.filter(group=group, user=request.user).first()
 
-        if group.owner != request.user:
+        if not membership or membership.role not in ['owner', 'admin']:
             return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
 
         user = get_object_or_404(User, username=username)
@@ -255,8 +256,9 @@ def api_remove_member(request):
 
         group = get_object_or_404(Group, id=group_id)
         target_user = get_object_or_404(User, id=user_id)
+        membership = GroupMember.objects.filter(group=group, user=request.user).first()
 
-        if group.owner != request.user:
+        if not membership or membership.role not in ['owner', 'admin']:
             return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
 
         if target_user == group.owner:

@@ -38,8 +38,4 @@ class UtilsPathTests(TestCase):
         self.assertEqual(result, 'original.pdf')
 
 
-class UtilsFormatMentionTests(TestCase):
-    def test_format_mention_escaped(self):
-        from chat.utils import format_mention_content
-        result = format_mention_content('&lt;span class="mention"&gt;@user&lt;/span&gt;')
-        self.assertIn('mention', result)
+

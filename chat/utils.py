@@ -120,28 +120,6 @@ def parse_mentions(content, group=None, receiver=None):
     return content, list(set(mentioned_user_ids))
 
 
-def format_mention_content(content):
-    """
-    Безопасно форматирует контент с упоминаниями для отображения
-    """
-    import html
-    content = html.escape(content)
-
-    # Но оставляем наши mention-теги
-    content = re.sub(
-        r'&lt;span class="mention.*?&gt;@all&lt;/span&gt;',
-        '<span class="mention mention-all">@all</span>',
-        content
-    )
-    content = re.sub(
-        r'&lt;a href=".*?" class="mention".*?&gt;@(\w+)&lt;/a&gt;',
-        r'<a href="\1" class="mention">@\1</a>',
-        content
-    )
-
-    return content
-
-
 # ==================== УВЕДОМЛЕНИЯ ====================
 
 def create_notification(user, notification_type, title, message, url='', related_message=None):

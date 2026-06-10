@@ -1,6 +1,14 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .card {
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+</style>
 {% endblock %}
 {% block content %}
 <div class="container d-flex justify-content-center align-items-center h-100">
@@ -62,13 +70,4 @@
         </div>
     </div>
 </div>
-
-<style>
-    body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    .card {
-        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-    }
-</style>
 {% endblock %}
