@@ -231,6 +231,7 @@ class APITests(TestCase):
     def test_api_add_member_already_exists(self):
         group = Group.objects.create(name='G5', owner=self.user)
         GroupMember.objects.create(group=group, user=self.friend, role='member')
+        GroupMember.objects.create(group=group, user=self.user, role='owner')
         response = self.client.post('/api/add-member/', json.dumps({
             'group_id': str(group.id), 'username': self.friend.username
         }), content_type='application/json')

@@ -115,6 +115,7 @@ class GroupTests(TestCase):
 
     def test_api_add_member(self):
         group = Group.objects.create(name='API Group', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
         other = User.objects.create_user(username='newguy', password='123')
         response = self.client.post('/api/add-member/', json.dumps({
             'group_id': str(group.id), 'username': 'newguy'
@@ -132,6 +133,7 @@ class GroupTests(TestCase):
 
     def test_api_remove_member(self):
         group = Group.objects.create(name='API G3', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
         GroupMember.objects.create(group=group, user=self.member, role='member')
         response = self.client.post('/api/remove-member/', json.dumps({
             'group_id': str(group.id), 'user_id': self.member.id

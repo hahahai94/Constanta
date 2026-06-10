@@ -4,7 +4,7 @@ from django.utils.html import format_html
 from django.http import HttpResponse
 from django.contrib import messages
 from django.db.models import Count
-from chat.models import Group, Message, GroupMember
+from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 import csv, os
 
 User = get_user_model()
@@ -155,3 +155,16 @@ class UltimateGroupMemberAdmin(admin.ModelAdmin):
         self.message_user(request, f"Исключено {count} участников", messages.WARNING)
 
     actions = ['promote_to_admin', 'demote_to_member', 'kick_from_groups']
+
+
+@admin.register(Channel)
+class ChannelAdmin(admin.ModelAdmin):
+    list_display = ('name', 'owner', 'is_private', 'created_at')
+    list_filter = ('is_private', 'created_at')
+    search_fields = ('name', 'owner__username')
+
+
+@admin.register(ChannelMember)
+class ChannelMemberAdmin(admin.ModelAdmin):
+    list_display = ('channel', 'user', 'role', 'joined_at')
+    list_filter = ('role', 'channel')

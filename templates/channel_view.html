@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ channel.name }} — Constanta{% endblock %}
+{% block extra_css %}
+<style>
+.channel-header { background: #1e1e2e; border-bottom: 1px solid #313244; padding: 16px 0; }
+.channel-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
+.post-card { background: #1e1e2e; border: 1px solid #313244; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.post-card:hover { border-color: #667eea; }
+.post-meta { font-size: 0.85rem; color: #6c757d; }
+.post-form { background: #1e1e2e; border: 1px solid #313244; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="channel-header">
+  <div class="container d-flex align-items-center">
+    <img src="{{ channel.get_avatar_url }}" class="channel-avatar me-3" alt="">
+    <div>
+      <h3 class="mb-0">{{ channel.name }}</h3>
+      <small class="text-muted">{{ channel.description|default:'Нет описания' }}</small>
+      <span class="badge bg-secondary ms-2">{{ membership.get_role_display }}</span>
+      {% if channel.is_private %}<span class="badge bg-warning ms-1">Приватный</span>{% endif %}
+    </div>
+    <div class="ms-auto">
+      <a href="{% url 'channel_list' %}" class="btn btn-outline-secondary btn-sm">← Все каналы</a>
+      {% if membership.role == 'owner' or membership.role == 'admin' %}
+      <a href="{% url 'edit_channel' channel.id %}" class="btn btn-outline-primary btn-sm">Редактировать</a>
+      {% endif %}
+      {% if channel.owner == user %}
+      <form method="post" action="{% url 'delete_channel' channel.id %}" class="d-inline">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Удалить канал?')">Удалить</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{% url 'leave_channel' channel.id %}" class="d-inline">
+        {% csrf_token %}
+        <button class="btn btn-outline-warning btn-sm">Отписаться</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="container mt-4">
+  {% if edit_mode %}
+  <div class="post-form">
+    <h5>Редактировать канал</h5>
+    <form method="post" action="{% url 'edit_channel' channel.id %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="mb-2">
+        <label>Название</label>
+        <input type="text" name="name" class="form-control" value="{{ channel.name }}" required>
+      </div>
+      <div class="mb-2">
+        <label>Описание</label>
+        <textarea name="description" class="form-control" rows="2">{{ channel.description }}</textarea>
+      </div>
+      <div class="mb-2">
+        <label>Аватар</label>
+        <input type="file" name="avatar" class="form-control">
+      </div>
+      <button type="submit" class="btn btn-success">Сохранить</button>
+      <a href="{% url 'channel_view' channel.id %}" class="btn btn-secondary">Отмена</a>
+    </form>
+  </div>
+  {% endif %}
+  {% if can_post %}
+  <div class="post-form">
+    <form method="post" action="{% url 'api_channel_post' channel.id %}" enctype="multipart/form-data" data-channel-post-form>
+      {% csrf_token %}
+      <div class="mb-2">
+        <textarea name="content" class="form-control" rows="3" placeholder="Напишите пост..." maxlength="{{ max_message_length|default:'2000' }}"></textarea>
+      </div>
+      <div class="d-flex justify-content-between align-items-center">
+        <input type="file" name="attachment" class="form-control" style="width:auto">
+        <button type="submit" class="btn btn-primary">Опубликовать</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  {% for post in posts %}
+  <div class="post-card" data-message-id="{{ post.id }}">
+    <div class="post-meta mb-2">
+      <strong>{{ post.sender.username }}</strong> • {{ post.created_at|date:"d.m.Y H:i" }}
+    </div>
+    {% if post.reply_to %}
+    <div class="reply-preview p-2 rounded mb-2" style="background:#11111b;font-size:0.9rem;border-left:3px solid #667eea">
+      <small>Ответ на <strong>{{ post.reply_to.sender.username }}</strong>: {{ post.reply_to.content|truncatewords:10 }}</small>
+    </div>
+    {% endif %}
+    <div>{{ post.content|linebreaksbr }}</div>
+    {% if post.attachment %}
+    <div class="mt-2">
+      {% if post.attachment_type == 'image' %}
+        <img src="{{ post.attachment.url }}" class="img-fluid rounded" style="max-height:400px" alt="">
+      {% else %}
+        <a href="{% url 'download_attachment' post.id %}" class="btn btn-sm btn-outline-info">{{ post.get_attachment_name }}</a>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if post.mentions %}
+    <div class="post-meta mt-1"><small>Упомянуты: {{ post.mentions }}</small></div>
+    {% endif %}
+  </div>
+  {% empty %}
+  <p class="text-muted">В канале пока нет публикаций.</p>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-channel-post-form]').forEach(form => {
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    fetch(this.action, { method: 'POST', body: formData, headers: { 'X-CSRFToken': formData.get('csrfmiddlewaretoken') } })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') { location.reload(); }
+      else { alert(data.message); }
+    });
+  });
+});
+</script>
+{% endblock %}

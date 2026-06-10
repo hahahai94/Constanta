@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Каналы — Constanta{% endblock %}
+{% block extra_css %}
+<style>
+.channel-card { background: #1e1e2e; border: 1px solid #313244; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.channel-card:hover { border-color: #667eea; }
+.channel-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Каналы</h2>
+    {% if user.is_superuser %}
+    <form method="post" action="{% url 'create_channel' %}" style="display:inline">
+      {% csrf_token %}
+      <input type="text" name="name" placeholder="Название канала" required class="form-control d-inline-block" style="width:auto;display:inline">
+      <button class="btn btn-success">Создать канал</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if memberships %}
+    {% for m in memberships %}
+    <div class="channel-card d-flex align-items-center">
+      <img src="{{ m.channel.get_avatar_url }}" class="channel-avatar me-3" alt="">
+      <div class="flex-grow-1">
+        <a href="{% url 'channel_view' m.channel.id %}" class="text-decoration-none"><h5 class="mb-1">{{ m.channel.name }}</h5></a>
+        <small class="text-muted">{{ m.channel.description|default:'Нет описания' }}</small>
+      </div>
+      <span class="badge bg-secondary ms-2">{{ m.get_role_display }}</span>
+      <form method="post" action="{% url 'leave_channel' m.channel.id %}" class="ms-2">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-outline-danger">Отписаться</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-muted">Вы ещё не подписаны ни на один канал.</p>
+  {% endif %}
+  {% if user.is_superuser %}
+  <h3 class="mt-4">Все каналы (управление)</h3>
+  {% for ch in all_channels %}
+    <div class="channel-card d-flex align-items-center">
+      <img src="{{ ch.get_avatar_url }}" class="channel-avatar me-3" alt="">
+      <div class="flex-grow-1">
+        <a href="{% url 'channel_view' ch.id %}" class="text-decoration-none"><h5 class="mb-1">{{ ch.name }}</h5></a>
+        <small class="text-muted">Владелец: {{ ch.owner.username }}</small>
+      </div>
+      <form method="post" action="{% url 'delete_channel' ch.id %}" class="ms-2">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить канал?')">Удалить</button>
+      </form>
+    </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

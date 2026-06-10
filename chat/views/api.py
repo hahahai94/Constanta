@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
-from chat.models import Group, Message, GroupMember
+from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from chat.utils import parse_mentions, create_notification
 
 logger = logging.getLogger(__name__)
@@ -307,3 +307,61 @@ def api_heartbeat(request):
     request.user.last_seen = timezone.now()
     request.user.save(update_fields=['last_seen'])
     return JsonResponse({'status': 'ok'})
+
+
+@login_required
+def api_channel_post(request, channel_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
+    channel = get_object_or_404(Channel, id=channel_id)
+    membership = ChannelMember.objects.filter(channel=channel, user=request.user).first()
+    if not membership or membership.role not in ['owner', 'admin']:
+        return JsonResponse({'status': 'error', 'message': 'Нет прав на публикацию'}, status=403)
+    content = request.POST.get('content', '').strip()
+    attachment = request.FILES.get('attachment')
+    if not content and not attachment:
+        return JsonResponse({'status': 'error', 'message': 'Пустой пост'}, status=400)
+    if len(content) > settings.MAX_MESSAGE_LENGTH:
+        return JsonResponse({'status': 'error', 'message': 'Слишком длинное'}, status=400)
+    try:
+        attachment_type = 'none'
+        if attachment:
+            head = attachment.read(32)
+            attachment.seek(0)
+            detected = _detect_image_type(head)
+            ct = attachment.content_type or ''
+            if detected:
+                attachment_type = 'image'
+            elif ct.startswith('audio/'):
+                attachment_type = 'voice'
+            elif ct.startswith('image/'):
+                attachment_type = 'image'
+            else:
+                attachment_type = 'file'
+        msg = Message.objects.create(
+            sender=request.user, channel=channel, receiver=None, group=None,
+            content=content, attachment=attachment, attachment_type=attachment_type,
+        )
+        if content:
+            try:
+                parsed_content, mentioned_users = parse_mentions(content, group=None)
+                if mentioned_users:
+                    msg.mentions = json.dumps(mentioned_users)
+                    msg.save(update_fields=['mentions'])
+                    for uid in mentioned_users:
+                        mentioned_user = User.objects.filter(id=uid).first()
+                        if mentioned_user:
+                            create_notification(
+                                user=mentioned_user,
+                                notification_type='mention',
+                                title='Упоминание в канале',
+                                message=f'{request.user.username} упомянул вас в канале: {content[:50]}',
+                                url=f'/channel/{channel_id}/',
+                                related_message=msg,
+                            )
+            except Exception:
+                logger.exception('Failed to process mentions for channel post')
+        return JsonResponse({'status': 'ok'})
+    except Exception:
+        logger.exception('Failed to create channel post')
+        return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=500)
