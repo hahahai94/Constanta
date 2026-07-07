@@ -8,8 +8,12 @@ from chat.models import Channel, ChannelMember, Message
 @login_required
 def channel_list(request):
     memberships = ChannelMember.objects.filter(user=request.user).select_related('channel').order_by('channel__name')
-    all_channels = Channel.objects.all().order_by('name') if request.user.is_superuser else []
-    return render(request, 'channels.html', {'memberships': memberships, 'all_channels': all_channels})
+    subscribed_ids = memberships.values_list('channel_id', flat=True)
+    discover_channels = Channel.objects.exclude(id__in=subscribed_ids).order_by('name')
+    return render(request, 'channels.html', {
+        'memberships': memberships,
+        'discover_channels': discover_channels,
+    })
 
 
 @login_required

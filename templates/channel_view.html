@@ -50,10 +50,12 @@
         <button class="btn-grad grad-red" style="padding: 6px 14px; font-size: 13px;" onclick="return confirm('Удалить канал?')">Удалить</button>
       </form>
       {% endif %}
+      {% if channel.owner != user %}
       <form method="post" action="{% url 'leave_channel' channel.id %}" class="d-inline">
         {% csrf_token %}
         <button class="btn-grad grad-orange" style="padding: 6px 14px; font-size: 13px;">Отписаться</button>
       </form>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -81,7 +83,7 @@
     </form>
   </div>
   {% endif %}
-  {% if can_post %}
+  {% if can_post and not edit_mode %}
   <div class="post-form">
     <h5>Новый пост</h5>
     <form method="post" action="{% url 'api_channel_post' channel.id %}" enctype="multipart/form-data" data-channel-post-form>
