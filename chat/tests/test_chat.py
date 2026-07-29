@@ -21,7 +21,10 @@ class PrivateChatTests(TestCase):
             'content': 'Привет, Боб!'
         })
         self.assertEqual(response.status_code, 200)
-        self.assertJSONEqual(response.content, {'status': 'ok'})
+        data = response.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('html', data)
+        self.assertIn('message_id', data)
 
         # Проверка БД
         msg = Message.objects.get(sender=self.user1, receiver=self.user2)
@@ -39,7 +42,10 @@ class PrivateChatTests(TestCase):
         })
 
         self.assertEqual(response.status_code, 200)
-        self.assertJSONEqual(response.content, {'status': 'ok'})
+        data = response.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('html', data)
+        self.assertIn('message_id', data)
 
         msg = Message.objects.get(sender=self.user1, receiver=self.user2)
         self.assertTrue(msg.attachment)

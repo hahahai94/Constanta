@@ -35,15 +35,7 @@ class GroupForm(forms.ModelForm):
         }
 
 
-class GroupEditForm(forms.ModelForm):
-    class Meta:
-        model = Group
-        fields = ['name', 'description', 'avatar']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'avatar': forms.FileInput(attrs={'class': 'form-control'}),
-        }
+GroupEditForm = GroupForm
 
 
 class AddMemberForm(forms.Form):

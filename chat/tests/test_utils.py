@@ -101,3 +101,56 @@ class UtilsNotificationTests(TransactionTestCase):
             message='Someone wants to be your friend'
         )
         self.assertTrue(Notification.objects.filter(user=self.user).exists())
+
+
+class RateLimitTests(TestCase):
+    def test_rate_limit_decorator_blocks_excess(self):
+        from chat.utils import rate_limit
+        from django.http import HttpResponse
+
+        call_count = [0]
+
+        @rate_limit('test_endpoint', limit=2, period=10)
+        def my_view(request):
+            call_count[0] += 1
+            return HttpResponse('ok')
+
+        from django.http import HttpRequest
+        req = HttpRequest()
+        req.META = {'REMOTE_ADDR': '127.0.0.1'}
+        req.method = 'POST'
+        req.path = '/test/'
+
+        resp1 = my_view(req)
+        self.assertEqual(resp1.status_code, 200)
+        self.assertEqual(call_count[0], 1)
+
+        resp2 = my_view(req)
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(call_count[0], 2)
+
+        resp3 = my_view(req)
+        self.assertEqual(resp3.status_code, 429)
+        self.assertEqual(call_count[0], 2)
+
+    def test_rate_limit_get_not_limited(self):
+        from chat.utils import rate_limit
+        from django.http import HttpResponse
+
+        call_count = [0]
+
+        @rate_limit('test_get', limit=1, period=10)
+        def my_view(request):
+            call_count[0] += 1
+            return HttpResponse('ok')
+
+        from django.http import HttpRequest
+        req = HttpRequest()
+        req.META = {'REMOTE_ADDR': '127.0.0.1'}
+        req.method = 'GET'
+        req.path = '/test/'
+
+        my_view(req)
+        my_view(req)
+        my_view(req)
+        self.assertEqual(call_count[0], 3)

@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+from io import BytesIO
 from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -9,11 +10,12 @@ from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
-from chat.utils import parse_mentions, create_notification
+from chat.utils import parse_mentions, create_notification, rate_limit
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+# Магические байты для детекции типа (первые 16 байт достаточно для всех известных форматов)
 IMAGE_MAGIC_BYTES = {
     b'\xff\xd8\xff': 'image/jpeg',
     b'\x89PNG\r\n\x1a\n': 'image/png',
@@ -23,12 +25,54 @@ IMAGE_MAGIC_BYTES = {
     b'\x42\x4d': 'image/bmp',
 }
 
+AUDIO_MAGIC_BYTES = {
+    b'RIFF': 'audio/wav',
+    b'OggS': 'audio/ogg',
+    b'fLaC': 'audio/flac',
+}
 
-def _detect_image_type(data):
+
+def _detect_attachment_type(data, content_type=''):
+    ct = (content_type or '').lower()
     for magic, mime in IMAGE_MAGIC_BYTES.items():
         if data.startswith(magic):
-            return mime
-    return None
+            return 'image'
+    for magic, mime in AUDIO_MAGIC_BYTES.items():
+        if data.startswith(magic):
+            return 'voice'
+    if ct.startswith('audio/'):
+        return 'voice'
+    if ct.startswith('image/'):
+        return 'image'
+    return 'file'
+
+
+def _validate_attachment(attachment):
+    """Проверяет загруженный файл: размер + валидация содержимого.
+
+    Возвращает (attachment_type, None) в случае успеха
+    или (None, JsonResponse) в случае ошибки.
+    """
+    if attachment.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
+        return None, JsonResponse({'status': 'error', 'message': 'Файл слишком большой'}, status=400)
+
+    head = attachment.read(1024)
+    attachment.seek(0)
+
+    attachment_type = _detect_attachment_type(head, attachment.content_type)
+
+    if attachment_type == 'image':
+        for magic in IMAGE_MAGIC_BYTES:
+            if head.startswith(magic):
+                try:
+                    from PIL import Image
+                    img = Image.open(BytesIO(head))
+                    img.verify()
+                except Exception:
+                    return None, JsonResponse({'status': 'error', 'message': 'Файл не является валидным изображением'}, status=400)
+                break
+
+    return attachment_type, None
 
 
 def _safe_filename(name):
@@ -48,6 +92,7 @@ def _content_disposition_header(filename):
 
 
 @login_required
+@rate_limit('api_send', limit=20, period=60)
 def send_message(request):
     """API: отправка сообщения с поддержкой ответов"""
     if request.method != 'POST':
@@ -71,20 +116,9 @@ def send_message(request):
 
     attachment_type = 'none'
     if attachment:
-        if attachment.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
-            return JsonResponse({'status': 'error', 'message': 'Файл слишком большой'}, status=400)
-        head = attachment.read(32)
-        attachment.seek(0)
-        detected = _detect_image_type(head)
-        ct = attachment.content_type or ''
-        if detected:
-            attachment_type = 'image'
-        elif ct.startswith('audio/'):
-            attachment_type = 'voice'
-        elif ct.startswith('image/'):
-            attachment_type = 'image'
-        else:
-            attachment_type = 'file'
+        attachment_type, error = _validate_attachment(attachment)
+        if error:
+            return error
 
     reply_msg = None
     if reply_to_id:
@@ -105,6 +139,7 @@ def send_message(request):
                 content=content, attachment=attachment,
                 attachment_type=attachment_type, reply_to=reply_msg
             )
+            template_name = 'parts/message_list.html'
         elif group_id:
             group_obj = get_object_or_404(Group, id=group_id)
             if not GroupMember.objects.filter(group=group_obj, user=request.user).exists():
@@ -114,6 +149,7 @@ def send_message(request):
                 content=content, attachment=attachment,
                 attachment_type=attachment_type, reply_to=reply_msg
             )
+            template_name = 'parts/group_message_list.html'
         else:
             return JsonResponse({'status': 'error', 'message': 'Нет получателя'}, status=400)
 
@@ -135,7 +171,13 @@ def send_message(request):
             except Exception:
                 logger.exception('Failed to process mentions for message %s', msg.id)
 
-        return JsonResponse({'status': 'ok'})
+        from django.template.loader import render_to_string
+        html = render_to_string(template_name, {
+            'messages': [msg],
+            'request': request,
+            'user': request.user,
+        })
+        return JsonResponse({'status': 'ok', 'html': html, 'message_id': msg.id})
 
     except Exception:
         logger.exception('Failed to create message')
@@ -143,6 +185,7 @@ def send_message(request):
 
 
 @login_required
+@rate_limit('api_update_group', limit=10, period=60)
 def api_update_group(request, group_id):
     """Обновление настроек группы (название, описание, аватарка)"""
     if request.method != 'POST':
@@ -180,6 +223,7 @@ def api_update_group(request, group_id):
 
 
 @login_required
+@rate_limit('api_add_member', limit=10, period=60)
 def api_add_member(request):
     """Добавление участника в группу"""
     if request.method != 'POST':
@@ -210,6 +254,7 @@ def api_add_member(request):
 
 
 @login_required
+@rate_limit('api_set_role', limit=10, period=60)
 def api_set_role(request):
     """Смена роли участника (владелец -> админ)"""
     if request.method != 'POST':
@@ -244,6 +289,7 @@ def api_set_role(request):
 
 
 @login_required
+@rate_limit('api_remove_member', limit=10, period=60)
 def api_remove_member(request):
     """Удаление участника из группы"""
     if request.method != 'POST':
@@ -298,6 +344,7 @@ def download_attachment(request, message_id):
 
 
 @login_required
+@rate_limit('api_heartbeat', limit=60, period=60)
 def api_heartbeat(request):
     """Обновление статуса онлайн"""
     if request.method != 'POST':
@@ -310,6 +357,7 @@ def api_heartbeat(request):
 
 
 @login_required
+@rate_limit('api_channel_post', limit=10, period=60)
 def api_channel_post(request, channel_id):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
@@ -326,18 +374,9 @@ def api_channel_post(request, channel_id):
     try:
         attachment_type = 'none'
         if attachment:
-            head = attachment.read(32)
-            attachment.seek(0)
-            detected = _detect_image_type(head)
-            ct = attachment.content_type or ''
-            if detected:
-                attachment_type = 'image'
-            elif ct.startswith('audio/'):
-                attachment_type = 'voice'
-            elif ct.startswith('image/'):
-                attachment_type = 'image'
-            else:
-                attachment_type = 'file'
+            attachment_type, error = _validate_attachment(attachment)
+            if error:
+                return error
         msg = Message.objects.create(
             sender=request.user, channel=channel, receiver=None, group=None,
             content=content, attachment=attachment, attachment_type=attachment_type,
@@ -365,3 +404,74 @@ def api_channel_post(request, channel_id):
     except Exception:
         logger.exception('Failed to create channel post')
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=500)
+
+
+@login_required
+@rate_limit('api_poll', limit=30, period=60)
+def api_poll(request):
+    """Получение новых сообщений (после указанного ID) — для автообновления"""
+    if request.method != 'GET':
+        return JsonResponse({'status': 'error', 'message': 'Только GET'}, status=405)
+
+    after_id = request.GET.get('after_id')
+    if not after_id:
+        return JsonResponse({'status': 'error', 'message': 'Нет after_id'}, status=400)
+
+    try:
+        after_id = int(after_id)
+    except (ValueError, TypeError):
+        return JsonResponse({'status': 'error', 'message': 'Неверный after_id'}, status=400)
+
+    user = request.user
+    friend_id = request.GET.get('friend_id')
+    group_id = request.GET.get('group_id')
+    channel_id = request.GET.get('channel_id')
+
+    messages_qs = None
+
+    if friend_id:
+        friend = get_object_or_404(User, id=friend_id)
+        messages_qs = Message.objects.filter(
+            id__gt=after_id,
+        ).filter(
+            Q(sender=user, receiver=friend) | Q(sender=friend, receiver=user)
+        ).order_by('created_at')
+        template_name = 'parts/message_list.html'
+
+    elif group_id:
+        group = get_object_or_404(Group, id=group_id)
+        if not GroupMember.objects.filter(group=group, user=user).exists():
+            return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
+        messages_qs = Message.objects.filter(
+            id__gt=after_id, group=group, is_deleted=False
+        ).order_by('created_at')
+        template_name = 'parts/group_message_list.html'
+
+    elif channel_id:
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not ChannelMember.objects.filter(channel=channel, user=user).exists():
+            return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
+        messages_qs = Message.objects.filter(
+            id__gt=after_id, channel=channel, is_deleted=False
+        ).order_by('-created_at')
+        template_name = 'parts/channel_post_list.html'
+
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Укажите friend_id, group_id или channel_id'}, status=400)
+
+    messages = list(messages_qs)
+
+    from django.template.loader import render_to_string
+    html = render_to_string(template_name, {
+        'messages': messages,
+        'request': request,
+        'user': request.user,
+    })
+
+    last_id = messages[-1].id if messages else after_id
+
+    return JsonResponse({
+        'html': html,
+        'count': len(messages),
+        'last_id': last_id,
+    })

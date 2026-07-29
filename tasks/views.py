@@ -1,6 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.utils import timezone
 from tasks.models import TaskList, Task
 
@@ -28,7 +27,6 @@ def task_list_detail(request, list_id):
                     description=request.POST.get('description', '').strip(),
                     created_by=request.user,
                 )
-                messages.success(request, 'Задача добавлена')
             return redirect('task_list_detail', list_id=list_id)
 
         elif action == 'toggle_task':
@@ -52,7 +50,6 @@ def task_list_detail(request, list_id):
                 task.title = title
                 task.description = request.POST.get('description', '').strip()
                 task.save()
-                messages.success(request, 'Задача обновлена')
             return redirect('task_list_detail', list_id=list_id)
 
     return render(request, 'tasks/task_list_detail.html', {
@@ -71,7 +68,6 @@ def create_task_list(request):
                 description=request.POST.get('description', '').strip(),
                 owner=request.user,
             )
-            messages.success(request, 'Список задач создан')
         return redirect('task_lists')
     return redirect('task_lists')
 
@@ -85,7 +81,6 @@ def edit_task_list(request, list_id):
             task_list.name = name
             task_list.description = request.POST.get('description', '').strip()
             task_list.save()
-            messages.success(request, 'Список обновлён')
         return redirect('task_lists')
     return redirect('task_lists')
 
@@ -95,5 +90,4 @@ def delete_task_list(request, list_id):
     task_list = get_object_or_404(TaskList, id=list_id, owner=request.user)
     if request.method == 'POST':
         task_list.delete()
-        messages.success(request, 'Список удалён')
     return redirect('task_lists')

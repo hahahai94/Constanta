@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from chat.models import Message, Group, GroupMember, _file_hash, _attachment_upload_to
+from chat.models import Message, Group, GroupMember, _attachment_upload_to
+from chat.utils import generate_file_hash
 import io
 import os
 
@@ -135,7 +136,7 @@ class FileHashTests(TestCase):
                 self._pos += len(chunk)
                 return chunk
 
-        result = _file_hash(FakeFile(b'hash me'), user_id=1)
+        result = generate_file_hash(FakeFile(b'hash me'), user_id=1)
         self.assertEqual(len(result), 64)
 
     def test_attachment_upload_to_without_hash(self):

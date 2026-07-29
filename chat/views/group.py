@@ -1,11 +1,14 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from chat.models import Group, GroupMember, Message
 
 User = get_user_model()
+
+MESSAGES_PER_PAGE = 30
 
 
 @login_required
@@ -39,12 +42,30 @@ def group_chat(request, group_id):
     )
     messages_qs = Message.objects.filter(
         group=group, is_deleted=False
-    ).order_by('created_at')[:50]
+    ).order_by('created_at')
+    paginator = Paginator(messages_qs, MESSAGES_PER_PAGE)
+    page_number = request.GET.get('page', paginator.num_pages)
+    messages_page = paginator.get_page(page_number)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and 'page' in request.GET:
+        from django.template.loader import render_to_string
+        html = render_to_string('parts/group_message_list.html', {
+            'messages': messages_page,
+            'request': request,
+            'user': request.user,
+        })
+        from django.http import JsonResponse
+        return JsonResponse({
+            'html': html,
+            'has_previous': messages_page.has_previous(),
+            'page': messages_page.number,
+        })
 
     return render(request, 'group_chat.html', {
         'group': group,
         'members': members,
-        'messages': messages_qs,
+        'messages': messages_page.object_list,
+        'messages_page': messages_page,
         'is_owner': is_owner,
         'is_admin': is_admin,
     })
@@ -61,7 +82,6 @@ def create_group(request):
                 return redirect('groups')
             group = Group.objects.create(name=name, owner=request.user)
             GroupMember.objects.create(group=group, user=request.user, role='owner')
-            messages.success(request, f'✅ Группа "{name}" создана!')
             return redirect('group_chat', group_id=group.id)
     return redirect('groups')
 
@@ -79,7 +99,6 @@ def edit_group(request, group_id):
         if request.FILES.get('avatar'):
             group.avatar = request.FILES.get('avatar')
         group.save()
-        messages.success(request, '✅ Группа обновлена')
     return redirect('group_chat', group_id=group_id)
 
 
@@ -97,7 +116,6 @@ def add_member(request, group_id):
             user = User.objects.get(username=username)
             if not GroupMember.objects.filter(group=group, user=user).exists():
                 GroupMember.objects.create(group=group, user=user, role='member')
-                messages.success(request, f'✅ {user.get_display_name()} добавлен')
             else:
                 messages.warning(request, '⚠️ Уже в группе')
         except User.DoesNotExist:
@@ -118,7 +136,6 @@ def remove_member(request, group_id, user_id):
         messages.error(request, '🚫 Нельзя удалить владельца')
     else:
         target.delete()
-        messages.success(request, '✅ Участник удалён')
     return redirect('group_chat', group_id=group_id)
 
 

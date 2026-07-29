@@ -1,5 +1,6 @@
 # users/views/auth.py
 from django.shortcuts import render, redirect
+from django.conf import settings
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
@@ -33,8 +34,8 @@ def auth_view(request):
             if form.is_valid():
                 cache.delete(f"ratelimit:auth:{request.META.get('REMOTE_ADDR', 'unknown')}")
                 user = form.save()
-                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-                messages.success(request, f'✅ Добро пожаловать, {user.username}!')
+                user.backend = settings.AUTHENTICATION_BACKENDS[0]
+                login(request, user)
                 return redirect('main')
             else:
                 for field, errors in form.errors.items():
@@ -49,8 +50,7 @@ def auth_view(request):
                 user = authenticate(request, username=username, password=password)
                 if user is not None:
                     cache.delete(f"ratelimit:auth:{request.META.get('REMOTE_ADDR', 'unknown')}")
-                    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-                    messages.success(request, f'✅ С возвращением, {username}!')
+                    login(request, user)
                     return redirect('main')
                 else:
                     messages.error(request, '❌ Неверный логин или пароль')

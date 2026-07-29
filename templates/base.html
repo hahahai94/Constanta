@@ -44,30 +44,30 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                 {% if user.is_authenticated %}
-                <li class="nav-item me-2">
-                    <a class="btn-grad grad-purple" href="{% url 'profile' %}" style="padding: 8px 15px; font-size: 14px;">👤 Профиль</a>
+                <li class="nav-item me-1">
+                    <a class="btn-grad grad-purple" href="{% url 'main' %}" style="padding: 6px 12px; font-size: 13px;">💬 Чаты</a>
                 </li>
-                <li class="nav-item me-2">
-                     <a class="btn-grad grad-pink" href="{% url 'groups' %}" style="padding: 8px 15px; font-size: 14px;">📁 Группы</a>
+                <li class="nav-item me-1">
+                     <a class="btn-grad grad-pink" href="{% url 'groups' %}" style="padding: 6px 12px; font-size: 13px;">📁 Группы</a>
                 </li>
-                <li class="nav-item me-2">
-                     <a class="btn-grad grad-purple" href="{% url 'channel_list' %}" style="padding: 8px 15px; font-size: 14px;">📢 Каналы</a>
+                <li class="nav-item me-1">
+                     <a class="btn-grad grad-blue" href="{% url 'channel_list' %}" style="padding: 6px 12px; font-size: 13px;">📢 Каналы</a>
                 </li>
-                <li class="nav-item me-2">
-                     <a class="btn-grad grad-blue" href="{% url 'users_catalog' %}" style="padding: 8px 15px; font-size: 14px;">🔍 Люди</a>
+                <li class="nav-item me-1">
+                     <a class="btn-grad grad-purple" href="{% url 'users_catalog' %}" style="padding: 6px 12px; font-size: 13px;">🔍 Люди</a>
                 </li>
-                <li class="nav-item me-2">
-                     <a class="btn-grad grad-orange" href="{% url 'task_lists' %}" style="padding: 8px 15px; font-size: 14px;">📋 Задачи</a>
+                <li class="nav-item me-1">
+                     <a class="btn-grad grad-orange" href="{% url 'task_lists' %}" style="padding: 6px 12px; font-size: 13px;">📋 Задачи</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn-grad grad-red" href="{% url 'logout' %}" style="padding: 8px 15px; font-size: 14px;">🚪 Выйти</a>
+                    <a class="btn-grad grad-red" href="{% url 'logout' %}" style="padding: 6px 12px; font-size: 13px;">🚪</a>
                 </li>
                 {% else %}
                 <li class="nav-item me-2">
-                    <a class="btn-grad grad-green" href="{% url 'auth' %}" style="padding: 8px 15px; font-size: 14px;">Войти</a>
+                    <a class="btn-grad grad-green" href="{% url 'auth' %}" style="padding: 6px 12px; font-size: 13px;">🔑 Войти</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn-grad grad-purple" href="{% url 'auth' %}?mode=reg" style="padding: 8px 15px; font-size: 14px;">Регистрация</a>
+                    <a class="btn-grad grad-purple" href="{% url 'auth' %}?mode=reg" style="padding: 6px 12px; font-size: 13px;">📝 Регистрация</a>
                 </li>
                     {% endif %}
                 </ul>
@@ -76,32 +76,17 @@
     </nav>
 
     <!-- Основной контент -->
-    <div class="container-fluid mt-0 p-0">
+    <div class="container-fluid mt-0 p-0 page-content">
         {% block content %}{% endblock %}
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Heartbeat: обновление online-статуса -->
-    <script>
-    (function() {
-        {% if user.is_authenticated %}
-        function getCSRFToken() {
-            const el = document.querySelector('[name=csrfmiddlewaretoken]');
-            return el ? el.value : '';
-        }
-        function heartbeat() {
-            fetch('{% url "api_heartbeat" %}', {
-                method: 'POST',
-                headers: { 'X-CSRFToken': getCSRFToken() }
-            }).catch(() => {});
-        }
-        heartbeat();
-        setInterval(heartbeat, 60000);
-        {% endif %}
-    })();
-    </script>
+    {% if user.is_authenticated %}
+    <script>window.HEARTBEAT_URL = '{% url "api_heartbeat" %}';</script>
+    {% endif %}
+    <script src="{% static 'js/app.js' %}"></script>
 
     <!-- Скрипты страницы -->
     {% block scripts %}{% endblock %}

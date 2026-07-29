@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
 from chat.models import Message, Group, GroupMember
-from chat.views.api import _detect_image_type, _content_disposition_header
+from chat.views.api import _detect_attachment_type, _content_disposition_header
 import json, io, os
 
 User = get_user_model()
@@ -148,9 +148,9 @@ class APITests(TestCase):
         response = self.client.post(f'/groups/{group.id}/settings/', {'name': ''})
         self.assertEqual(response.status_code, 400)
 
-    def test_detect_image_type_none(self):
-        result = _detect_image_type(b'\x00\x00\x00')
-        self.assertIsNone(result)
+    def test_detect_attachment_type_none(self):
+        result = _detect_attachment_type(b'\x00\x00\x00', '')
+        self.assertEqual(result, 'file')
 
     def test_content_disposition_non_ascii(self):
         result = _content_disposition_header('файл.txt')

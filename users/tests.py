@@ -85,10 +85,29 @@ class UserModelTests(TestCase):
 
 
 class CustomAuthBackendTests(TestCase):
-    def test_user_can_authenticate_always(self):
-        backend = CustomAuthBackend()
-        user = User(username='anyuser')
-        self.assertTrue(backend.user_can_authenticate(user))
+    def setUp(self):
+        self.backend = CustomAuthBackend()
+
+    def test_user_can_authenticate_active(self):
+        user = User(username='activeuser')
+        self.assertTrue(self.backend.user_can_authenticate(user))
+
+    def test_user_can_authenticate_inactive(self):
+        user = User(username='inactive', is_active=False)
+        self.assertFalse(self.backend.user_can_authenticate(user))
+
+    def test_authenticate_inactive_user_returns_none(self):
+        User.objects.create_user(username='inactive_user', password='pass123', is_active=False)
+        user = self.backend.authenticate(request=None, username='inactive_user', password='pass123')
+        self.assertIsNone(user)
+
+    def test_login_view_rejects_inactive_user(self):
+        User.objects.create_user(username='disabled', password='pass123', is_active=False)
+        from django.core.cache import cache
+        cache.clear()
+        response = self.client.post('/auth/', {'username': 'disabled', 'password': 'pass123'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'правильные имя пользователя и пароль')
 
 
 class IPBanMiddlewareTests(TestCase):

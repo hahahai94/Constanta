@@ -3,72 +3,40 @@
 
 {% block extra_css %}
 <style>
-    /* Фиксируем высоту на весь экран и убираем прокрутку страницы */
-    html, body {
-        height: 100%;
-        margin: 0;
-        overflow: hidden; /* Запрещаем скролл всей страницы */
-    }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
 
-    .message-bubble {
-        max-width: 70%;
-        padding: 12px 18px;
-        border-radius: 18px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        position: relative;
-    }
-    .message-own {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        margin-left: auto;
-    }
-    .message-other {
-        background: white;
-        color: #212529;
-        margin-right: auto;
-    }
+    .message-bubble { position: relative; }
 
-    /* Кнопка ответа */
     .reply-btn {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        background: rgba(255,255,255,0.2);
-        border: none;
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        transition: opacity 0.2s;
-        font-size: 14px;
-        color: inherit;
+        position: absolute; top: 8px; right: 8px;
+        background: rgba(255,255,255,0.2); border: none; border-radius: 50%;
+        width: 28px; height: 28px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.2s; font-size: 14px; color: inherit;
     }
     .message-bubble:hover .reply-btn { opacity: 1; }
     .reply-btn:hover { background: rgba(255,255,255,0.4); }
 
-    /* Цитата ответа */
     .reply-quote {
-        background: rgba(0,0,0,0.05);
-        border-left: 3px solid #667eea;
-        padding: 6px 10px;
-        margin-bottom: 8px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85rem;
+        background: rgba(0,0,0,0.05); border-left: 3px solid #667eea;
+        padding: 6px 10px; margin-bottom: 8px; border-radius: 6px;
+        cursor: pointer; font-size: 0.85rem;
     }
     .message-own .reply-quote {
-        background: rgba(255,255,255,0.15);
-        border-left-color: rgba(255,255,255,0.8);
+        background: rgba(255,255,255,0.15); border-left-color: rgba(255,255,255,0.8);
     }
     .reply-quote-author { font-weight: 600; color: #667eea; display: block; margin-bottom: 2px; }
     .message-own .reply-quote-author { color: rgba(255,255,255,0.9); }
     .reply-quote-text { color: #666; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .message-own .reply-quote-text { color: rgba(255,255,255,0.8); }
+
+    .file-tag button { background: none; border: none; color: #0d6efd; cursor: pointer; margin-left: 6px; padding: 0; font-size: 1rem; }
+
+    .reply-panel { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 10px 15px; display: none; }
+    .reply-panel.active { display: block; }
+    .reply-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .reply-panel-author { font-weight: 600; color: #667eea; }
+    .reply-panel-text { color: #666; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     #emoji-picker {
         display: none;
@@ -77,10 +45,6 @@
         padding: 12px;
         max-height: 280px;
         overflow-y: auto;
-        background: white;
-        border: 1px solid #e0e0e0;
-        border-radius: 14px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
         position: absolute;
         bottom: 70px;
         left: 20px;
@@ -88,58 +52,6 @@
         z-index: 1050;
     }
     #emoji-picker.active { display: grid; }
-    .emoji-btn {
-        font-size: 1.6rem;
-        padding: 6px;
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.15s;
-        line-height: 1;
-        font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-    }
-    .emoji-btn:hover {
-        background: #e2e6ea;
-        transform: scale(1.15);
-        border-color: #adb5bd;
-    }
-
-    .file-tag {
-        display: inline-flex;
-        align-items: center;
-        background: #e7f1ff;
-        color: #0d6efd;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        margin-right: 10px;
-    }
-    .file-tag button {
-        background: none;
-        border: none;
-        color: #0d6efd;
-        cursor: pointer;
-        margin-left: 6px;
-        padding: 0;
-        font-size: 1rem;
-    }
-
-    .reply-panel {
-        background: #f8f9fa;
-        border-bottom: 1px solid #dee2e6;
-        padding: 10px 15px;
-        display: none;
-    }
-    .reply-panel.active { display: block; }
-    .reply-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-    .reply-panel-author { font-weight: 600; color: #667eea; }
-    .reply-panel-text { color: #666; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    /* Стили для списка чатов */
-    .chat-item { transition: background 0.2s; cursor: pointer; }
-    .chat-item:hover { background: #f8f9fa; }
-    .chat-item.active { background: #e9ecef; }
 </style>
 {% endblock %}
 
@@ -208,62 +120,16 @@
 
         <!-- Сообщения (скролл только здесь!) -->
         <div class="flex-grow-1 overflow-auto p-4" id="messages-container" style="background: #f5f7fa;">
-            {% for msg in messages %}
-            <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3" data-message-id="{{ msg.id }}">
-                <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
-                    <!-- Кнопка ответа -->
-                    <button type="button" class="reply-btn" onclick="startReply('{{ msg.id }}', '{{ msg.sender.username }}', '{{ msg.content|escapejs|default:"📎 Вложение" }}')">
-                        ↩️
-                    </button>
-
-                    <!-- Цитата ответа -->
-                    {% if msg.reply_to %}
-                    <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
-                        <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>
-                        <span class="reply-quote-text">{{ msg.reply_to.content|default:"📎 Вложение" }}</span>
-                    </div>
-                    {% endif %}
-
-                    {% if msg.attachment_type == 'image' and msg.attachment %}
-                        <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
-                    {% endif %}
-
-                    {% if msg.attachment_type == 'file' and msg.attachment %}
-                        <a href="{% url 'download_attachment' msg.id %}" class="text-decoration-none d-block mb-2 p-2 rounded"
-                           style="background: rgba(0,0,0,0.1); color: inherit;">
-                            <i class="bi bi-file-earmark me-1"></i>
-                            {{ msg.attachment_original_name|default:"Файл" }}
-                            {% if msg.attachment_size %}
-                                <small class="d-block opacity-75">{{ msg.attachment_size|filesizeformat }}</small>
-                            {% endif %}
-                        </a>
-                    {% endif %}
-
-                    {% if msg.attachment_type == 'voice' and msg.attachment %}
-                        <audio controls class="w-100 mb-2">
-                            <source src="{{ msg.attachment.url }}">
-                        </audio>
-                    {% endif %}
-
-                    {% if msg.content %}
-                        <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
-                    {% endif %}
-
-                    <small style="font-size: 0.75rem; opacity: 0.7; display: block; text-align: right; margin-top: 5px;">
-                        {{ msg.created_at|date:"H:i" }}
-                    </small>
-                </div>
+            {% if messages_page and messages_page.has_previous %}
+            <div class="text-center mb-3">
+                <button class="btn btn-outline-primary btn-sm rounded-pill" id="load-more-btn"
+                        onclick="loadMoreMessages()"
+                        data-page="{{ messages_page.previous_page_number }}">
+                    <i class="bi bi-arrow-up-circle me-1"></i>Загрузить ещё
+                </button>
             </div>
-            {% empty %}
-            <!-- Если сообщений нет, показываем по центру -->
-            <div class="d-flex align-items-center justify-content-center h-100 text-muted">
-                <div class="text-center">
-                    <i class="bi bi-chat-square-text" style="font-size: 4rem; opacity: 0.3;"></i>
-                    <p class="mt-3 fs-5">Нет сообщений</p>
-                    <small>Напишите первое сообщение!</small>
-                </div>
-            </div>
-            {% endfor %}
+            {% endif %}
+            {% include 'parts/message_list.html' %}
         </div>
 
         <!-- Поле ввода (всегда внизу) -->
@@ -428,6 +294,20 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
 
     formData.set('content', textContent);
 
+    const container = document.getElementById('messages-container');
+    const empty = container.querySelector('.h-100.text-muted');
+    if (empty) empty.remove();
+
+    // показываем "отправляется..." сразу
+    const sendingDiv = document.createElement('div');
+    sendingDiv.className = 'd-flex justify-content-end mb-3';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble message-own sending';
+    bubble.textContent = textContent || '📎 Файл';
+    sendingDiv.appendChild(bubble);
+    container.appendChild(sendingDiv);
+    container.scrollTop = container.scrollHeight;
+
     const btn = document.getElementById('send-btn');
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
@@ -435,7 +315,11 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
     fetch(this.action, { method: 'POST', body: formData })
     .then(r => r.json())
     .then(d => {
-        if (d.status === 'ok') {
+        sendingDiv.remove();
+        if (d.status === 'ok' && d.html) {
+            container.insertAdjacentHTML('beforeend', d.html);
+            if (window.pollState) pollState.afterId = d.message_id;
+            container.scrollTop = container.scrollHeight;
             messageInput.value = '';
             fileUpload.value = '';
             fileTagContainer.innerHTML = '';
@@ -445,6 +329,7 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
         }
     })
     .catch(err => {
+        sendingDiv.remove();
         console.error('Error:', err);
         alert('Ошибка соединения');
     })
@@ -454,26 +339,73 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
     });
 });
 
-// ===== АВТООБНОВЛЕНИЕ =====
-if (!window.autoRefreshInterval) {
-    window.autoRefreshInterval = setInterval(() => {
-        const container = document.getElementById('messages-container');
-        if (!container || !window.location.search.includes('friend_id=')) return;
+// ===== ЗАГРУЗКА СТАРЫХ СООБЩЕНИЙ =====
+function loadMoreMessages() {
+    const btn = document.getElementById('load-more-btn');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
 
-        fetch(window.location.href, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-            .then(r => r.text())
-            .then(html => {
-                const parser = new DOMParser();
-                const newDoc = parser.parseFromString(html, 'text/html');
-                const newContainer = newDoc.getElementById('messages-container');
-                if (newContainer && container.innerHTML !== newContainer.innerHTML) {
-                    const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-                    container.innerHTML = newContainer.innerHTML;
-                    if (wasAtBottom) container.scrollTop = container.scrollHeight;
-                }
-            })
-            .catch(() => {});
-    }, 2000);
+    const page = btn.dataset.page;
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', page);
+
+    fetch(url.toString(), { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('messages-container');
+            const temp = document.createElement('div');
+            temp.innerHTML = data.html;
+            // вставляем после кнопки (первый элемент в контейнере)
+            const btnWrapper = container.querySelector('#load-more-btn')?.parentElement;
+            if (btnWrapper) {
+                btnWrapper.after(...temp.children);
+            } else {
+                container.insertAdjacentHTML('afterbegin', data.html);
+            }
+            if (data.has_previous) {
+                btn.dataset.page = data.page - 1;
+                btn.disabled = false;
+            } else {
+                btn.remove();
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+        });
+}
+
+// ===== ПОЛЛЕР (вызывается и по таймеру, и после отправки) =====
+window.doPoll = function() {
+    if (!window.pollState || !pollState.param) return;
+    const url = '/api/poll/?after_id=' + pollState.afterId + '&' + pollState.param;
+    fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        .then(r => r.json())
+        .then(data => {
+            if (data.count > 0) {
+                const container = document.getElementById('messages-container');
+                const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+                container.insertAdjacentHTML('beforeend', data.html);
+                pollState.afterId = data.last_id;
+                if (wasAtBottom) container.scrollTop = container.scrollHeight;
+            }
+        })
+        .catch(() => {});
+};
+
+// ===== АВТООБНОВЛЕНИЕ (JSON API) =====
+if (!window.pollState) {
+    window.pollState = { afterId: 0, url: new URL(window.location.href) };
+
+    const friendId = pollState.url.searchParams.get('friend_id');
+    const groupId = pollState.url.searchParams.get('group_id');
+    if (friendId) pollState.param = 'friend_id=' + friendId;
+    else if (groupId) pollState.param = 'group_id=' + groupId;
+
+    const lastMsg = document.querySelector('[data-message-id]:last-child');
+    if (lastMsg) pollState.afterId = parseInt(lastMsg.dataset.messageId) || 0;
+
+    window.autoRefreshInterval = setInterval(window.doPoll, 2000);
+    window.doPoll();
 }
 
 // Прокрутка вниз при загрузке

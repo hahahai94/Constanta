@@ -1,12 +1,14 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 
 User = get_user_model()
 
 class AuthAndProfileTests(TestCase):
     def setUp(self):
         """Создаём пользователя для тестов"""
+        cache.clear()
         self.user = User.objects.create_user(
             username='tester',
             password='securepassword123',

@@ -99,37 +99,70 @@
   </div>
   {% endif %}
 
-  {% for post in posts %}
-  <div class="post-card" data-message-id="{{ post.id }}">
-    <div class="post-meta mb-2">
-      <strong>{{ post.sender.username }}</strong> • {{ post.created_at|date:"d.m.Y H:i" }}
-    </div>
-    {% if post.reply_to %}
-    <div class="reply-preview p-2 rounded mb-2" style="background:#f8f9fa;font-size:0.9rem;border-left:3px solid #667eea">
-      <small>Ответ на <strong>{{ post.reply_to.sender.username }}</strong>: {{ post.reply_to.content|truncatewords:10 }}</small>
-    </div>
-    {% endif %}
-    <div>{{ post.content|linebreaksbr }}</div>
-    {% if post.attachment %}
-    <div class="mt-2">
-      {% if post.attachment_type == 'image' %}
-        <img src="{{ post.attachment.url }}" class="img-fluid rounded" style="max-height:400px" alt="">
-      {% else %}
-        <a href="{% url 'download_attachment' post.id %}" class="btn btn-sm btn-outline-info">{{ post.get_attachment_name }}</a>
-      {% endif %}
-    </div>
-    {% endif %}
-    {% if post.mentions %}
-    <div class="post-meta mt-1"><small>Упомянуты: {{ post.mentions }}</small></div>
-    {% endif %}
+  <div class="posts-container">
+  {% if posts_page and posts_page.has_next %}
+  <div class="text-center mb-3">
+    <button class="btn btn-outline-primary btn-sm rounded-pill" id="load-more-btn"
+            onclick="loadMorePosts()"
+            data-page="{{ posts_page.next_page_number }}">
+      <i class="bi bi-arrow-down-circle me-1"></i>Загрузить ещё
+    </button>
   </div>
-  {% empty %}
-  <p class="text-muted">В канале пока нет публикаций.</p>
-  {% endfor %}
+  {% endif %}
+  {% include 'parts/channel_post_list.html' %}
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
+window.loadMorePosts = function() {
+    const btn = document.getElementById('load-more-btn');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+
+    const page = btn.dataset.page;
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', page);
+
+    fetch(url.toString(), { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        .then(r => r.json())
+        .then(data => {
+            document.querySelector('.posts-container').insertAdjacentHTML('beforeend', data.html);
+            if (data.has_next) {
+                btn.dataset.page = data.page + 1;
+                btn.disabled = false;
+            } else {
+                btn.remove();
+            }
+        })
+        .catch(() => { btn.disabled = false; });
+};
+
+// автополлинг новых постов
+(function() {
+    const channelId = '{{ channel.id }}';
+    if (!channelId) return;
+    window.pollChannelState = { afterId: 0, channelId: channelId };
+    const lastPost = document.querySelector('[data-message-id]:last-child');
+    if (lastPost) pollChannelState.afterId = parseInt(lastPost.dataset.messageId) || 0;
+
+    window.doPoll = function() {
+        if (!pollChannelState.afterId) return;
+        fetch('/api/poll/?after_id=' + pollChannelState.afterId + '&channel_id=' + pollChannelState.channelId, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+            .then(r => r.json())
+            .then(data => {
+                if (data.count > 0) {
+                    const container = document.querySelector('.posts-container');
+                    container.insertAdjacentHTML('afterbegin', data.html);
+                    pollChannelState.afterId = data.last_id;
+                }
+            })
+            .catch(() => {});
+    };
+
+    setInterval(window.doPoll, 3000);
+})();
+
 document.querySelectorAll('[data-channel-post-form]').forEach(form => {
   form.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -137,8 +170,13 @@ document.querySelectorAll('[data-channel-post-form]').forEach(form => {
     fetch(this.action, { method: 'POST', body: formData, headers: { 'X-CSRFToken': formData.get('csrfmiddlewaretoken') } })
     .then(r => r.json())
     .then(data => {
-      if (data.status === 'ok') { location.reload(); }
-      else { alert(data.message); }
+      if (data.status === 'ok') {
+        this.querySelector('textarea').value = '';
+        this.querySelector('[type="file"]').value = '';
+        window.doPoll();
+      } else {
+        alert(data.message);
+      }
     });
   });
 });

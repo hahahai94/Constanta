@@ -11,7 +11,7 @@ class User(AbstractUser):
     nick = models.CharField(max_length=50, unique=True, null=True, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True, default='')
-    last_seen = models.DateTimeField(null=True, blank=True, verbose_name="Последний вход")
+    last_seen = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Последний вход")
 
     @property
     def is_online(self):
@@ -77,7 +77,6 @@ class Notification(models.Model):
     TYPE_CHOICES = [
         ('message', 'Новое сообщение'),
         ('mention', 'Упоминание'),
-        ('friend_request', 'Запрос в друзья'),
         ('group_add', 'Добавлен в группу'),
     ]
 
@@ -108,7 +107,6 @@ class Notification(models.Model):
         icons = {
             'message': '💬',
             'mention': '📢',
-            'friend_request': '👥',
             'group_add': '📁',
         }
         return icons.get(self.notification_type, '🔔')

@@ -16,7 +16,6 @@ def profile_view(request):
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Профиль обновлён!')
         else:
             for field, errors in form.errors.items():
                 for error in errors:
@@ -51,7 +50,6 @@ def change_username(request):
         if form.is_valid():
             request.user.username = form.cleaned_data['username']
             request.user.save()
-            messages.success(request, 'Логин изменён')
             return redirect('profile')
     else:
         form = ChangeUsernameForm(user=request.user)
@@ -65,8 +63,7 @@ def change_password(request):
         if form.is_valid():
             user = form.save()
             update_session_auth_hash(request, user)
-            messages.success(request, 'Пароль изменён')
-            return redirect('profile')
+            return redirect('password_done')
     else:
         form = ChangePasswordForm(request.user)
     return render(request, 'change_password.html', {'form': form})
