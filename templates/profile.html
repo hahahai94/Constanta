@@ -16,9 +16,9 @@
             <div class="card-modern">
                 <!-- 🔹 Шапка профиля -->
                 <div class="text-center mb-4">
-    <div class="position-relative d-inline-block">
+<div class="position-relative d-inline-block">
         <img src="{{ request.user.get_avatar_url }}"
-             class="rounded-circle shadow" style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #667eea;">
+             class="rounded-circle shadow" style="width: 150px; height: 150px; object-fit: cover; border: 3px solid #667eea;">
         <label for="avatar-upload" class="position-absolute"
                style="bottom: 10px; right: 10px; background: rgba(102, 126, 234, 0.95);
                       color: white; width: 40px; height: 40px; border-radius: 50%;
@@ -56,7 +56,7 @@
                         <textarea name="bio" class="form-control-modern w-100" rows="3" style="box-sizing:border-box;">{{ user.bio|default:'' }}</textarea>
                     </div>
 
-                    <button type="submit" class="btn-grad grad-purple w-100">💾 Сохранить изменения</button>
+                    <button type="submit" class="btn btn-primary w-100">💾 Сохранить изменения</button>
                 </form>
 
                 <hr class="my-4">
@@ -65,13 +65,13 @@
                 <h5 class="text-center mb-3 text-muted">⚙️ Управление аккаунтом</h5>
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <a href="{% url 'change_username' %}" class="btn-grad grad-blue w-100">🔤 Сменить логин</a>
+                        <a href="{% url 'change_username' %}" class="btn btn-outline-primary w-100">🔤 Сменить логин</a>
                     </div>
                     <div class="col-md-6">
-                        <a href="{% url 'change_password' %}" class="btn-grad grad-orange w-100">🔒 Сменить пароль</a>
+                        <a href="{% url 'change_password' %}" class="btn btn-outline-secondary w-100">🔒 Сменить пароль</a>
                     </div>
                     <div class="col-12">
-                        <button onclick="if(confirm('Вы действительно хотите выйти из системы?')) window.location.href='{% url "logout" %}'" class="btn-grad grad-red w-100">🚪 Выйти из аккаунта</button>
+                        <button onclick="if(confirm('Вы действительно хотите выйти из системы?')) window.location.href='{% url "logout" %}'" class="btn btn-outline-danger w-100">🚪 Выйти из аккаунта</button>
                     </div>
                 </div>
             </div>

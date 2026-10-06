@@ -24,7 +24,7 @@
     .participant-item:hover { background: #f8f9fa; }
 
     .modal-header-gradient {
-        background: var(--primary-gradient);
+        background: var(--accent);
         color: white;
     }
 
@@ -46,7 +46,7 @@
         border: 3px solid white;
     }
     .avatar-upload-overlay:hover {
-        background: #764ba2;
+        background: var(--accent-dark);
         transform: scale(1.1);
     }
 
@@ -106,7 +106,7 @@
             <a href="{% url 'profile' %}" class="btn-grad grad-purple w-100 mb-2 rounded-pill" style="padding: 8px 15px; font-size: 14px;">
                 <i class="bi bi-person me-2"></i>Профиль
             </a>
-            <a href="{% url 'groups' %}" class="btn-grad grad-pink w-100 rounded-pill" style="padding: 8px 15px; font-size: 14px;">
+            <a href="{% url 'groups' %}" class="btn btn-outline-secondary w-100 rounded-pill" style="padding: 8px 15px; font-size: 14px;">
                 <i class="bi bi-folder me-2"></i>Мои группы
             </a>
         </div>
@@ -114,7 +114,7 @@
         <div class="p-4 text-center border-bottom">
             <img src="{{ group.get_avatar_url }}"
                  class="rounded-circle mb-3 shadow"
-                 style="width: 100px; height: 100px; object-fit: cover; border: 4px solid #667eea;">
+                 style="width: 100px; height: 100px; object-fit: cover; border: 3px solid #667eea;">
             <h5 class="fw-bold mb-1">{{ group.name }}</h5>
             <small class="text-muted">{{ members|length }} участников</small>
             {% if group.description %}
@@ -159,10 +159,10 @@
 
         {% if is_owner %}
         <div class="p-3 border-top bg-light">
-            <button class="btn-grad grad-green btn-sm w-100 mb-2 rounded-pill" data-bs-toggle="modal" data-bs-target="#addModal" style="padding: 8px 15px; font-size: 14px;">
+            <button class="btn btn-outline-primary btn-sm w-100 mb-2 rounded-pill" data-bs-toggle="modal" data-bs-target="#addModal" style="padding: 8px 15px; font-size: 14px;">
                 <i class="bi bi-person-plus me-2"></i>Добавить участника
             </button>
-            <button class="btn-grad grad-blue btn-sm w-100 rounded-pill" data-bs-toggle="modal" data-bs-target="#settingsModal" style="padding: 8px 15px; font-size: 14px;">
+            <button class="btn btn-outline-secondary btn-sm w-100 rounded-pill" data-bs-toggle="modal" data-bs-target="#settingsModal" style="padding: 8px 15px; font-size: 14px;">
                 <i class="bi bi-gear me-2"></i>Настройки группы
             </button>
         </div>
@@ -224,7 +224,7 @@
                 <input type="file" id="file-upload" class="d-none" name="attachment"
                        accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z">
 
-                <button type="submit" class="btn btn-gradient-primary rounded-circle"
+                <button type="submit" class="btn btn-primary rounded-circle"
                         style="width: 45px; height: 45px; flex-shrink: 0;" id="send-btn">
                     <i class="bi bi-send-fill"></i>
                 </button>
@@ -247,7 +247,7 @@
                     <div class="avatar-upload-wrapper">
                         <img src="{{ group.get_avatar_url }}"
                              id="modal-avatar-preview"
-                             class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #667eea;">
+                             class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover; border: 3px solid #667eea;">
                         <label for="avatar-upload" class="avatar-upload-overlay" title="Изменить аватарку">
                             <i class="bi bi-camera-fill"></i>
                         </label>
@@ -266,7 +266,7 @@
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-gradient-primary rounded-pill px-4" onclick="saveGroupSettings()">
+                <button type="button" class="btn btn-primary rounded-pill px-4" onclick="saveGroupSettings()">
                     <i class="bi bi-check-lg me-2"></i>Сохранить
                 </button>
             </div>

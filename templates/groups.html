@@ -13,7 +13,7 @@
     {% endif %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>📁 Мои группы</h2>
-        <button type="button" class="btn-grad grad-green" data-bs-toggle="modal" data-bs-target="#createGroupModal">➕ Создать группу</button>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">➕ Создать группу</button>
     </div>
 
     <div class="row g-4">
@@ -29,7 +29,7 @@
                 </div>
                 <p class="text-muted small">{{ membership.group.description|truncatewords:15 }}</p>
                 <div class="d-grid">
-                    <a href="{% url 'group_chat' membership.group.id %}" class="btn-grad grad-blue w-100">Открыть чат 💬</a>
+                    <a href="{% url 'group_chat' membership.group.id %}" class="btn btn-primary w-100">Открыть чат 💬</a>
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn-grad grad-green rounded-pill px-4">Создать</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Создать</button>
                 </div>
             </form>
         </div>

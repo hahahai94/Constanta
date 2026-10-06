@@ -28,17 +28,17 @@ def main_chat(request):
     last_msg_ids = [u.last_msg_id for u in chat_users if u.last_msg_id]
     last_messages = {m.id: m for m in Message.objects.filter(id__in=last_msg_ids)}
 
-    chats = [{'friend': u, 'last_message': last_messages.get(u.last_msg_id)} for u in chat_users]
+    chats = [{'user': u, 'last_message': last_messages.get(u.last_msg_id)} for u in chat_users]
 
-    friend_id = request.GET.get('friend_id')
-    active_friend = None
+    user_id = request.GET.get('user_id')
+    active_user = None
     messages_page = None
 
-    if friend_id:
-        active_friend = get_object_or_404(User, id=friend_id)
+    if user_id:
+        active_user = get_object_or_404(User, id=user_id)
         messages_qs = Message.objects.filter(
-            Q(sender=user, receiver=active_friend) |
-            Q(sender=active_friend, receiver=user)
+            Q(sender=user, receiver=active_user) |
+            Q(sender=active_user, receiver=user)
         ).order_by('created_at')
         paginator = Paginator(messages_qs, MESSAGES_PER_PAGE)
         page_number = request.GET.get('page', paginator.num_pages)
@@ -60,7 +60,7 @@ def main_chat(request):
 
     return render(request, 'index.html', {
         'chats': chats,
-        'active_friend': active_friend,
+        'active_user': active_user,
         'messages': messages_page.object_list if messages_page else [],
         'messages_page': messages_page,
         'active_group': None,

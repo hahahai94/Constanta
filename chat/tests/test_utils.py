@@ -96,9 +96,9 @@ class UtilsNotificationTests(TransactionTestCase):
     def test_create_notification(self):
         create_notification(
             user=self.user,
-            notification_type='friend_request',
-            title='Friend request',
-            message='Someone wants to be your friend'
+            notification_type='message',
+            title='New message',
+            message='Someone sent you a message'
         )
         self.assertTrue(Notification.objects.filter(user=self.user).exists())
 

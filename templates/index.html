@@ -72,12 +72,12 @@
         <!-- Список чатов с прокруткой -->
         <div class="flex-grow-1 overflow-auto">
             {% for chat in chats %}
-            <a href="?friend_id={{ chat.friend.id }}"
-               class="chat-item d-flex align-items-center p-3 text-decoration-none text-dark {% if active_friend and active_friend.id == chat.friend.id %}active{% endif %}">
-                <img src="{{ chat.friend.get_avatar_url }}"
+            <a href="?user_id={{ chat.user.id }}"
+               class="chat-item d-flex align-items-center p-3 text-decoration-none text-dark {% if active_user and active_user.id == chat.user.id %}active{% endif %}">
+                <img src="{{ chat.user.get_avatar_url }}"
                      class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
                 <div class="flex-grow-1 min-width-0">
-                    <h6 class="mb-1 text-truncate fw-bold">{{ chat.friend.get_display_name|default:chat.friend.username }}</h6>
+                    <h6 class="mb-1 text-truncate fw-bold">{{ chat.user.get_display_name|default:chat.user.username }}</h6>
                     {% if chat.last_message %}
                     <small class="text-muted text-truncate d-block">{{ chat.last_message.content|truncatewords:5 }}</small>
                     {% else %}
@@ -96,14 +96,14 @@
 
     <!-- Основная область чата -->
     <div class="flex-grow-1 d-flex flex-column bg-light position-relative" style="height: 100%;">
-        {% if active_friend %}
+        {% if active_user %}
         <!-- Шапка чата -->
         <div class="bg-white border-bottom p-3 d-flex align-items-center shadow-sm">
-            <img src="{{ active_friend.get_avatar_url }}"
+            <img src="{{ active_user.get_avatar_url }}"
                  class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;">
             <div>
-                <h6 class="mb-0 fw-bold">{{ active_friend.get_display_name|default:active_friend.username }}</h6>
-                <small class="text-muted">{% if active_friend.is_online %} Онлайн{% else %}Офлайн{% endif %}</small>
+                <h6 class="mb-0 fw-bold">{{ active_user.get_display_name|default:active_user.username }}</h6>
+                <small class="text-muted">{% if active_user.is_online %} Онлайн{% else %}Офлайн{% endif %}</small>
             </div>
         </div>
 
@@ -138,7 +138,7 @@
 
             <form id="chat-form" method="POST" action="{% url 'api_send' %}" enctype="multipart/form-data">
                 {% csrf_token %}
-                <input type="hidden" name="friend_id" value="{{ active_friend.id }}">
+                <input type="hidden" name="user_id" value="{{ active_user.id }}">
                 <input type="hidden" name="reply_to_id" id="reply-to-id" value="">
 
                 <div class="d-flex gap-2 align-items-center">
@@ -396,9 +396,9 @@ window.doPoll = function() {
 if (!window.pollState) {
     window.pollState = { afterId: 0, url: new URL(window.location.href) };
 
-    const friendId = pollState.url.searchParams.get('friend_id');
+    const userId = pollState.url.searchParams.get('user_id');
     const groupId = pollState.url.searchParams.get('group_id');
-    if (friendId) pollState.param = 'friend_id=' + friendId;
+    if (userId) pollState.param = 'user_id=' + userId;
     else if (groupId) pollState.param = 'group_id=' + groupId;
 
     const lastMsg = document.querySelector('[data-message-id]:last-child');

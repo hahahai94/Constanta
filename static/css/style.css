@@ -1,33 +1,29 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: #f0f2f5;
-    min-height: 100vh;
-    color: #1a1a2e;
-}
-
 :root {
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    --message-own: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --message-other: #f8f9fa;
+    --accent: #667eea;
+    --accent-dark: #4c66d9;
+    --accent-soft: #eef0fd;
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --border: #e3e6ea;
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --message-own: #667eea;
     --navbar-height: 56px;
 }
 
-/* ===== Навбар ===== */
-@keyframes navbarShimmer {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
 }
 
+/* ===== Навбар ===== */
 .navbar {
-    background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe) !important;
-    background-size: 400% 400% !important;
-    animation: navbarShimmer 8s ease-in-out infinite;
-    box-shadow: 0 2px 20px rgba(102, 126, 234, 0.4);
+    background: var(--accent) !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     height: var(--navbar-height);
 }
 
@@ -39,31 +35,34 @@ body {
 }
 
 .nav-link {
-    color: rgba(255,255,255,0.85) !important;
-    font-weight: 500;
+    color: rgba(255,255,255,0.9) !important;
+    font-weight: 600;
     font-size: 14px;
-    padding: 6px 12px !important;
-    border-radius: 8px;
-    transition: all 0.2s;
+    padding: 6px 14px !important;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.14);
+    transition: background 0.2s, color 0.2s;
     white-space: nowrap;
 }
 
 .nav-link:hover {
-    background: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.28);
     color: white !important;
 }
 
-.nav-link.text-danger:hover {
-    background: rgba(220, 53, 69, 0.2);
+.nav-link.active {
+    background: rgba(255,255,255,0.35);
+    color: white !important;
 }
 
-.nav-profile {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
+.navbar-nav .nav-item { margin-left: 4px; }
 
-/* ===== Кнопки с градиентом ===== */
+.navbar-nav .nav-item:last-child { margin-left: 8px; }
+
+.nav-link.text-danger { background: rgba(220, 53, 69, 0.25); color: #fff !important; }
+.nav-link.text-danger:hover { background: rgba(220, 53, 69, 0.45); color: #fff !important; }
+
+/* ===== Кнопки ===== */
 .btn-grad {
     color: #ffffff !important;
     border: none !important;
@@ -75,47 +74,25 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    transition: background 0.2s ease;
     cursor: pointer;
     gap: 6px;
-    position: relative;
-    overflow: hidden;
 }
-
-.btn-grad::after {
-    content: '';
-    position: absolute;
-    top: -50%; left: -50%;
-    width: 200%; height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
-    opacity: 0;
-    transition: opacity 0.4s;
-}
-
-.btn-grad:hover::after { opacity: 1; }
 
 .btn-grad:hover {
-    transform: translateY(-3px) scale(1.03);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
     color: #ffffff !important;
+    filter: brightness(0.94);
+    text-decoration: none;
 }
 
-.btn-grad:active { transform: translateY(-1px) scale(0.98); }
+.btn-grad:active { filter: brightness(0.88); }
 
-.grad-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; }
-.grad-green  { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important; }
-.grad-pink   { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important; }
-.grad-blue   { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important; }
-.grad-red    { background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%) !important; }
-.grad-orange { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%) !important; }
-
-/* pulse-анимация для кнопок */
-@keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 4px 15px rgba(102,126,234,0.3); }
-    50% { box-shadow: 0 4px 25px rgba(102,126,234,0.6); }
-}
-.btn-grad.grad-purple { animation: pulse-glow 2.5s ease-in-out infinite; }
+.grad-purple { background: #667eea !important; }
+.grad-green  { background: #2f9e6e !important; }
+.grad-pink   { background: #d15aa2 !important; }
+.grad-blue   { background: #3d8fd4 !important; }
+.grad-red    { background: #d9534f !important; }
+.grad-orange { background: #d9873a !important; }
 
 /* ===== Чат ===== */
 .chat-page body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -131,10 +108,10 @@ body {
     background: #fff;
     overflow-y: auto;
     flex-shrink: 0;
-    border-right: 1px solid #e8e8e8;
+    border-right: 1px solid var(--border);
 }
 
-.chat-area { flex: 1; display: flex; flex-direction: column; background: #f0f2f5; min-width: 0; }
+.chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
 
 .chat-item {
     display: flex;
@@ -144,7 +121,7 @@ body {
     border-radius: 10px;
     text-decoration: none;
     color: #333;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease;
     gap: 12px;
     animation: slideInItem 0.3s ease-out forwards;
     opacity: 0;
@@ -166,12 +143,9 @@ body {
 .chat-item:nth-child(9) { animation-delay: 0.18s; }
 .chat-item:nth-child(10) { animation-delay: 0.20s; }
 
-.chat-item:hover {
-    background: #f0f2f5;
-    transform: translateX(4px);
-}
+.chat-item:hover { background: var(--bg); }
 
-.chat-item.active { background: #e8eaff; }
+.chat-item.active { background: var(--accent-soft); }
 
 .chat-item-avatar {
     width: 48px;
@@ -186,13 +160,13 @@ body {
 .chat-item-name {
     font-weight: 600;
     font-size: 14px;
-    color: #1a1a2e;
+    color: var(--text);
     margin-bottom: 2px;
 }
 
 .chat-item-preview {
     font-size: 13px;
-    color: #999;
+    color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -210,31 +184,20 @@ body {
     to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes messageGlow {
-    0%, 100% { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    50% { box-shadow: 0 1px 12px rgba(102,126,234,0.15); }
-}
-
-@keyframes sendingPulse {
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.02); }
-}
-
 .message-bubble {
     max-width: 70%;
     padding: 10px 16px;
     border-radius: 18px;
     margin-bottom: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     position: relative;
     line-height: 1.45;
-    animation: messageIn 0.3s ease-out forwards;
+    animation: messageIn 0.25s ease-out forwards;
 }
 
 .message-bubble.sending {
-    animation: sendingPulse 0.8s ease-in-out infinite;
-    pointer-events: none;
     opacity: 0.7;
+    pointer-events: none;
 }
 
 .message-bubble.sending::after {
@@ -251,39 +214,33 @@ body {
 }
 
 .message-own {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--message-own);
     color: white;
     margin-left: auto;
     border-bottom-right-radius: 4px;
 }
 
-.message-own:hover {
-    animation: messageGlow 1.5s ease-in-out;
-}
-
 .message-other {
     background: white;
-    color: #1a1a2e;
+    color: var(--text);
     margin-right: auto;
     border-bottom-left-radius: 4px;
 }
 
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-.status-dot.online {
-    background: #4caf50;
-    box-shadow: 0 0 6px #4caf50;
-    animation: pulseOnline 2s ease-in-out infinite;
-}
+.status-dot.online { background: #4caf50; }
 .status-dot.offline { background: #9e9e9e; }
 
-@keyframes pulseOnline {
-    0%, 100% { box-shadow: 0 0 4px #4caf50; }
-    50% { box-shadow: 0 0 12px #4caf50; }
-}
-
 /* ===== Аватарки ===== */
-.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #e0e0e0; transition: all 0.3s ease; }
-.avatar:hover { border-color: #667eea; transform: scale(1.1) rotate(-3deg); }
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    transition: border-color 0.2s;
+}
+.avatar:hover { border-color: var(--accent); }
 
 /* ===== Спиннер загрузки ===== */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -312,34 +269,96 @@ body {
 /* ===== Карточки ===== */
 .card-modern {
     background: white;
-    border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid var(--border);
     padding: 24px;
     margin-bottom: 16px;
-    border: none;
 }
+
+/* ===== Формы ===== */
+.form-control-modern {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control-modern:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+    background: #fff;
+}
+
+/* ===== Кастомные кнопки ===== */
+.btn-gradient-primary {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-gradient-primary:hover {
+    color: #fff;
+    background: var(--accent-dark);
+}
+
+/* ===== Боковая панель (groups) ===== */
+.chat-sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: #fff;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== Карточки пользователей ===== */
+.user-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.user-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    border-color: var(--accent);
+}
+
+.user-name { font-weight: 600; font-size: 15px; color: var(--text); }
+.user-username { font-size: 13px; color: var(--text-muted); }
+
+.btn-write {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.btn-write:hover {
+    color: var(--accent);
+    background: #e2e6fb;
+}
+
+.avatar-upload-overlay { background: var(--accent); }
 
 /* ===== Эмодзи ===== */
-#emoji-picker {
-    display: none;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 4px;
-    padding: 12px;
-    max-height: 260px;
-    overflow-y: auto;
-    background: white;
-    border: 1px solid #e8e8e8;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-    position: absolute;
-    bottom: 70px;
-    left: 20px;
-    width: 320px;
-    z-index: 1050;
-}
-
-#emoji-picker.active { display: grid; }
-
 .emoji-btn {
     font-size: 1.5rem;
     padding: 6px;
@@ -347,36 +366,24 @@ body {
     border: 1px solid #e9ecef;
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s;
     line-height: 1;
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
 }
 
-.emoji-btn:hover { background: #e2e6ea; transform: scale(1.15); border-color: #adb5bd; }
+.emoji-btn:hover { background: #e2e6ea; border-color: #adb5bd; }
 
 /* ===== Файлы ===== */
 .file-tag {
     display: inline-flex;
     align-items: center;
-    background: #e8ecff;
-    color: #667eea;
+    background: var(--accent-soft);
+    color: var(--accent);
     padding: 4px 10px;
     border-radius: 16px;
     font-size: 0.85rem;
     gap: 6px;
 }
-
-/* ===== Аватарка загрузка ===== */
-.avatar-upload-wrap { position: relative; display: inline-block; }
-.avatar-upload-wrap img { width: 120px; height: 120px; object-fit: cover; border-radius: 50%; border: 3px solid #e0e0e0; }
-.avatar-upload-overlay {
-    position: absolute; bottom: 0; right: 0;
-    background: var(--primary-gradient); color: white;
-    border-radius: 50%; width: 36px; height: 36px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.2s; border: 2px solid white;
-}
-.avatar-upload-overlay:hover { transform: scale(1.1); }
 
 /* ===== Уведомления (messages) ===== */
 .alert-container { max-width: 600px; margin: 0 auto 16px; }

@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from chat.utils import parse_mentions, create_notification, rate_limit
 
@@ -98,13 +99,13 @@ def send_message(request):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
 
-    friend_id = request.POST.get('friend_id')
+    user_id = request.POST.get('user_id')
     group_id = request.POST.get('group_id')
     content = request.POST.get('content', '').strip()
     attachment = request.FILES.get('attachment')
     reply_to_id = request.POST.get('reply_to_id')
 
-    if not friend_id and not group_id:
+    if not user_id and not group_id:
         return JsonResponse({'status': 'error', 'message': 'Нет получателя'}, status=400)
 
     max_chars = settings.MAX_MESSAGE_LENGTH
@@ -124,16 +125,16 @@ def send_message(request):
     if reply_to_id:
         reply_msg = Message.objects.filter(id=reply_to_id).first()
         if reply_msg:
-            if friend_id:
-                ids = {request.user.id, int(friend_id)}
+            if user_id:
+                ids = {request.user.id, int(user_id)}
                 if reply_msg.sender.id not in ids or (reply_msg.receiver_id not in ids and reply_msg.receiver_id is not None):
                     reply_msg = None
             elif group_id and reply_msg.group_id is not None and str(reply_msg.group_id) != group_id:
                 reply_msg = None
 
     try:
-        if friend_id:
-            receiver = get_object_or_404(User, id=friend_id)
+        if user_id:
+            receiver = get_object_or_404(User, id=user_id)
             msg = Message.objects.create(
                 sender=request.user, receiver=receiver, group=None,
                 content=content, attachment=attachment,
@@ -423,18 +424,18 @@ def api_poll(request):
         return JsonResponse({'status': 'error', 'message': 'Неверный after_id'}, status=400)
 
     user = request.user
-    friend_id = request.GET.get('friend_id')
+    user_id = request.GET.get('user_id')
     group_id = request.GET.get('group_id')
     channel_id = request.GET.get('channel_id')
 
     messages_qs = None
 
-    if friend_id:
-        friend = get_object_or_404(User, id=friend_id)
+    if user_id:
+        peer = get_object_or_404(User, id=user_id)
         messages_qs = Message.objects.filter(
             id__gt=after_id,
         ).filter(
-            Q(sender=user, receiver=friend) | Q(sender=friend, receiver=user)
+            Q(sender=user, receiver=peer) | Q(sender=peer, receiver=user)
         ).order_by('created_at')
         template_name = 'parts/message_list.html'
 
@@ -457,7 +458,7 @@ def api_poll(request):
         template_name = 'parts/channel_post_list.html'
 
     else:
-        return JsonResponse({'status': 'error', 'message': 'Укажите friend_id, group_id или channel_id'}, status=400)
+        return JsonResponse({'status': 'error', 'message': 'Укажите user_id, group_id или channel_id'}, status=400)
 
     messages = list(messages_qs)
 

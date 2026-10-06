@@ -40,7 +40,7 @@
         margin-bottom: 12px;
     }
     .btn-write {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #667eea;
         color: white;
         border: none;
         padding: 8px 16px;
@@ -98,7 +98,7 @@
     <div class="search-bar">
         <form method="get" action="{% url 'users_catalog' %}" class="d-flex gap-2">
             <input type="text" name="q" class="form-control" placeholder="🔍 Поиск по имени или нику..." value="{{ query }}">
-            <button type="submit" class="btn btn-gradient-primary px-4">Найти</button>
+            <button type="submit" class="btn btn-primary px-4">Найти</button>
         </form>
     </div>
 
@@ -116,7 +116,7 @@
                             <div class="user-name">{{ user.get_display_name|default:user.username }}</div>
                             <div class="user-username">@{{ user.username }}</div>
                         </a>
-                        <a href="{% url 'main' %}?friend_id={{ user.id }}" class="btn-write">
+                        <a href="{% url 'main' %}?user_id={{ user.id }}" class="btn-write">
                             <i class="bi bi-chat-left-fill"></i> Написать
                         </a>
                     </div>

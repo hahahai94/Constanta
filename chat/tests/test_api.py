@@ -13,7 +13,7 @@ User = get_user_model()
 class APITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='api_tester', password='123')
-        self.friend = User.objects.create_user(username='api_friend', password='456')
+        self.other = User.objects.create_user(username='api_other', password='456')
         self.client.login(username='api_tester', password='123')
 
     def test_heartbeat_auth(self):
@@ -32,7 +32,7 @@ class APITests(TestCase):
 
     def test_send_empty_message(self):
         response = self.client.post('/api/send/', {
-            'friend_id': '999', 'content': ''
+            'user_id': '999', 'content': ''
         })
         self.assertNotEqual(response.status_code, 500)
 
@@ -44,17 +44,17 @@ class APITests(TestCase):
 
     def test_send_private_message(self):
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
-            'content': 'Hello friend!'
+            'user_id': self.other.id,
+            'content': 'Hello there!'
         })
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Message.objects.filter(
-            sender=self.user, receiver=self.friend, content='Hello friend!'
+            sender=self.user, receiver=self.other, content='Hello there!'
         ).exists())
 
     def test_send_message_too_long(self):
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': 'x' * (settings.MAX_MESSAGE_LENGTH + 1)
         })
         self.assertEqual(response.status_code, 400)
@@ -62,34 +62,34 @@ class APITests(TestCase):
     def test_send_file_message(self):
         file = SimpleUploadedFile("test.png", io.BytesIO(b'image').read(), content_type="image/png")
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': 'Check this',
             'attachment': file
         })
         self.assertEqual(response.status_code, 200)
-        msg = Message.objects.get(sender=self.user, receiver=self.friend)
+        msg = Message.objects.get(sender=self.user, receiver=self.other)
         self.assertEqual(msg.attachment_type, 'image')
 
     def test_send_file_message_audio(self):
         file = SimpleUploadedFile("voice.ogg", io.BytesIO(b'audio').read(), content_type="audio/ogg")
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': 'Voice message',
             'attachment': file
         })
         self.assertEqual(response.status_code, 200)
-        msg = Message.objects.get(sender=self.user, receiver=self.friend)
+        msg = Message.objects.get(sender=self.user, receiver=self.other)
         self.assertEqual(msg.attachment_type, 'voice')
 
     def test_send_file_message_other(self):
         file = SimpleUploadedFile("doc.pdf", io.BytesIO(b'pdf').read(), content_type="application/pdf")
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': 'Document',
             'attachment': file
         })
         self.assertEqual(response.status_code, 200)
-        msg = Message.objects.get(sender=self.user, receiver=self.friend)
+        msg = Message.objects.get(sender=self.user, receiver=self.other)
         self.assertEqual(msg.attachment_type, 'file')
 
     def test_send_message_get_fails(self):
@@ -99,7 +99,7 @@ class APITests(TestCase):
     def test_download_attachment(self):
         file = SimpleUploadedFile("download.txt", b"content", content_type="text/plain")
         msg = Message.objects.create(
-            sender=self.user, receiver=self.friend,
+            sender=self.user, receiver=self.other,
             content='With file', attachment=file
         )
         response = self.client.get(f'/download/{msg.id}/')
@@ -107,7 +107,7 @@ class APITests(TestCase):
 
     def test_download_attachment_no_file(self):
         msg = Message.objects.create(
-            sender=self.user, receiver=self.friend,
+            sender=self.user, receiver=self.other,
             content='No file'
         )
         response = self.client.get(f'/download/{msg.id}/')
@@ -132,7 +132,7 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 405)
 
     def test_api_update_group_not_owner(self):
-        group = Group.objects.create(name='G', owner=self.friend)
+        group = Group.objects.create(name='G', owner=self.other)
         response = self.client.post(f'/groups/{group.id}/settings/', {'name': 'Hacked'})
         self.assertEqual(response.status_code, 403)
 
@@ -159,7 +159,7 @@ class APITests(TestCase):
     def test_send_oversized_file(self):
         file = SimpleUploadedFile("big.bin", b"x" * (settings.FILE_UPLOAD_MAX_MEMORY_SIZE + 1), content_type="application/octet-stream")
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': 'big',
             'attachment': file
         })
@@ -168,11 +168,11 @@ class APITests(TestCase):
     def test_send_message_with_mention(self):
         mentioned = User.objects.create_user(username='mention_target', password='123')
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': f'Hello @{mentioned.username}'
         })
         self.assertEqual(response.status_code, 200)
-        msg = Message.objects.get(sender=self.user, receiver=self.friend)
+        msg = Message.objects.get(sender=self.user, receiver=self.other)
         self.assertIn(str(mentioned.id), msg.mentions)
 
     def test_send_message_to_group(self):
@@ -186,7 +186,7 @@ class APITests(TestCase):
         self.assertTrue(Message.objects.filter(group=group, content='Group message').exists())
 
     def test_send_message_to_group_not_member(self):
-        group = Group.objects.create(name='Private', owner=self.friend)
+        group = Group.objects.create(name='Private', owner=self.other)
         response = self.client.post('/api/send/', {
             'group_id': str(group.id),
             'content': 'Hack'
@@ -230,21 +230,21 @@ class APITests(TestCase):
 
     def test_api_add_member_already_exists(self):
         group = Group.objects.create(name='G5', owner=self.user)
-        GroupMember.objects.create(group=group, user=self.friend, role='member')
+        GroupMember.objects.create(group=group, user=self.other, role='member')
         GroupMember.objects.create(group=group, user=self.user, role='owner')
         response = self.client.post('/api/add-member/', json.dumps({
-            'group_id': str(group.id), 'username': self.friend.username
+            'group_id': str(group.id), 'username': self.other.username
         }), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_api_set_role_not_owner(self):
-        group = Group.objects.create(name='G6', owner=self.friend)
-        GroupMember.objects.create(group=group, user=self.friend, role='owner')
+        group = Group.objects.create(name='G6', owner=self.other)
+        GroupMember.objects.create(group=group, user=self.other, role='owner')
         self.client.logout()
         stranger = User.objects.create_user(username='stranger3', password='123')
         self.client.login(username='stranger3', password='123')
         response = self.client.post('/api/set-role/', json.dumps({
-            'group_id': str(group.id), 'user_id': self.friend.id, 'role': 'member'
+            'group_id': str(group.id), 'user_id': self.other.id, 'role': 'member'
         }), content_type='application/json')
         self.assertEqual(response.status_code, 403)
 
@@ -277,10 +277,10 @@ class APITests(TestCase):
     def test_download_attachment_via_group(self):
         group = Group.objects.create(name='Shared', owner=self.user)
         GroupMember.objects.create(group=group, user=self.user, role='owner')
-        GroupMember.objects.create(group=group, user=self.friend, role='member')
+        GroupMember.objects.create(group=group, user=self.other, role='member')
         file = SimpleUploadedFile("group_file.txt", b"shared", content_type="text/plain")
         msg = Message.objects.create(
-            sender=self.friend, group=group,
+            sender=self.other, group=group,
             content='Group file', attachment=file
         )
         response = self.client.get(f'/download/{msg.id}/')
@@ -289,7 +289,7 @@ class APITests(TestCase):
     def test_download_attachment_file_missing(self):
         file = SimpleUploadedFile("temp.txt", b"gone", content_type="text/plain")
         msg = Message.objects.create(
-            sender=self.user, receiver=self.friend,
+            sender=self.user, receiver=self.other,
             content='Temporary', attachment=file
         )
         os.remove(msg.attachment.path)
@@ -297,10 +297,10 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_download_attachment_group_member_unauthorized(self):
-        group = Group.objects.create(name='Secret', owner=self.friend)
+        group = Group.objects.create(name='Secret', owner=self.other)
         file = SimpleUploadedFile("secret.txt", b"secret", content_type="text/plain")
         msg = Message.objects.create(
-            sender=self.friend, group=group,
+            sender=self.other, group=group,
             content='Secret file', attachment=file
         )
         response = self.client.get(f'/download/{msg.id}/')
@@ -319,10 +319,10 @@ class APITests(TestCase):
     def test_send_message_mime_image_by_content_type(self):
         file = SimpleUploadedFile("weird.png", b'\x00\x00\x00', content_type="image/png")
         response = self.client.post('/api/send/', {
-            'friend_id': self.friend.id,
+            'user_id': self.other.id,
             'content': 'Detected by content_type',
             'attachment': file
         })
         self.assertEqual(response.status_code, 200)
-        msg = Message.objects.get(sender=self.user, receiver=self.friend, content='Detected by content_type')
+        msg = Message.objects.get(sender=self.user, receiver=self.other, content='Detected by content_type')
         self.assertEqual(msg.attachment_type, 'image')

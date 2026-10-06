@@ -17,7 +17,7 @@ class PrivateChatTests(TestCase):
     def test_send_text_message(self):
         """Тест: Отправка текстового сообщения через API"""
         response = self.client.post('/api/send/', {
-            'friend_id': self.user2.id,
+            'user_id': self.user2.id,
             'content': 'Привет, Боб!'
         })
         self.assertEqual(response.status_code, 200)
@@ -36,7 +36,7 @@ class PrivateChatTests(TestCase):
         uploaded_file = SimpleUploadedFile("test.png", file_content.read(), content_type="image/png")
 
         response = self.client.post('/api/send/', {
-            'friend_id': self.user2.id,
+            'user_id': self.user2.id,
             'content': 'Смотри фотку',
             'attachment': uploaded_file
         })
@@ -53,6 +53,6 @@ class PrivateChatTests(TestCase):
 
     def test_view_chat_page(self):
         """Тест: Страница чата грузится (200)"""
-        response = self.client.get(f'/?friend_id={self.user2.id}')
+        response = self.client.get(f'/?user_id={self.user2.id}')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.user2.username)

@@ -4,7 +4,7 @@
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>📢 Каналы</h2>
-    <button type="button" class="btn-grad grad-green" data-bs-toggle="modal" data-bs-target="#createChannelModal">➕ Создать канал</button>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createChannelModal">➕ Создать канал</button>
   </div>
 
   {% if memberships %}
@@ -24,7 +24,7 @@
             {% if m.channel.owner != user %}
             <form method="post" action="{% url 'leave_channel' m.channel.id %}">
               {% csrf_token %}
-              <button class="btn-grad grad-red" style="padding: 6px 14px; font-size: 13px;">Отписаться</button>
+              <button class="btn btn-outline-danger" style="padding: 6px 14px; font-size: 13px;">Отписаться</button>
             </form>
             {% endif %}
           </div>
@@ -52,7 +52,7 @@
         </div>
         <form method="post" action="{% url 'join_channel' ch.id %}">
           {% csrf_token %}
-          <button class="btn-grad grad-green" style="padding: 6px 14px; font-size: 13px;">Подписаться</button>
+          <button class="btn btn-primary" style="padding: 6px 14px; font-size: 13px;">Подписаться</button>
         </form>
       </div>
     </div>
@@ -76,7 +76,7 @@
         </div>
         <div class="modal-footer border-0 pt-0">
           <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
-          <button type="submit" class="btn-grad grad-green rounded-pill px-4">Создать</button>
+          <button type="submit" class="btn btn-primary rounded-pill px-4">Создать</button>
         </div>
       </form>
     </div>

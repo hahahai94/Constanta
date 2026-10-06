@@ -45,29 +45,32 @@
                 <ul class="navbar-nav ms-auto">
                 {% if user.is_authenticated %}
                 <li class="nav-item me-1">
-                    <a class="btn-grad grad-purple" href="{% url 'main' %}" style="padding: 6px 12px; font-size: 13px;">💬 Чаты</a>
+                    <a class="nav-link" href="{% url 'main' %}">💬 Чаты</a>
                 </li>
                 <li class="nav-item me-1">
-                     <a class="btn-grad grad-pink" href="{% url 'groups' %}" style="padding: 6px 12px; font-size: 13px;">📁 Группы</a>
+                     <a class="nav-link" href="{% url 'groups' %}">📁 Группы</a>
                 </li>
                 <li class="nav-item me-1">
-                     <a class="btn-grad grad-blue" href="{% url 'channel_list' %}" style="padding: 6px 12px; font-size: 13px;">📢 Каналы</a>
+                     <a class="nav-link" href="{% url 'channel_list' %}">📢 Каналы</a>
                 </li>
                 <li class="nav-item me-1">
-                     <a class="btn-grad grad-purple" href="{% url 'users_catalog' %}" style="padding: 6px 12px; font-size: 13px;">🔍 Люди</a>
+                     <a class="nav-link" href="{% url 'users_catalog' %}">🔍 Люди</a>
                 </li>
                 <li class="nav-item me-1">
-                     <a class="btn-grad grad-orange" href="{% url 'task_lists' %}" style="padding: 6px 12px; font-size: 13px;">📋 Задачи</a>
+                     <a class="nav-link" href="{% url 'task_lists' %}">📋 Задачи</a>
+                </li>
+                <li class="nav-item me-1">
+                     <a class="nav-link" href="{% url 'profile' %}">👤 Профиль</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn-grad grad-red" href="{% url 'logout' %}" style="padding: 6px 12px; font-size: 13px;">🚪</a>
+                    <a class="nav-link text-danger" href="{% url 'logout' %}" title="Выйти">🚪</a>
                 </li>
                 {% else %}
                 <li class="nav-item me-2">
-                    <a class="btn-grad grad-green" href="{% url 'auth' %}" style="padding: 6px 12px; font-size: 13px;">🔑 Войти</a>
+                    <a class="nav-link" href="{% url 'auth' %}">🔑 Войти</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn-grad grad-purple" href="{% url 'auth' %}?mode=reg" style="padding: 6px 12px; font-size: 13px;">📝 Регистрация</a>
+                    <a class="nav-link" href="{% url 'auth' %}?mode=reg">📝 Регистрация</a>
                 </li>
                     {% endif %}
                 </ul>
