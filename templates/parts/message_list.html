@@ -1,0 +1,41 @@
+{% for msg in messages %}
+<div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3" data-message-id="{{ msg.id }}">
+    <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
+        <button type="button" class="reply-btn" onclick="startReply('{{ msg.id }}', '{{ msg.sender.username }}', '{{ msg.content|escapejs|default:"📎 Вложение" }}')">↩️</button>
+        {% if msg.reply_to %}
+        <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
+            <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>
+            <span class="reply-quote-text">{{ msg.reply_to.content|default:"📎 Вложение" }}</span>
+        </div>
+        {% endif %}
+        {% if msg.attachment_type == 'image' and msg.attachment %}
+            <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
+        {% endif %}
+        {% if msg.attachment_type == 'file' and msg.attachment %}
+            <a href="{% url 'download_attachment' msg.id %}" class="text-decoration-none d-block mb-2 p-2 rounded"
+               style="background: rgba(0,0,0,0.1); color: inherit;">
+                <i class="bi bi-file-earmark me-1"></i>
+                {{ msg.attachment_original_name|default:"Файл" }}
+                {% if msg.attachment_size %}<small class="d-block opacity-75">{{ msg.attachment_size|filesizeformat }}</small>{% endif %}
+            </a>
+        {% endif %}
+        {% if msg.attachment_type == 'voice' and msg.attachment %}
+            <audio controls class="w-100 mb-2"><source src="{{ msg.attachment.url }}"></audio>
+        {% endif %}
+        {% if msg.content %}
+            <p class="mb-1" style="white-space: pre-wrap;">{{ msg.content|linebreaksbr }}</p>
+        {% endif %}
+        <small style="font-size: 0.75rem; opacity: 0.7; display: block; text-align: right; margin-top: 5px;">
+            {{ msg.created_at|date:"H:i" }}
+        </small>
+    </div>
+</div>
+{% empty %}
+<div class="d-flex align-items-center justify-content-center h-100 text-muted">
+    <div class="text-center">
+        <i class="bi bi-chat-square-text" style="font-size: 4rem; opacity: 0.3;"></i>
+        <p class="mt-3 fs-5">Нет сообщений</p>
+        <small>Напишите первое сообщение!</small>
+    </div>
+</div>
+{% endfor %}

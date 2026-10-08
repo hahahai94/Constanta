@@ -1,0 +1,27 @@
+{% for post in posts %}
+<div class="post-card" data-message-id="{{ post.id }}">
+    <div class="post-meta mb-2">
+        <strong>{{ post.sender.username }}</strong> &bull; {{ post.created_at|date:"d.m.Y H:i" }}
+    </div>
+    {% if post.reply_to %}
+    <div class="reply-preview p-2 rounded mb-2" style="background:#f8f9fa;font-size:0.9rem;border-left:3px solid #667eea">
+        <small>Ответ на <strong>{{ post.reply_to.sender.username }}</strong>: {{ post.reply_to.content|truncatewords:10 }}</small>
+    </div>
+    {% endif %}
+    <div>{{ post.content|linebreaksbr }}</div>
+    {% if post.attachment %}
+    <div class="mt-2">
+        {% if post.attachment_type == 'image' %}
+            <img src="{{ post.attachment.url }}" class="img-fluid rounded" style="max-height:400px" alt="">
+        {% else %}
+            <a href="{% url 'download_attachment' post.id %}" class="btn btn-sm btn-outline-info">{{ post.get_attachment_name }}</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if post.mentions %}
+    <div class="post-meta mt-1"><small>Упомянуты: {{ post.mentions }}</small></div>
+    {% endif %}
+</div>
+{% empty %}
+<p class="text-muted">В канале пока нет публикаций.</p>
+{% endfor %}
