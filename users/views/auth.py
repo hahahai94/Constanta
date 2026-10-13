@@ -7,11 +7,12 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from users.forms import RegistrationForm
+from users.utils import get_client_ip
 
 
 def _rate_limit(request, key_prefix, limit=5, period=300):
     """Простой rate limiter через кеш (по умолчанию: 5 попыток за 5 минут)"""
-    ip = request.META.get('REMOTE_ADDR', 'unknown')
+    ip = get_client_ip(request) or 'unknown'
     key = f"ratelimit:{key_prefix}:{ip}"
     attempts = cache.get(key, 0)
     if attempts >= limit:
@@ -32,7 +33,7 @@ def auth_view(request):
         if mode == 'reg' or 'register' in request.POST:
             form = RegistrationForm(request.POST)
             if form.is_valid():
-                cache.delete(f"ratelimit:auth:{request.META.get('REMOTE_ADDR', 'unknown')}")
+                cache.delete(f"ratelimit:auth:{get_client_ip(request) or 'unknown'}")
                 user = form.save()
                 user.backend = settings.AUTHENTICATION_BACKENDS[0]
                 login(request, user)
@@ -49,7 +50,7 @@ def auth_view(request):
                 password = form.cleaned_data.get('password')
                 user = authenticate(request, username=username, password=password)
                 if user is not None:
-                    cache.delete(f"ratelimit:auth:{request.META.get('REMOTE_ADDR', 'unknown')}")
+                    cache.delete(f"ratelimit:auth:{get_client_ip(request) or 'unknown'}")
                     login(request, user)
                     return redirect('main')
                 else:

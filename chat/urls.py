@@ -19,6 +19,8 @@ urlpatterns = [
     path('channel/<uuid:channel_id>/delete/', views.delete_channel, name='delete_channel'),
     path('channel/<uuid:channel_id>/join/', views.join_channel, name='join_channel'),
     path('channel/<uuid:channel_id>/leave/', views.leave_channel, name='leave_channel'),
+    path('channel/invite/<uuid:token>/', views.channel_invite, name='channel_invite'),
+    path('channel/<uuid:channel_id>/regenerate-invite/', views.regenerate_invite, name='channel_regenerate_invite'),
 
     path('api/send/', views.send_message, name='api_send'),
     path('api/heartbeat/', views.api_heartbeat, name='api_heartbeat'),

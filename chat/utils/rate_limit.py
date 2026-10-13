@@ -1,6 +1,7 @@
 from functools import wraps
 from django.core.cache import cache
 from django.http import JsonResponse
+from users.utils import get_client_ip
 
 
 def rate_limit(key_prefix, limit=30, period=60):
@@ -13,7 +14,7 @@ def rate_limit(key_prefix, limit=30, period=60):
         def wrapper(request, *args, **kwargs):
             if not request.META:
                 return view_func(request, *args, **kwargs)
-            ip = request.META.get('REMOTE_ADDR', 'unknown')
+            ip = get_client_ip(request) or 'unknown'
             method = request.method
             path = request.path
             safe_methods = getattr(view_func, '_rate_limit_safe_methods', ['GET', 'HEAD', 'OPTIONS'])

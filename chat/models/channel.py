@@ -10,6 +10,7 @@ class Channel(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='owned_channels', on_delete=models.CASCADE)
     avatar = models.ImageField(upload_to='channel_avatars/', null=True, blank=True)
     is_private = models.BooleanField(default=False)
+    invite_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

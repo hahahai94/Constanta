@@ -1,8 +1,10 @@
+import uuid
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.conf import settings
+from django.urls import reverse
 from chat.models import Channel, ChannelMember, Message
 
 POSTS_PER_PAGE = 30
@@ -27,6 +29,9 @@ def channel_view(request, channel_id):
         messages.error(request, 'Вы не подписаны на этот канал')
         return redirect('channel_list')
     can_post = membership.role in ['owner', 'admin']
+    invite_url = ''
+    if can_post:
+        invite_url = request.build_absolute_uri(reverse('channel_invite', args=[channel.invite_token]))
     posts_qs = Message.objects.filter(channel=channel, is_deleted=False).order_by('-created_at')
     paginator = Paginator(posts_qs, POSTS_PER_PAGE)
     page_number = request.GET.get('page', 1)
@@ -50,6 +55,7 @@ def channel_view(request, channel_id):
         'posts': posts_page.object_list,
         'posts_page': posts_page,
         'can_post': can_post,
+        'invite_url': invite_url,
         'membership': membership,
     })
 
@@ -59,7 +65,8 @@ def create_channel(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
-            channel = Channel.objects.create(name=name, owner=request.user)
+            is_private = request.POST.get('is_private') == '1'
+            channel = Channel.objects.create(name=name, owner=request.user, is_private=is_private)
             ChannelMember.objects.create(channel=channel, user=request.user, role='owner')
             return redirect('channel_view', channel_id=channel.id)
     return redirect('channel_list')
@@ -74,6 +81,7 @@ def edit_channel(request, channel_id):
     if request.method == 'POST':
         channel.name = request.POST.get('name', channel.name).strip()
         channel.description = request.POST.get('description', channel.description).strip()
+        channel.is_private = request.POST.get('is_private') == '1'
         if request.FILES.get('avatar'):
             channel.avatar = request.FILES['avatar']
         channel.save()
@@ -123,3 +131,29 @@ def leave_channel(request, channel_id):
     ChannelMember.objects.filter(channel=channel, user=request.user).delete()
     messages.success(request, 'Вы отписались от канала')
     return redirect('channel_list')
+
+
+@login_required
+def channel_invite(request, token):
+    """Подписка по ссылке-приглашению (работает и для приватных каналов)."""
+    channel = get_object_or_404(Channel, invite_token=token)
+    if ChannelMember.objects.filter(channel=channel, user=request.user).exists():
+        messages.info(request, 'Вы уже подписаны на этот канал')
+    else:
+        ChannelMember.objects.create(channel=channel, user=request.user, role='subscriber')
+        messages.success(request, f'Вы подписались на {channel.name}')
+    return redirect('channel_view', channel_id=channel.id)
+
+
+@login_required
+def regenerate_invite(request, channel_id):
+    """Пересоздание ссылки-приглашения (только владелец)."""
+    channel = get_object_or_404(Channel, id=channel_id)
+    if channel.owner != request.user:
+        messages.error(request, 'Нет прав')
+        return redirect('channel_view', channel_id=channel_id)
+    if request.method == 'POST':
+        channel.invite_token = uuid.uuid4()
+        channel.save(update_fields=['invite_token'])
+        messages.success(request, 'Ссылка-приглашение обновлена')
+    return redirect('channel_view', channel_id=channel_id)

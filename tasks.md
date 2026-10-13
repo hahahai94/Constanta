@@ -1,93 +1,67 @@
 # Tasks — Constanta
 
 ## 1. 🔧 Инфраструктура и настройки
-- [ ] Внедрить **nginx** для раздачи статики / настроить `STATIC_ROOT` для `collectstatic`
+- [x] `STATIC_ROOT` + `collectstatic` настроены; `staticfiles/` больше не хранится в git
+- [ ] Внедрить **nginx** для раздачи статики в продакшне (сейчас Whitenoise)
 - [ ] Разделить **логи** по модулям, добавить `RotatingFileHandler`
-- [ ] Проверить интеграцию **Jinja2** как альтернативу Django Templates
-- [ ] Настроить WebSocket (channels) — ASGI настроен, но нет consumer'ов, весь обмен через HTTP POST + polling
+- [ ] Настроить WebSocket (channels) — ASGI настроен, но нет consumer'ов, обмен через HTTP + polling
 
-## 2. 🐛 Ошибки и баги
+## 2. 🐛 Ошибки и баги (исправлено)
+- [x] **Курсор автообновления** — polling использовал `id` (UUID) как целое число. Переведён на курсор по `created_at` (`api_poll`, `data-cursor` в шаблонах)
+- [x] **Дубли постов в каналах** — сортировка/курсор канала исправлены, повторная выдача исключена
+- [x] **Вложения из каналов не скачивались** — `download_attachment` теперь проверяет подписку на канал
+- [x] **Слабая валидация изображений** — Pillow проверяет файл целиком, а не первые 1024 байта
+- [x] **Rate-limit/IP-бан** — общий файловый кэш + `X-Forwarded-For` учитывается только при `USE_X_FORWARDED_FOR=True` (`users/utils.get_client_ip`)
+- [x] **Приватные каналы** — добавлена ссылка-приглашение (`invite_token`), подписка по токену
+- [x] **`int(user_id)` мог дать 500** — невалидный `user_id` возвращает 400
+- [x] Обход `CustomAuthBackend` — `auth_view` использует `AUTHENTICATION_BACKENDS[0]`, неактивные не входят
+- [x] Дублирование `_file_hash()` / `generate_file_hash()` — оставлена одна реализация в `chat/utils/file_hash.py`
+- [x] `GroupForm` и `GroupEditForm` объединены
+- [x] Мёртвые шаблоны `group_create.html` / `group_edit.html` удалены
+- [x] `password_done` — `change_password` редиректит на `password_done`
+- [x] `STATICFILES_DIRS` определяется один раз
+- [x] `is_private` у Channel учитывается в правах доступа
 
-### Высокий приоритет
-- [ ] **Обход `CustomAuthBackend`** — `auth_view()` в `users/views/auth.py:36,52` хардкодит `backend='django.contrib.auth.backends.ModelBackend'`, неактивные пользователи могут войти
-- [ ] **Слабая валидация файлов** — `chat/views/api.py:73-87` проверяет только magic-байты (32 байта), без полной валидации содержимого
-- [ ] **Нет rate limiting на API** — только страница входа защищена, все `/api/*` эндпоинты без ограничений
-- [ ] **`is_private` у Channel не проверяется** — поле хранится, но нигде не учитывается в правах доступа
+## 3. 🧹 Рефакторинг: users app ✅
+Выделено в отдельное приложение `users/`.
 
-### Средний приоритет
-- [ ] **Дублирование `_file_hash()`** — `chat/models.py:_file_hash()` и `chat/utils.py:generate_file_hash()` делают одно и то же
-- [ ] **Дублирование форм** — `GroupForm` и `GroupEditForm` в `chat/forms.py` идентичны
-- [ ] **Мёртвый шаблон `group_create.html`** — `create_group` редиректит, не рендерит форму
-- [ ] **Мёртвый шаблон `group_edit.html`** — `edit_group` редиректит на `group_chat`
-- [ ] **`password_done.html` существует, но `change_password` редиректит на `profile`, а не на `password_done`**
-- [ ] **Дублирование проверок `is_owner`/`is_admin`** в `group_chat()` (group.py:27-28 и 38-43)
-- [ ] **`STATICFILES_DIRS` переопределяется 3 раза** (settings.py:176, 177, 190) — работает только последнее
-- [ ] **В шаблонах ссылаются на несуществующие URL-имена** (`superadmin_*` и др.)
-
-## 3. 🧹 Рефакторинг: вынести `users` app ✅
-Выделено в отдельное приложение `users/`. Требуется верификация:
-
-### Модели и бэкенды ✅
-- [x] Перенести `User`, `BannedIP`, `Notification`, `AdminLog` → `users/models.py`
-- [x] `backends.py` → `users/backends.py`
-- [x] `IPBanMiddleware` → `users/middleware.py`
-- [x] `chat/admin.py` → убрать регистрацию User/BannedIP, перенести в `users/admin.py`
-
-### Вьюхи, формы, URL ✅
-- [x] Перенести `auth.py` + `profile.py` → `users/views/`
-- [x] Перенести формы: `RegistrationForm`, `LoginForm`, `ProfileForm`, `ChangeUsernameForm`, `ChangePasswordForm`
-- [x] Перенести URL-паттерны: auth, logout, profile, change-username, change-password, password-done, users
-
-### Шаблоны ✅
-- [x] Перенести: `auth.html`, `profile.html`, `users_catalog.html`, `change_username.html`, `change_password.html`, `banned.html`, `public_profile.html`
-- [ ] `profile_edit.html`, `user_detail.html`, `settings.html` — не найдены (возможно, не существуют)
-- [ ] superadmin-шаблоны: `panel.html`, `user_edit.html`, `user_delete.html`, `ban_confirm.html` — не найдены
-
-### Конфигурация ✅
-- [x] `AUTH_USER_MODEL` → `'users.User'`
-- [x] `AUTHENTICATION_BACKENDS` → `'users.backends.CustomAuthBackend'` + fallback
-- [x] Добавить `'users.apps.UsersConfig'` в `INSTALLED_APPS`
-
-### Импорты и миграции ✅
-- [x] Обновить импорты `User` во всех файлах `chat/`
-- [x] Обновить импорты в шаблонах (`{% url %}` и контекст)
-- [x] Пересоздать все миграции с нуля + `db.sqlite3`
+- [x] Модели: `User`, `BannedIP`, `Notification`, `AdminLog` → `users/models.py`
+- [x] `backends.py`, `middleware.py`, `admin.py`, формы, вьюхи, URL, шаблоны
+- [x] `AUTH_USER_MODEL = 'users.User'`, `AUTHENTICATION_BACKENDS`
+- [x] Импорты и миграции обновлены
 
 ## 4. 🧹 Рефакторинг: остальное
-- [ ] Разделить `chat/models.py` → `models/` (пакет)
-- [ ] Разделить `chat/utils.py` → `utils/` (пакет)
-- [ ] Вынести CSS/JS в `static/css/` и `static/js/`
-- [ ] Вынести повторяющиеся HTML-блоки в `templates/parts/`
-- [ ] Удалить мёртвые шаблоны: `group_create.html`, `group_edit.html`
-- [ ] Удалить дубликат `_file_hash()` / `generate_file_hash()`, оставить один
-- [ ] Объединить `GroupForm` и `GroupEditForm`
+- [x] `chat/models.py` → пакет `chat/models/` (`message.py`, `channel.py`, `group.py`)
+- [x] `chat/utils.py` → пакет `chat/utils/` (`file_hash.py`, `mentions.py`, `notifications.py`, `rate_limit.py`)
+- [ ] Вынести оставшиеся CSS/JS из шаблонов в `static/css/` и `static/js/` (сейчас часть JS инлайн)
+- [x] Общие HTML-блоки вынесены в `templates/parts/`
 
 ## 5. 🔐 Безопасность
-- [ ] Скрыть `/admin/` (IP-белый список или сложный путь `ADMIN_URL`)
+- [x] `ADMIN_URL` (сложный путь админки) поддерживается через переменную окружения
+- [x] Rate limiting на всех API-эндпоинтах + странице входа
+- [x] Полная валидация загружаемых изображений
+- [x] `X-Forwarded-For` не доверяется без явного включения
 - [ ] Внедрить **сквозное шифрование (E2EE)**
-- [ ] Усилить валидацию типов загружаемых файлов (проверять весь файл, а не 32 байта)
-- [ ] Добавить rate limiting на все API-эндпоинты
-- [ ] Исправить `auth_view` — убрать хардкод `backend=` или использовать `CustomAuthBackend`
-- [ ] Реализовать проверку `is_private` для Channel
 
 ## 6. 🧪 Тестирование
-- [ ] Покрыть ключевые сценарии (регистрация, отправка сообщений, группы)
-- [ ] Дописать тесты для API-эндпоинтов
-- [ ] Написать тест на обход `CustomAuthBackend`
-- [ ] Написать тест на rate limiting API
+- [x] Тесты на регистрацию, вход, сообщения, группы, каналы, API
+- [x] Тесты на курсор polling (личные/группы/каналы)
+- [x] Тесты на приватные каналы и инвайты
+- [x] Тесты на доступ к вложениям каналов
+- [x] Тесты на определение клиентского IP / доверие прокси
+- [ ] WebSocket и голосовые звонки
 
 ## 7. ⚡ Производительность
-- [ ] **N+1 запрос в `main_chat()`** — для каждого собеседника отдельный запрос `last_message`
-- [ ] **Автообновление через polling** — `templates/index.html:463` загружает полную HTML-страницу каждые 2с (заменить на JSON API)
-- [ ] **Нет пагинации сообщений** — `main_chat` загружает только 50 сообщений без "load more"
-- [ ] **Добавить индекс на `last_seen`** — для оптимизации `is_online` и heartbeat
+- [x] N+1 в `main_chat()` — заменён на `Subquery`-аннотацию
+- [x] Автообновление переведено на JSON API (`/api/poll/`), без перезагрузки HTML
+- [x] Пагинация сообщений (30 на страницу) с подгрузкой старых
+- [x] Индекс на `last_seen` (миграция `users/0002`)
 
 ## 8. 🚀 Фичи
-
 ### Плановые (из README)
-- [ ] **WebSocket / голосовые звонки**
-- [ ] **Кастомные темы оформления** и тёмный режим
+- [ ] WebSocket / голосовые звонки
+- [ ] Кастомные темы и тёмный режим
 
 ### Недостающий функционал
-- [ ] **Email-верификация** — регистрация создаёт пользователей без подтверждения email
-- [ ] **WebSocket consumer** — ASGI настроен, но не используется для реального времени
+- [ ] Email-верификация при регистрации
+- [ ] WebSocket consumer (ASGI настроен, но не используется)

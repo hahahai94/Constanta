@@ -73,6 +73,11 @@
         <div class="modal-body">
           <label class="form-label fw-bold">Название канала</label>
           <input type="text" name="name" class="form-control-modern" placeholder="Например: Новости, Блог, Объявления..." required>
+          <div class="form-check mt-3">
+            <input type="hidden" name="is_private" value="0">
+            <input type="checkbox" name="is_private" value="1" class="form-check-input" id="is-private-create">
+            <label class="form-check-label" for="is-private-create">Приватный канал (подписка только по приглашению)</label>
+          </div>
         </div>
         <div class="modal-footer border-0 pt-0">
           <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>

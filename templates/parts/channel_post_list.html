@@ -1,5 +1,5 @@
 {% for post in posts %}
-<div class="post-card" data-message-id="{{ post.id }}">
+<div class="post-card" data-message-id="{{ post.id }}" data-cursor="{{ post.created_at|date:'c' }}">
     <div class="post-meta mb-2">
         <strong>{{ post.sender.username }}</strong> &bull; {{ post.created_at|date:"d.m.Y H:i" }}
     </div>

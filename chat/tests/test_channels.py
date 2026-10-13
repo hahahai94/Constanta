@@ -173,3 +173,82 @@ class ChannelModelTestAdditional(TestCase):
         user = User.objects.create_user(username='av_test', password='123')
         ch = Channel.objects.create(name='AvChan', owner=user)
         self.assertEqual(ch.get_avatar_url(), '/static/default_channel_avatar.png')
+
+    def test_channel_has_unique_invite_token(self):
+        user = User.objects.create_user(username='tok_test', password='123')
+        ch1 = Channel.objects.create(name='C1', owner=user)
+        ch2 = Channel.objects.create(name='C2', owner=user)
+        self.assertIsNotNone(ch1.invite_token)
+        self.assertNotEqual(ch1.invite_token, ch2.invite_token)
+
+
+class ChannelInviteTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='inv_owner', password='123')
+        self.user = User.objects.create_user(username='inv_user', password='123')
+        self.channel = Channel.objects.create(name='Private', owner=self.owner, is_private=True)
+        ChannelMember.objects.create(channel=self.channel, user=self.owner, role='owner')
+
+    def test_create_private_channel(self):
+        self.client.login(username='inv_owner', password='123')
+        response = self.client.post(reverse('create_channel'), {'name': 'Secret', 'is_private': '1'})
+        channel = Channel.objects.get(name='Secret')
+        self.assertTrue(channel.is_private)
+        self.assertRedirects(response, reverse('channel_view', args=[channel.id]))
+
+    def test_edit_channel_toggle_private(self):
+        self.client.login(username='inv_owner', password='123')
+        self.client.post(reverse('edit_channel', args=[self.channel.id]), {
+            'name': 'Private', 'description': '', 'is_private': '0'
+        })
+        self.channel.refresh_from_db()
+        self.assertFalse(self.channel.is_private)
+
+    def test_invite_link_shown_to_owner(self):
+        self.client.login(username='inv_owner', password='123')
+        response = self.client.get(reverse('channel_view', args=[self.channel.id]))
+        self.assertContains(response, str(self.channel.invite_token))
+
+    def test_invite_join_private_channel(self):
+        self.client.login(username='inv_user', password='123')
+        response = self.client.get(reverse('channel_invite', args=[self.channel.invite_token]))
+        self.assertTrue(ChannelMember.objects.filter(channel=self.channel, user=self.user).exists())
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+
+    def test_invite_already_subscribed(self):
+        ChannelMember.objects.create(channel=self.channel, user=self.user, role='subscriber')
+        self.client.login(username='inv_user', password='123')
+        response = self.client.get(reverse('channel_invite', args=[self.channel.invite_token]))
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+        self.assertEqual(ChannelMember.objects.filter(channel=self.channel, user=self.user).count(), 1)
+
+    def test_invalid_invite_token_404(self):
+        self.client.login(username='inv_user', password='123')
+        response = self.client.get(reverse('channel_invite', args=['00000000-0000-0000-0000-000000000000']))
+        self.assertEqual(response.status_code, 404)
+
+    def test_regenerate_invite_changes_token(self):
+        self.client.login(username='inv_owner', password='123')
+        old = self.channel.invite_token
+        response = self.client.post(reverse('channel_regenerate_invite', args=[self.channel.id]))
+        self.channel.refresh_from_db()
+        self.assertNotEqual(old, self.channel.invite_token)
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+
+    def test_regenerate_invite_old_token_invalid(self):
+        old = self.channel.invite_token
+        self.client.login(username='inv_owner', password='123')
+        self.client.post(reverse('channel_regenerate_invite', args=[self.channel.id]))
+        self.client.logout()
+        self.client.login(username='inv_user', password='123')
+        response = self.client.get(reverse('channel_invite', args=[old]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_regenerate_invite_not_owner(self):
+        ChannelMember.objects.create(channel=self.channel, user=self.user, role='subscriber')
+        self.client.login(username='inv_user', password='123')
+        old = self.channel.invite_token
+        response = self.client.post(reverse('channel_regenerate_invite', args=[self.channel.id]))
+        self.channel.refresh_from_db()
+        self.assertEqual(old, self.channel.invite_token)
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))

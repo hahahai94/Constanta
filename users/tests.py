@@ -135,13 +135,22 @@ class IPBanMiddlewareTests(TestCase):
         response = IPBanMiddleware(lambda r: None)(request)
         self.assertIsNone(response)
 
-    @override_settings(DEBUG=False)
+    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=True)
     def test_middleware_x_forwarded_for(self):
         request = self.factory.get('/')
         request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99, 10.0.0.1'
         BannedIP.objects.create(ip_address='10.0.0.99', reason='proxy')
         response = IPBanMiddleware(lambda r: None)(request)
         self.assertEqual(response.status_code, 403)
+
+    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=False)
+    def test_middleware_ignores_x_forwarded_for_by_default(self):
+        request = self.factory.get('/')
+        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99'
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+        BannedIP.objects.create(ip_address='10.0.0.99', reason='spoofed')
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertIsNone(response)
 
     def test_middleware_banned_ip_in_debug(self):
         BannedIP.objects.create(ip_address='10.0.0.88', reason='test')
@@ -303,3 +312,23 @@ class ProfileViewTests(TestCase):
         response = self.client.get('/users/?q=findme')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'zzz_findme')
+
+
+class ClientIPTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_default_ignores_x_forwarded_for(self):
+        from users.utils import get_client_ip
+        request = self.factory.get(
+            '/', REMOTE_ADDR='1.2.3.4', HTTP_X_FORWARDED_FOR='9.9.9.9'
+        )
+        self.assertEqual(get_client_ip(request), '1.2.3.4')
+
+    @override_settings(USE_X_FORWARDED_FOR=True)
+    def test_trusts_x_forwarded_for_when_enabled(self):
+        from users.utils import get_client_ip
+        request = self.factory.get(
+            '/', REMOTE_ADDR='1.2.3.4', HTTP_X_FORWARDED_FOR='9.9.9.9, 8.8.8.8'
+        )
+        self.assertEqual(get_client_ip(request), '9.9.9.9')

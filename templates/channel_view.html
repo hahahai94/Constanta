@@ -78,9 +78,27 @@
         <label>Аватар</label>
         <input type="file" name="avatar" class="form-control">
       </div>
+      <div class="form-check mb-2">
+        <input type="hidden" name="is_private" value="0">
+        <input type="checkbox" name="is_private" value="1" class="form-check-input" id="is-private-edit" {% if channel.is_private %}checked{% endif %}>
+        <label class="form-check-label" for="is-private-edit">Приватный канал (подписка только по приглашению)</label>
+      </div>
       <button type="submit" class="btn btn-primary">Сохранить</button>
       <a href="{% url 'channel_view' channel.id %}" class="btn btn-secondary">Отмена</a>
     </form>
+  </div>
+  {% endif %}
+  {% if invite_url and not edit_mode %}
+  <div class="post-form">
+    <h6 class="mb-2">🔗 Ссылка-приглашение</h6>
+    <div class="d-flex">
+      <input type="text" class="form-control me-2" value="{{ invite_url }}" readonly onclick="this.select()">
+      <form method="post" action="{% url 'channel_regenerate_invite' channel.id %}">
+        {% csrf_token %}
+        <button class="btn btn-outline-secondary" type="submit" onclick="return confirm('Обновить ссылку? Старая перестанет работать.')">Обновить</button>
+      </form>
+    </div>
+    <small class="text-muted">По этой ссылке можно подписаться, в том числе на приватный канал.</small>
   </div>
   {% endif %}
   {% if can_post and not edit_mode %}
@@ -139,22 +157,29 @@ window.loadMorePosts = function() {
 };
 
 // автополлинг новых постов
+window.latestCursor = function() {
+    let max = null;
+    document.querySelectorAll('[data-message-id]').forEach(function(el) {
+        const c = el.dataset.cursor;
+        if (c && (!max || c > max)) max = c;
+    });
+    return max;
+};
+
 (function() {
     const channelId = '{{ channel.id }}';
     if (!channelId) return;
-    window.pollChannelState = { afterId: 0, channelId: channelId };
-    const lastPost = document.querySelector('[data-message-id]:last-child');
-    if (lastPost) pollChannelState.afterId = parseInt(lastPost.dataset.messageId) || 0;
+    window.pollChannelState = { cursor: window.latestCursor(), channelId: channelId };
 
     window.doPoll = function() {
-        if (!pollChannelState.afterId) return;
-        fetch('/api/poll/?after_id=' + pollChannelState.afterId + '&channel_id=' + pollChannelState.channelId, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        const url = '/api/poll/?' + (pollChannelState.cursor ? 'after=' + encodeURIComponent(pollChannelState.cursor) + '&' : '') + 'channel_id=' + pollChannelState.channelId;
+        fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
             .then(r => r.json())
             .then(data => {
                 if (data.count > 0) {
                     const container = document.querySelector('.posts-container');
                     container.insertAdjacentHTML('afterbegin', data.html);
-                    pollChannelState.afterId = data.last_id;
+                    if (data.cursor) pollChannelState.cursor = data.cursor;
                 }
             })
             .catch(() => {});

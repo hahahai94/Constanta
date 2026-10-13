@@ -3,11 +3,20 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
-from chat.models import Message, Group, GroupMember
+from chat.models import Message, Group, GroupMember, Channel, ChannelMember
 from chat.views.api import _detect_attachment_type, _content_disposition_header
+from django.utils.dateparse import parse_datetime
 import json, io, os
 
 User = get_user_model()
+
+
+def make_png():
+    """Возвращает байты корректного PNG 2x2 для тестов загрузки изображений."""
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new('RGB', (2, 2), (255, 0, 0)).save(buf, format='PNG')
+    return buf.getvalue()
 
 
 class APITests(TestCase):
@@ -60,7 +69,7 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_send_file_message(self):
-        file = SimpleUploadedFile("test.png", io.BytesIO(b'image').read(), content_type="image/png")
+        file = SimpleUploadedFile("test.png", make_png(), content_type="image/png")
         response = self.client.post('/api/send/', {
             'user_id': self.other.id,
             'content': 'Check this',
@@ -316,13 +325,124 @@ class APITests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
 
-    def test_send_message_mime_image_by_content_type(self):
+    def test_send_message_invalid_image_rejected(self):
         file = SimpleUploadedFile("weird.png", b'\x00\x00\x00', content_type="image/png")
         response = self.client.post('/api/send/', {
             'user_id': self.other.id,
             'content': 'Detected by content_type',
             'attachment': file
         })
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Message.objects.filter(content='Detected by content_type').exists())
+
+    def test_send_message_image_detected_by_magic_bytes(self):
+        file = SimpleUploadedFile("weird.bin", make_png(), content_type="application/octet-stream")
+        response = self.client.post('/api/send/', {
+            'user_id': self.other.id,
+            'content': 'Detected by magic bytes',
+            'attachment': file
+        })
         self.assertEqual(response.status_code, 200)
-        msg = Message.objects.get(sender=self.user, receiver=self.other, content='Detected by content_type')
+        msg = Message.objects.get(sender=self.user, receiver=self.other, content='Detected by magic bytes')
         self.assertEqual(msg.attachment_type, 'image')
+
+    def test_send_invalid_user_id_returns_400(self):
+        response = self.client.post('/api/send/', {'user_id': 'abc', 'content': 'hi'})
+        self.assertEqual(response.status_code, 400)
+        self.assertNotEqual(response.status_code, 500)
+
+    def test_send_response_contains_cursor(self):
+        response = self.client.post('/api/send/', {
+            'user_id': self.other.id, 'content': 'cursor test'
+        })
+        data = json.loads(response.content)
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('cursor', data)
+        self.assertTrue(data['cursor'])
+
+
+class PollAPITests(TestCase):
+    def setUp(self):
+        self.a = User.objects.create_user(username='poll_a', password='123')
+        self.b = User.objects.create_user(username='poll_b', password='123')
+        self.client.login(username='poll_a', password='123')
+
+    def test_poll_invalid_after_returns_400(self):
+        response = self.client.get('/api/poll/', {'after': 'not-a-date', 'user_id': self.b.id})
+        self.assertEqual(response.status_code, 400)
+
+    def test_poll_requires_target(self):
+        response = self.client.get('/api/poll/', {'after': ''})
+        self.assertEqual(response.status_code, 400)
+
+    def test_poll_private_messages_after_cursor(self):
+        m1 = Message.objects.create(sender=self.b, receiver=self.a, content='first')
+        cursor = m1.created_at.isoformat()
+        m2 = Message.objects.create(sender=self.b, receiver=self.a, content='second')
+
+        response = self.client.get('/api/poll/', {'after': cursor, 'user_id': self.b.id})
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 1)
+        self.assertIn('second', data['html'])
+        self.assertNotIn('first', data['html'])
+        self.assertEqual(parse_datetime(data['cursor']), m2.created_at)
+
+    def test_poll_group_after_cursor(self):
+        group = Group.objects.create(name='PollGroup', owner=self.a)
+        GroupMember.objects.create(group=group, user=self.a, role='owner')
+        m1 = Message.objects.create(sender=self.a, group=group, content='g1')
+        cursor = m1.created_at.isoformat()
+        Message.objects.create(sender=self.a, group=group, content='g2')
+        m3 = Message.objects.create(sender=self.a, group=group, content='g3')
+
+        response = self.client.get('/api/poll/', {'after': cursor, 'group_id': group.id})
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 2)
+        self.assertIn('g2', data['html'])
+        self.assertIn('g3', data['html'])
+        self.assertEqual(parse_datetime(data['cursor']), m3.created_at)
+
+    def test_poll_channel_no_duplicates(self):
+        channel = Channel.objects.create(name='PollChannel', owner=self.a)
+        ChannelMember.objects.create(channel=channel, user=self.a, role='owner')
+        m1 = Message.objects.create(sender=self.a, channel=channel, content='c1')
+        cursor = m1.created_at.isoformat()
+        m2 = Message.objects.create(sender=self.a, channel=channel, content='c2')
+
+        response = self.client.get('/api/poll/', {'after': cursor, 'channel_id': channel.id})
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 1)
+        self.assertIn('c2', data['html'])
+        self.assertNotIn('c1', data['html'])
+        self.assertEqual(parse_datetime(data['cursor']), m2.created_at)
+
+        second = self.client.get('/api/poll/', {'after': data['cursor'], 'channel_id': channel.id})
+        self.assertEqual(json.loads(second.content)['count'], 0)
+
+
+class AttachmentAccessTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='att_owner', password='123')
+        self.subscriber = User.objects.create_user(username='att_sub', password='123')
+        self.outsider = User.objects.create_user(username='att_out', password='123')
+        self.channel = Channel.objects.create(name='Attach', owner=self.owner)
+        ChannelMember.objects.create(channel=self.channel, user=self.owner, role='owner')
+        ChannelMember.objects.create(channel=self.channel, user=self.subscriber, role='subscriber')
+
+    def _channel_message_with_file(self):
+        file = SimpleUploadedFile('note.txt', b'hello', content_type='text/plain')
+        return Message.objects.create(
+            sender=self.owner, channel=self.channel, content='file', attachment=file
+        )
+
+    def test_subscriber_can_download_channel_attachment(self):
+        msg = self._channel_message_with_file()
+        self.client.login(username='att_sub', password='123')
+        response = self.client.get(reverse('download_attachment', args=[msg.id]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_outsider_cannot_download_channel_attachment(self):
+        msg = self._channel_message_with_file()
+        self.client.login(username='att_out', password='123')
+        response = self.client.get(reverse('download_attachment', args=[msg.id]))
+        self.assertEqual(response.status_code, 302)

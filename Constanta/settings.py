@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from environs import Env
 
@@ -5,6 +6,10 @@ env = Env()
 env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Тестовый прогон (`manage.py test`) — кэш держим в памяти, чтобы не читать
+# устаревшие счётчики rate-limit между запусками.
+TESTING = 'test' in sys.argv
 
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env.bool('DEBUG', default=False)
@@ -134,12 +139,26 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@constanta.local')
 
+# Общий кэш (rate-limit, сессии-агрегаты) должен быть виден всем воркерам Gunicorn.
+# По умолчанию используется файловый кэш (общий для процессов на одном хосте).
+# Для нескольких хостов задайте CACHE_BACKEND (например, django_redis) и CACHE_LOCATION.
+CACHE_BACKEND = env(
+    'CACHE_BACKEND',
+    default='django.core.cache.backends.locmem.LocMemCache' if TESTING
+    else 'django.core.cache.backends.filebased.FileBasedCache',
+)
+CACHE_LOCATION = env('CACHE_LOCATION', default='constanta' if TESTING else str(BASE_DIR / '.cache'))
+
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'BACKEND': CACHE_BACKEND,
+        'LOCATION': CACHE_LOCATION,
     }
 }
+
+# Доверять заголовку X-Forwarded-For только если приложение реально стоит за прокси.
+# Иначе клиент может подделать IP и обойти IP-бан / rate-limit.
+USE_X_FORWARDED_FOR = env.bool('USE_X_FORWARDED_FOR', default=False)
 
 SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=86400)
 SESSION_SAVE_EVERY_REQUEST = env.bool('SESSION_SAVE_EVERY_REQUEST', default=False)

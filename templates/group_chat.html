@@ -441,7 +441,7 @@ document.getElementById('chat-form').addEventListener('submit', function(e) {
             sendingDiv.remove();
             if (d.status === 'ok' && d.html) {
                 container.insertAdjacentHTML('beforeend', d.html);
-                if (window.pollGroupState) pollGroupState.afterId = d.message_id;
+                if (window.pollGroupState && d.cursor) pollGroupState.cursor = d.cursor;
                 container.scrollTop = container.scrollHeight;
                 messageInput.value = '';
                 fileUpload.value = '';
@@ -495,24 +495,31 @@ window.loadMoreMessages = function() {
 };
 
 // ===== 5. АВТООБНОВЛЕНИЕ (JSON API) =====
+window.latestCursor = function() {
+    let max = null;
+    document.querySelectorAll('[data-message-id]').forEach(function(el) {
+        const c = el.dataset.cursor;
+        if (c && (!max || c > max)) max = c;
+    });
+    return max;
+};
+
 (function() {
     const groupId = '{{ group.id }}';
     if (!groupId) return;
 
-    window.pollGroupState = { afterId: 0, groupId: groupId };
-    const lastMsg = document.querySelector('[data-message-id]:last-child');
-    if (lastMsg) pollGroupState.afterId = parseInt(lastMsg.dataset.messageId) || 0;
+    window.pollGroupState = { cursor: window.latestCursor(), groupId: groupId };
 
     window.doPoll = function() {
-        if (!pollGroupState.afterId) return;
-        fetch('/api/poll/?after_id=' + pollGroupState.afterId + '&group_id=' + pollGroupState.groupId, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        const url = '/api/poll/?' + (pollGroupState.cursor ? 'after=' + encodeURIComponent(pollGroupState.cursor) + '&' : '') + 'group_id=' + pollGroupState.groupId;
+        fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
             .then(r => r.json())
             .then(data => {
                 if (data.count > 0) {
                     const container = document.getElementById('messages-container');
                     const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
                     container.insertAdjacentHTML('beforeend', data.html);
-                    pollGroupState.afterId = data.last_id;
+                    if (data.cursor) pollGroupState.cursor = data.cursor;
                     if (wasAtBottom) container.scrollTop = container.scrollHeight;
                 }
             })

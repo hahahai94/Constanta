@@ -318,7 +318,7 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
         sendingDiv.remove();
         if (d.status === 'ok' && d.html) {
             container.insertAdjacentHTML('beforeend', d.html);
-            if (window.pollState) pollState.afterId = d.message_id;
+            if (window.pollState && d.cursor) pollState.cursor = d.cursor;
             container.scrollTop = container.scrollHeight;
             messageInput.value = '';
             fileUpload.value = '';
@@ -375,9 +375,18 @@ function loadMoreMessages() {
 }
 
 // ===== ПОЛЛЕР (вызывается и по таймеру, и после отправки) =====
+window.latestCursor = function() {
+    let max = null;
+    document.querySelectorAll('[data-message-id]').forEach(function(el) {
+        const c = el.dataset.cursor;
+        if (c && (!max || c > max)) max = c;
+    });
+    return max;
+};
+
 window.doPoll = function() {
     if (!window.pollState || !pollState.param) return;
-    const url = '/api/poll/?after_id=' + pollState.afterId + '&' + pollState.param;
+    const url = '/api/poll/?' + (pollState.cursor ? 'after=' + encodeURIComponent(pollState.cursor) + '&' : '') + pollState.param;
     fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
         .then(r => r.json())
         .then(data => {
@@ -385,7 +394,7 @@ window.doPoll = function() {
                 const container = document.getElementById('messages-container');
                 const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
                 container.insertAdjacentHTML('beforeend', data.html);
-                pollState.afterId = data.last_id;
+                if (data.cursor) pollState.cursor = data.cursor;
                 if (wasAtBottom) container.scrollTop = container.scrollHeight;
             }
         })
@@ -394,15 +403,12 @@ window.doPoll = function() {
 
 // ===== АВТООБНОВЛЕНИЕ (JSON API) =====
 if (!window.pollState) {
-    window.pollState = { afterId: 0, url: new URL(window.location.href) };
+    window.pollState = { cursor: window.latestCursor(), url: new URL(window.location.href) };
 
     const userId = pollState.url.searchParams.get('user_id');
     const groupId = pollState.url.searchParams.get('group_id');
     if (userId) pollState.param = 'user_id=' + userId;
     else if (groupId) pollState.param = 'group_id=' + groupId;
-
-    const lastMsg = document.querySelector('[data-message-id]:last-child');
-    if (lastMsg) pollState.afterId = parseInt(lastMsg.dataset.messageId) || 0;
 
     window.autoRefreshInterval = setInterval(window.doPoll, 2000);
     window.doPoll();

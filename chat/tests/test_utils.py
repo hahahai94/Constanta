@@ -104,6 +104,10 @@ class UtilsNotificationTests(TransactionTestCase):
 
 
 class RateLimitTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
     def test_rate_limit_decorator_blocks_excess(self):
         from chat.utils import rate_limit
         from django.http import HttpResponse

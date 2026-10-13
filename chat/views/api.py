@@ -10,6 +10,8 @@ from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from chat.utils import parse_mentions, create_notification, rate_limit
 
@@ -51,27 +53,25 @@ def _detect_attachment_type(data, content_type=''):
 def _validate_attachment(attachment):
     """Проверяет загруженный файл: размер + валидация содержимого.
 
+    Изображения проверяются целиком через Pillow, а не по «голове» файла.
     Возвращает (attachment_type, None) в случае успеха
     или (None, JsonResponse) в случае ошибки.
     """
     if attachment.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
         return None, JsonResponse({'status': 'error', 'message': 'Файл слишком большой'}, status=400)
 
-    head = attachment.read(1024)
+    data = attachment.read()
     attachment.seek(0)
 
-    attachment_type = _detect_attachment_type(head, attachment.content_type)
+    attachment_type = _detect_attachment_type(data, attachment.content_type)
 
     if attachment_type == 'image':
-        for magic in IMAGE_MAGIC_BYTES:
-            if head.startswith(magic):
-                try:
-                    from PIL import Image
-                    img = Image.open(BytesIO(head))
-                    img.verify()
-                except Exception:
-                    return None, JsonResponse({'status': 'error', 'message': 'Файл не является валидным изображением'}, status=400)
-                break
+        try:
+            from PIL import Image
+            img = Image.open(BytesIO(data))
+            img.verify()
+        except Exception:
+            return None, JsonResponse({'status': 'error', 'message': 'Файл не является валидным изображением'}, status=400)
 
     return attachment_type, None
 
@@ -108,6 +108,12 @@ def send_message(request):
     if not user_id and not group_id:
         return JsonResponse({'status': 'error', 'message': 'Нет получателя'}, status=400)
 
+    if user_id:
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            return JsonResponse({'status': 'error', 'message': 'Неверный user_id'}, status=400)
+
     max_chars = settings.MAX_MESSAGE_LENGTH
     if len(content) > max_chars:
         return JsonResponse({'status': 'error', 'message': f'Слишком длинное (макс. {max_chars})'}, status=400)
@@ -126,7 +132,7 @@ def send_message(request):
         reply_msg = Message.objects.filter(id=reply_to_id).first()
         if reply_msg:
             if user_id:
-                ids = {request.user.id, int(user_id)}
+                ids = {request.user.id, user_id}
                 if reply_msg.sender.id not in ids or (reply_msg.receiver_id not in ids and reply_msg.receiver_id is not None):
                     reply_msg = None
             elif group_id and reply_msg.group_id is not None and str(reply_msg.group_id) != group_id:
@@ -178,7 +184,12 @@ def send_message(request):
             'request': request,
             'user': request.user,
         })
-        return JsonResponse({'status': 'ok', 'html': html, 'message_id': msg.id})
+        return JsonResponse({
+            'status': 'ok',
+            'html': html,
+            'message_id': msg.id,
+            'cursor': msg.created_at.isoformat(),
+        })
 
     except Exception:
         logger.exception('Failed to create message')
@@ -319,6 +330,17 @@ def api_remove_member(request):
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=400)
 
 
+def _user_can_access_message(msg, user):
+    """Доступ к вложению: отправитель/получатель, участник группы или подписчик канала."""
+    if msg.sender_id == user.id or msg.receiver_id == user.id:
+        return True
+    if msg.group_id and GroupMember.objects.filter(group_id=msg.group_id, user=user).exists():
+        return True
+    if msg.channel_id and ChannelMember.objects.filter(channel_id=msg.channel_id, user=user).exists():
+        return True
+    return False
+
+
 @login_required
 def download_attachment(request, message_id):
     """Скачивание файла с оригинальным именем"""
@@ -326,12 +348,8 @@ def download_attachment(request, message_id):
     if not msg.attachment:
         return redirect('main')
 
-    if msg.sender != request.user and msg.receiver != request.user:
-        if msg.group:
-            if not GroupMember.objects.filter(group=msg.group, user=request.user).exists():
-                return redirect('main')
-        else:
-            return redirect('main')
+    if not _user_can_access_message(msg, request.user):
+        return redirect('main')
 
     file_path = msg.attachment.path if hasattr(msg.attachment, 'path') else msg.attachment.name
     original_name = msg.attachment_original_name or os.path.basename(file_path)
@@ -401,7 +419,7 @@ def api_channel_post(request, channel_id):
                             )
             except Exception:
                 logger.exception('Failed to process mentions for channel post')
-        return JsonResponse({'status': 'ok'})
+        return JsonResponse({'status': 'ok', 'cursor': msg.created_at.isoformat()})
     except Exception:
         logger.exception('Failed to create channel post')
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=500)
@@ -410,18 +428,23 @@ def api_channel_post(request, channel_id):
 @login_required
 @rate_limit('api_poll', limit=30, period=60)
 def api_poll(request):
-    """Получение новых сообщений (после указанного ID) — для автообновления"""
+    """Получение новых сообщений (созданных после курсора `after`) — для автообновления.
+
+    Курсор — ISO-8601 метка времени `created_at` последнего известного сообщения.
+    Так как `Message.id` — UUID, а не автоинкремент, сравнение по времени корректно
+    упорядочивает сообщения и не зависит от порядка создания UUID.
+    """
     if request.method != 'GET':
         return JsonResponse({'status': 'error', 'message': 'Только GET'}, status=405)
 
-    after_id = request.GET.get('after_id')
-    if not after_id:
-        return JsonResponse({'status': 'error', 'message': 'Нет after_id'}, status=400)
-
-    try:
-        after_id = int(after_id)
-    except (ValueError, TypeError):
-        return JsonResponse({'status': 'error', 'message': 'Неверный after_id'}, status=400)
+    after_raw = request.GET.get('after')
+    after_dt = None
+    if after_raw:
+        after_dt = parse_datetime(after_raw)
+        if after_dt is None:
+            return JsonResponse({'status': 'error', 'message': 'Неверный after'}, status=400)
+        if timezone.is_naive(after_dt):
+            after_dt = timezone.make_aware(after_dt)
 
     user = request.user
     user_id = request.GET.get('user_id')
@@ -431,10 +454,12 @@ def api_poll(request):
     messages_qs = None
 
     if user_id:
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Неверный user_id'}, status=400)
         peer = get_object_or_404(User, id=user_id)
         messages_qs = Message.objects.filter(
-            id__gt=after_id,
-        ).filter(
             Q(sender=user, receiver=peer) | Q(sender=peer, receiver=user)
         ).order_by('created_at')
         template_name = 'parts/message_list.html'
@@ -444,7 +469,7 @@ def api_poll(request):
         if not GroupMember.objects.filter(group=group, user=user).exists():
             return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
         messages_qs = Message.objects.filter(
-            id__gt=after_id, group=group, is_deleted=False
+            group=group, is_deleted=False
         ).order_by('created_at')
         template_name = 'parts/group_message_list.html'
 
@@ -453,26 +478,30 @@ def api_poll(request):
         if not ChannelMember.objects.filter(channel=channel, user=user).exists():
             return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
         messages_qs = Message.objects.filter(
-            id__gt=after_id, channel=channel, is_deleted=False
+            channel=channel, is_deleted=False
         ).order_by('-created_at')
         template_name = 'parts/channel_post_list.html'
 
     else:
         return JsonResponse({'status': 'error', 'message': 'Укажите user_id, group_id или channel_id'}, status=400)
 
+    if after_dt is not None:
+        messages_qs = messages_qs.filter(created_at__gt=after_dt)
+
     messages = list(messages_qs)
 
     from django.template.loader import render_to_string
     html = render_to_string(template_name, {
         'messages': messages,
+        'posts': messages,
         'request': request,
         'user': request.user,
     })
 
-    last_id = messages[-1].id if messages else after_id
+    newest = max((m.created_at for m in messages), default=None)
 
     return JsonResponse({
         'html': html,
         'count': len(messages),
-        'last_id': last_id,
+        'cursor': newest.isoformat() if newest else (after_raw or ''),
     })
