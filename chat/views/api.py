@@ -6,7 +6,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -128,8 +128,16 @@ def send_message(request):
             template_name = 'parts/message_list.html'
         elif group_id:
             group_obj = get_object_or_404(Group, id=group_id)
-            if not GroupMember.objects.filter(group=group_obj, user=request.user).exists():
+            membership = GroupMember.objects.filter(group=group_obj, user=request.user).first()
+            if membership is None:
                 return JsonResponse({'status': 'error', 'message': 'Не в группе'}, status=403)
+            if membership.role == 'muted':
+                # Роль «Заблокирован» объявлена в модели, но раньше проверялось
+                # только наличие членства (problems.md, П-12).
+                return JsonResponse(
+                    {'status': 'error', 'message': 'Вы заблокированы в этой группе'},
+                    status=403,
+                )
             msg = Message.objects.create(
                 sender=request.user, receiver=None, group=group_obj,
                 content=content, attachment=attachment,
@@ -171,6 +179,8 @@ def send_message(request):
             'cursor': msg.created_at.isoformat(),
         })
 
+    except Http404:
+        raise
     except Exception:
         logger.exception('Failed to create message')
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=500)
@@ -247,6 +257,8 @@ def api_add_member(request):
         GroupMember.objects.create(group=group, user=user, role='member')
         return JsonResponse({'status': 'ok'})
 
+    except Http404:
+        raise
     except Exception:
         logger.exception('Failed to add member')
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=400)
@@ -271,6 +283,15 @@ def api_set_role(request):
         if group.owner != request.user:
             return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
 
+        # Роль проверяется по модели: `choices` — валидация формы, а не
+        # ограничение БД, поэтому раньше можно было записать что угодно,
+        # включая 'owner' (problems.md, П-13).
+        allowed_roles = [
+            value for value, _ in GroupMember.ROLE_CHOICES if value != 'owner'
+        ]
+        if new_role not in allowed_roles:
+            return JsonResponse({'status': 'error', 'message': 'Недопустимая роль'}, status=400)
+
         if target_user == group.owner:
             return JsonResponse({'status': 'error', 'message': 'Нельзя менять роль владельца'}, status=400)
 
@@ -282,6 +303,8 @@ def api_set_role(request):
 
     except GroupMember.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Участник не найден в группе'}, status=404)
+    except Http404:
+        raise
     except Exception:
         logger.exception('Failed to set role')
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=400)
@@ -312,6 +335,8 @@ def api_remove_member(request):
         GroupMember.objects.filter(group=group, user=target_user).delete()
         return JsonResponse({'status': 'ok'})
 
+    except Http404:
+        raise
     except Exception:
         logger.exception('Failed to remove member')
         return JsonResponse({'status': 'error', 'message': 'Ошибка сервера'}, status=400)

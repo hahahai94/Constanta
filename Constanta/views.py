@@ -1,4 +1,3 @@
-import os
 from django.conf import settings
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -10,8 +9,10 @@ from django.shortcuts import render
 
 @require_GET
 def robots_txt(request):
-    admin_url = os.environ.get('ADMIN_URL', 'admin/')
-    content = render_to_string('robots.txt', {'admin_url': admin_url})
+    # ADMIN_URL здесь намеренно не публикуется: robots.txt — первый файл,
+    # который читают сканеры, и раскрывать в нём путь админки нельзя
+    # (problems.md, П-22).
+    content = render_to_string('robots.txt')
     return HttpResponse(content, content_type='text/plain')
 
 

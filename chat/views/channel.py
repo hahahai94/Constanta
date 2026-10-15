@@ -12,13 +12,25 @@ from chat.utils import html_429, rate_limit
 from chat.utils.uploads import normalize_avatar
 
 POSTS_PER_PAGE = 30
+CHANNEL_LIST_LIMIT = 100
+DISCOVER_LIST_LIMIT = 60
 
 
 @login_required
 def channel_list(request):
-    memberships = ChannelMember.objects.filter(user=request.user).select_related('channel').order_by('channel__name')
-    subscribed_ids = memberships.values_list('channel_id', flat=True)
-    discover_channels = Channel.objects.filter(is_private=False).exclude(id__in=subscribed_ids).order_by('name')
+    """Список каналов пользователя.
+
+    Списки ограничены: раньше страница рендерила все подписки и все публичные
+    каналы разом (problems.md, П-28).
+    """
+    memberships = ChannelMember.objects.filter(
+        user=request.user
+    ).select_related('channel').order_by('channel__name')[:CHANNEL_LIST_LIMIT]
+    subscribed_ids = ChannelMember.objects.filter(
+        user=request.user).values_list('channel_id', flat=True)
+    discover_channels = Channel.objects.filter(
+        is_private=False
+    ).exclude(id__in=subscribed_ids).order_by('name')[:DISCOVER_LIST_LIMIT]
     return render(request, 'channels.html', {
         'memberships': memberships,
         'discover_channels': discover_channels,
@@ -70,6 +82,11 @@ def create_channel(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
+            if Channel.objects.filter(owner=request.user).count() >= settings.MAX_CHANNELS_PER_USER:
+                # раньше каналы не ограничивались вовсе, в отличие от групп (П-28)
+                messages.error(
+                    request, f'❌ Лимит каналов ({settings.MAX_CHANNELS_PER_USER})')
+                return redirect('channel_list')
             is_private = request.POST.get('is_private') == '1'
             channel = Channel.objects.create(name=name, owner=request.user, is_private=is_private)
             ChannelMember.objects.create(channel=channel, user=request.user, role='owner')
