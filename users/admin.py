@@ -22,6 +22,12 @@ def export_to_csv(modeladmin, request, queryset, filename, fields, headers):
 
 @admin.register(User)
 class UltimateUserAdmin(BaseUserAdmin):
+    # Поля, менять которые разрешено только суперпользователю. В Django 6
+    # штатный UserAdmin больше не отключает их для обычного персонала,
+    # поэтому без явной защиты сотрудник с правом change_user мог бы одним
+    # POST выдать себе суперпользователя (problems.md, П-1).
+    PRIVILEGED_FIELDS = ('is_superuser', 'groups', 'user_permissions')
+
     list_display = ('username', 'nick', 'email', 'is_active', 'is_banned', 'is_staff', 'is_superuser', 'last_seen', 'avatar_preview')
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'groups', 'last_login')
     search_fields = ('username', 'nick', 'email', 'first_name', 'last_name')
@@ -36,6 +42,42 @@ class UltimateUserAdmin(BaseUserAdmin):
         ('Бан', {'fields': ('ban_reason', 'banned_at', 'banned_by')}),
         ('Активность', {'fields': ('last_login', 'last_seen', 'date_joined')}),
     )
+
+    def get_form(self, request, obj=None, **kwargs):
+        """Отключает привилегированные поля для не-суперпользователей.
+
+        Без этого любой сотрудник с правом change_user мог бы выставить себе
+        is_superuser через POST. Отключённые поля игнорируются при сохранении.
+        """
+        form = super().get_form(request, obj, **kwargs)
+        if request.user.is_superuser:
+            return form
+
+        disabled = set(self.PRIVILEGED_FIELDS)
+        if obj is not None and obj == request.user:
+            # себе нельзя менять и собственный статус
+            disabled |= {'is_active', 'is_staff', 'username'}
+
+        for name in disabled:
+            if name in form.base_fields:
+                form.base_fields[name].disabled = True
+        return form
+
+    def get_fieldsets(self, request, obj=None):
+        """Скрывает привилегированные поля от не-суперпользователей."""
+        fieldsets = super().get_fieldsets(request, obj)
+        if request.user.is_superuser:
+            return fieldsets
+
+        cleaned = []
+        for name, options in fieldsets:
+            options = dict(options)
+            fields = [f for f in options.get('fields', ())
+                      if f not in self.PRIVILEGED_FIELDS]
+            if fields:
+                options['fields'] = fields
+                cleaned.append((name, options))
+        return cleaned
 
     def avatar_preview(self, obj):
         if obj.avatar:

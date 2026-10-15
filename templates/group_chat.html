@@ -403,6 +403,15 @@ window.scrollToMessage = function(msgId) {
     }
 };
 
+// Кнопки ответа обрабатываются делегированием, а значения берутся из
+// data-атрибутов, а не подставляются в JS-код. Поэтому имя пользователя
+// не может влиять на исполняемый сценарий (problems.md, П-2).
+document.getElementById('messages-container')?.addEventListener('click', function(e) {
+    const btn = e.target.closest('.reply-btn');
+    if (!btn) return;
+    window.startReply(btn.dataset.replyId, btn.dataset.replyAuthor, btn.dataset.replyText || '');
+});
+
 // ===== 4. ОТПРАВКА СООБЩЕНИЙ =====
 document.getElementById('chat-form').addEventListener('submit', function(e) {
     e.preventDefault();

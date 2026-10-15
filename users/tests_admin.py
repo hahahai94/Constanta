@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import BannedIP, AdminLog, Notification
 
@@ -59,3 +60,71 @@ class UserAdminTests(TestCase):
         )
         response = self.client.get(f'/admin/users/adminlog/{log.pk}/change/')
         self.assertEqual(response.status_code, 403)
+
+
+class StaffPrivilegeEscalationTests(TestCase):
+    """П-1: персонал не должен выдавать привилегии через админку.
+
+    В Django 6 штатный `UserAdmin` больше не отключает `is_superuser`,
+    `groups` и `user_permissions`, поэтому защита нужна в `UltimateUserAdmin`.
+    """
+
+    def setUp(self):
+        self.target = User.objects.create_user(username='victim', password='123')
+        self.superadmin = User.objects.create_superuser(
+            username='esc_super', password='123',
+        )
+        self.staff = User.objects.create_user(
+            username='esc_staff', password='123', is_staff=True,
+        )
+        self.staff.user_permissions.add(
+            Permission.objects.get(content_type__app_label='users',
+                                   codename='change_user')
+        )
+        self.client.login(username='esc_staff', password='123')
+        self.url = f'/admin/users/user/{self.target.pk}/change/'
+
+    def test_precondition_staff_can_change_users(self):
+        # предусловие уязвимости: право на изменение пользователей есть
+        self.assertTrue(self.staff.has_perm('users.change_user'))
+
+    def test_change_form_hides_privileged_fields(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="is_superuser"')
+        self.assertNotContains(response, 'name="user_permissions"')
+
+    def test_post_cannot_escalate_to_superuser(self):
+        response = self.client.post(self.url, {
+            'username': 'victim',
+            'is_active': 'on',
+            'is_superuser': 'on',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.target.refresh_from_db()
+        self.assertFalse(self.target.is_superuser)
+
+    def test_post_cannot_escalate_to_staff_on_self(self):
+        self_url = f'/admin/users/user/{self.staff.pk}/change/'
+        response = self.client.post(self_url, {
+            'username': 'esc_staff',
+            'is_active': 'on',
+            'is_staff': 'on',
+            'is_superuser': 'on',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.staff.refresh_from_db()
+        self.assertFalse(self.staff.is_superuser)
+
+    def test_superuser_can_still_grant_superuser(self):
+        # положительный контроль: защита не сломала штатное поведение
+        self.client.logout()
+        self.client.login(username='esc_super', password='123')
+        response = self.client.post(self.url, {
+            'username': 'victim',
+            'is_active': 'on',
+            'is_superuser': 'on',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.is_superuser)

@@ -176,14 +176,16 @@ class GroupTests(TestCase):
     def test_edit_group_with_avatar(self):
         group = Group.objects.create(name='Av Group', owner=self.owner)
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        avatar = SimpleUploadedFile("av.png", b"avatar", content_type="image/png")
+        from chat.tests.factories import image_upload
+        avatar = image_upload("av.png")
         response = self.client.post(reverse('edit_group', args=[group.id]), {
             'name': 'Updated', 'avatar': avatar
         })
         self.assertEqual(response.status_code, 302)
         group.refresh_from_db()
         self.assertEqual(group.name, 'Updated')
+        self.assertTrue(group.avatar)
+        self.assertTrue(group.avatar.name.endswith('.png'))
 
     def test_add_member_not_admin(self):
         group = Group.objects.create(name='Locked', owner=self.owner)

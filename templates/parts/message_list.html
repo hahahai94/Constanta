@@ -1,7 +1,10 @@
 {% for msg in messages %}
 <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% endif %} mb-3" data-message-id="{{ msg.id }}" data-cursor="{{ msg.created_at|date:'c' }}">
     <div class="message-bubble {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}">
-        <button type="button" class="reply-btn" onclick="startReply('{{ msg.id }}', '{{ msg.sender.username }}', '{{ msg.content|escapejs|default:"📎 Вложение" }}')">↩️</button>
+        <button type="button" class="reply-btn"
+                data-reply-id="{{ msg.id }}"
+                data-reply-author="{{ msg.sender.username }}"
+                data-reply-text="{{ msg.content|default:'📎 Вложение' }}">↩️</button>
         {% if msg.reply_to %}
         <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
             <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>

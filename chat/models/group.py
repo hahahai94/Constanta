@@ -2,13 +2,15 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+from chat.utils.uploads import group_avatar_upload_to
+
 
 class Group(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, default='')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='owned_groups', on_delete=models.CASCADE)
-    avatar = models.ImageField(upload_to='group_avatars/', null=True, blank=True)
+    avatar = models.ImageField(upload_to=group_avatar_upload_to, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

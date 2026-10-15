@@ -293,6 +293,36 @@ class ProfileViewTests(TestCase):
         response = self.client.get('/profile/change-username/')
         self.assertEqual(response.status_code, 200)
 
+    def test_change_username_rejects_quote_payload(self):
+        """П-2: логин с кавычкой больше не принимается.
+
+        Раньше `ChangeUsernameForm` не применял `UnicodeUsernameValidator`,
+        поэтому логин вроде `a');alert(1)//` попадал в шаблоны и исполнялся
+        как JS в inline-обработчике.
+        """
+        response = self.client.post('/profile/change-username/', {
+            'username': "a');alert(1)//"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'profileuser')
+
+    def test_change_username_rejects_markup(self):
+        response = self.client.post('/profile/change-username/', {
+            'username': '<script>alert(1)</script>'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'profileuser')
+
+    def test_change_username_still_accepts_valid_login(self):
+        response = self.client.post('/profile/change-username/', {
+            'username': 'valid.login+tag@host'
+        })
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'valid.login+tag@host')
+
     def test_change_password_get(self):
         response = self.client.get('/profile/change-password/')
         self.assertEqual(response.status_code, 200)

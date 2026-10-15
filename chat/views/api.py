@@ -2,10 +2,10 @@ import os
 import json
 import logging
 import re
-from io import BytesIO
 from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
@@ -14,66 +14,39 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from chat.utils import parse_mentions, create_notification, rate_limit
+from chat.utils.uploads import detect_attachment_type, normalize_avatar, normalize_upload
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-# Магические байты для детекции типа (первые 16 байт достаточно для всех известных форматов)
-IMAGE_MAGIC_BYTES = {
-    b'\xff\xd8\xff': 'image/jpeg',
-    b'\x89PNG\r\n\x1a\n': 'image/png',
-    b'GIF87a': 'image/gif',
-    b'GIF89a': 'image/gif',
-    b'RIFF': 'image/webp',
-    b'\x42\x4d': 'image/bmp',
-}
-
-AUDIO_MAGIC_BYTES = {
-    b'RIFF': 'audio/wav',
-    b'OggS': 'audio/ogg',
-    b'fLaC': 'audio/flac',
-}
-
-
-def _detect_attachment_type(data, content_type=''):
-    ct = (content_type or '').lower()
-    for magic, mime in IMAGE_MAGIC_BYTES.items():
-        if data.startswith(magic):
-            return 'image'
-    for magic, mime in AUDIO_MAGIC_BYTES.items():
-        if data.startswith(magic):
-            return 'voice'
-    if ct.startswith('audio/'):
-        return 'voice'
-    if ct.startswith('image/'):
-        return 'image'
-    return 'file'
+# Логика определения типа переехала в chat/utils/uploads.py; алиас сохранён,
+# потому что на него опираются тесты.
+_detect_attachment_type = detect_attachment_type
 
 
 def _validate_attachment(attachment):
-    """Проверяет загруженный файл: размер + валидация содержимого.
+    """Проверяет вложение и нормализует его расширение.
 
-    Изображения проверяются целиком через Pillow, а не по «голове» файла.
-    Возвращает (attachment_type, None) в случае успеха
-    или (None, JsonResponse) в случае ошибки.
+    Изображения проверяются целиком через Pillow, а расширение сохранённого
+    файла всегда выводится из содержимого, а не из имени, присланного
+    клиентом (problems.md, П-3).
+
+    Возвращает ``(attachment_type, original_name, None)`` при успехе или
+    ``(None, None, JsonResponse)`` при ошибке.
     """
-    if attachment.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
-        return None, JsonResponse({'status': 'error', 'message': 'Файл слишком большой'}, status=400)
+    original_name = attachment.name
+    try:
+        attachment_type, extension = normalize_upload(attachment)
+    except ValidationError as exc:
+        message = exc.messages[0] if exc.messages else 'Недопустимый файл'
+        return None, None, JsonResponse(
+            {'status': 'error', 'message': message}, status=400
+        )
 
-    data = attachment.read()
-    attachment.seek(0)
-
-    attachment_type = _detect_attachment_type(data, attachment.content_type)
-
-    if attachment_type == 'image':
-        try:
-            from PIL import Image
-            img = Image.open(BytesIO(data))
-            img.verify()
-        except Exception:
-            return None, JsonResponse({'status': 'error', 'message': 'Файл не является валидным изображением'}, status=400)
-
-    return attachment_type, None
+    # Имя-заглушка: реальный путь строит `_attachment_upload_to` из хеша, здесь
+    # важно только безопасное расширение.
+    attachment.name = f"upload{extension}"
+    return attachment_type, original_name, None
 
 
 def _safe_filename(name):
@@ -122,8 +95,9 @@ def send_message(request):
         return JsonResponse({'status': 'error', 'message': 'Пустое сообщение'}, status=400)
 
     attachment_type = 'none'
+    attachment_original_name = ''
     if attachment:
-        attachment_type, error = _validate_attachment(attachment)
+        attachment_type, attachment_original_name, error = _validate_attachment(attachment)
         if error:
             return error
 
@@ -144,7 +118,8 @@ def send_message(request):
             msg = Message.objects.create(
                 sender=request.user, receiver=receiver, group=None,
                 content=content, attachment=attachment,
-                attachment_type=attachment_type, reply_to=reply_msg
+                attachment_type=attachment_type, reply_to=reply_msg,
+                attachment_original_name=attachment_original_name,
             )
             template_name = 'parts/message_list.html'
         elif group_id:
@@ -154,7 +129,8 @@ def send_message(request):
             msg = Message.objects.create(
                 sender=request.user, receiver=None, group=group_obj,
                 content=content, attachment=attachment,
-                attachment_type=attachment_type, reply_to=reply_msg
+                attachment_type=attachment_type, reply_to=reply_msg,
+                attachment_original_name=attachment_original_name,
             )
             template_name = 'parts/group_message_list.html'
         else:
@@ -219,6 +195,13 @@ def api_update_group(request, group_id):
         group.description = description
 
         if 'avatar' in request.FILES:
+            # Сначала проверяем новый файл: иначе при ошибке уже потеряли бы
+            # старый аватар (problems.md, П-3).
+            try:
+                normalize_avatar(request.FILES['avatar'])
+            except ValidationError as exc:
+                message = exc.messages[0] if exc.messages else 'Недопустимый файл'
+                return JsonResponse({'status': 'error', 'message': message}, status=400)
             if group.avatar:
                 group.avatar.delete()
             group.avatar = request.FILES['avatar']
@@ -392,13 +375,15 @@ def api_channel_post(request, channel_id):
         return JsonResponse({'status': 'error', 'message': 'Слишком длинное'}, status=400)
     try:
         attachment_type = 'none'
+        attachment_original_name = ''
         if attachment:
-            attachment_type, error = _validate_attachment(attachment)
+            attachment_type, attachment_original_name, error = _validate_attachment(attachment)
             if error:
                 return error
         msg = Message.objects.create(
             sender=request.user, channel=channel, receiver=None, group=None,
             content=content, attachment=attachment, attachment_type=attachment_type,
+            attachment_original_name=attachment_original_name,
         )
         if content:
             try:

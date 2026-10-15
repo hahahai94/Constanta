@@ -1,10 +1,12 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from chat.models import Group, GroupMember, Message
+from chat.utils.uploads import normalize_avatar
 
 User = get_user_model()
 
@@ -94,10 +96,21 @@ def edit_group(request, group_id):
         return redirect('group_chat', group_id=group_id)
 
     if request.method == 'POST':
+        avatar = request.FILES.get('avatar')
+        if avatar:
+            # Проверяем до применения изменений, чтобы отклонённый файл не
+            # оставил группу частично обновлённой (problems.md, П-3).
+            try:
+                normalize_avatar(avatar)
+            except ValidationError as exc:
+                message = exc.messages[0] if exc.messages else 'Недопустимый файл'
+                messages.error(request, f'❌ {message}')
+                return redirect('group_chat', group_id=group_id)
+
         group.name = request.POST.get('name', group.name).strip()
         group.description = request.POST.get('description', group.description).strip()
-        if request.FILES.get('avatar'):
-            group.avatar = request.FILES.get('avatar')
+        if avatar:
+            group.avatar = avatar
         group.save()
     return redirect('group_chat', group_id=group_id)
 

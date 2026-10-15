@@ -2,10 +2,12 @@ import uuid
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.urls import reverse
 from chat.models import Channel, ChannelMember, Message
+from chat.utils.uploads import normalize_avatar
 
 POSTS_PER_PAGE = 30
 
@@ -79,11 +81,21 @@ def edit_channel(request, channel_id):
         messages.error(request, 'Нет прав')
         return redirect('channel_view', channel_id=channel_id)
     if request.method == 'POST':
+        avatar = request.FILES.get('avatar')
+        if avatar:
+            # Проверяем до применения изменений (problems.md, П-3).
+            try:
+                normalize_avatar(avatar)
+            except ValidationError as exc:
+                message = exc.messages[0] if exc.messages else 'Недопустимый файл'
+                messages.error(request, f'❌ {message}')
+                return redirect('channel_view', channel_id=channel_id)
+
         channel.name = request.POST.get('name', channel.name).strip()
         channel.description = request.POST.get('description', channel.description).strip()
         channel.is_private = request.POST.get('is_private') == '1'
-        if request.FILES.get('avatar'):
-            channel.avatar = request.FILES['avatar']
+        if avatar:
+            channel.avatar = avatar
         channel.save()
         return redirect('channel_view', channel_id=channel_id)
     membership = ChannelMember.objects.filter(channel=channel, user=request.user).first()

@@ -1,11 +1,13 @@
 from django.test import TestCase
 from django.urls import reverse
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from chat.models import Message
+from chat.tests.factories import fake_upload, image_upload
+
+import html
+import re
 
 User = get_user_model()
-import io
 
 
 class PrivateChatTests(TestCase):
@@ -32,8 +34,7 @@ class PrivateChatTests(TestCase):
 
     def test_send_file_message(self):
         """Тест: Отправка сообщения с файлом (картинкой)"""
-        file_content = io.BytesIO(b'fake image content')
-        uploaded_file = SimpleUploadedFile("test.png", file_content.read(), content_type="image/png")
+        uploaded_file = image_upload('test.png')
 
         response = self.client.post('/api/send/', {
             'user_id': self.user2.id,
@@ -51,8 +52,99 @@ class PrivateChatTests(TestCase):
         self.assertTrue(msg.attachment)
         self.assertEqual(msg.attachment_type, 'image')
 
+    def test_send_fake_image_rejected(self):
+        """Файл, который только выдаёт себя за картинку, не принимается.
+
+        Регрессия к tasks.md:13: валидация должна проверять файл целиком, а не
+        доверять Content-Type или первым байтам.
+        """
+        response = self.client.post('/api/send/', {
+            'user_id': self.user2.id,
+            'content': 'Подделка',
+            'attachment': fake_upload('fake.png', b'fake image content'),
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Message.objects.filter(content='Подделка').exists())
+
     def test_view_chat_page(self):
         """Тест: Страница чата грузится (200)"""
         response = self.client.get(f'/?user_id={self.user2.id}')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.user2.username)
+
+
+class ReplyButtonRenderingTests(TestCase):
+    """П-2: имя пользователя не должно попадать в исполняемый JS-код.
+
+    Смена логина теперь отклоняет опасные символы, но шаблон обязан быть
+    безопасным и для уже существующих «плохих» логинов, поэтому пользователь
+    создаётся в обход формы.
+    """
+
+    PAYLOAD = "a');alert(1);//"
+    TEMPLATES = ('parts/message_list.html', 'parts/group_message_list.html')
+    HANDLER_RE = re.compile(r'\son[a-z]+\s*=\s*"([^"]*)"')
+
+    def setUp(self):
+        self.sender = User.objects.create_user(username=self.PAYLOAD, password='123')
+        self.receiver = User.objects.create_user(username='reply_receiver', password='123')
+        self.message = Message.objects.create(
+            sender=self.sender, receiver=self.receiver, content='hello'
+        )
+
+    def _render(self, template, message=None):
+        from django.template.loader import render_to_string
+        return render_to_string(template, {
+            'messages': [message or self.message],
+            'user': self.receiver,
+            'request': None,
+        })
+
+    def _handler_values(self, markup):
+        """Значения inline-обработчиков, декодированные как в браузере.
+
+        Браузер декодирует сущности внутри значения атрибута до разбора JS,
+        поэтому проверять нужно именно декодированный текст.
+        """
+        return [html.unescape(value) for value in self.HANDLER_RE.findall(markup)]
+
+    def test_username_never_appears_inside_an_inline_handler(self):
+        # берём сообщение с цитатой, чтобы хотя бы один обработчик точно был
+        reply = Message.objects.create(
+            sender=self.receiver, receiver=self.sender,
+            content='original text', reply_to=self.message,
+        )
+        for template in self.TEMPLATES:
+            with self.subTest(template=template):
+                values = self._handler_values(self._render(template, message=reply))
+                self.assertTrue(values, 'ожидался хотя бы один inline-обработчик')
+                for value in values:
+                    self.assertNotIn(self.sender.username, value)
+                    self.assertNotIn('original text', value)
+
+    def test_reply_button_has_no_inline_handler(self):
+        for template in self.TEMPLATES:
+            with self.subTest(template=template):
+                markup = self._render(template)
+                self.assertIn('data-reply-author', markup)
+                self.assertIn('data-reply-id', markup)
+                button = markup.split('class="reply-btn"', 1)[1].split('>', 1)[0]
+                self.assertNotIn('onclick', button)
+
+    def test_payload_is_html_escaped_in_the_data_attribute(self):
+        markup = self._render('parts/message_list.html')
+        self.assertIn('&#x27;', markup)
+        self.assertNotIn(self.PAYLOAD, markup)
+
+    def test_reply_quote_handler_receives_uuid_only(self):
+        reply = Message.objects.create(
+            sender=self.receiver, receiver=self.sender,
+            content='original text', reply_to=self.message,
+        )
+        markup = self._render('parts/message_list.html', message=reply)
+        values = self._handler_values(markup)
+        self.assertTrue(values)
+        for value in values:
+            for argument in re.findall(r"'([^']*)'", value):
+                self.assertRegex(argument, r'^[0-9a-f-]{36}$')

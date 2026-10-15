@@ -1,6 +1,7 @@
 # users/forms.py
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from users.models import User
 
 
@@ -31,7 +32,15 @@ class ProfileForm(forms.ModelForm):
 
 
 class ChangeUsernameForm(forms.Form):
-    username = forms.CharField(max_length=150, label="Новый логин")
+    # Валидатор тот же, что у модели User: без него смена логина принимала
+    # произвольные символы (включая кавычки), что давало stored XSS через
+    # inline-обработчики в шаблонах (problems.md, П-2).
+    username = forms.CharField(
+        max_length=150,
+        label="Новый логин",
+        validators=[UnicodeUsernameValidator()],
+        help_text="До 150 символов. Только буквы, цифры и @/./+/-/_.",
+    )
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)

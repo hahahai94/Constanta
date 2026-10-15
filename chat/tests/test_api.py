@@ -5,18 +5,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
 from chat.models import Message, Group, GroupMember, Channel, ChannelMember
 from chat.views.api import _detect_attachment_type, _content_disposition_header
+from chat.tests.factories import image_upload, make_png
 from django.utils.dateparse import parse_datetime
 import json, io, os
 
 User = get_user_model()
-
-
-def make_png():
-    """Возвращает байты корректного PNG 2x2 для тестов загрузки изображений."""
-    from PIL import Image
-    buf = io.BytesIO()
-    Image.new('RGB', (2, 2), (255, 0, 0)).save(buf, format='PNG')
-    return buf.getvalue()
 
 
 class APITests(TestCase):
@@ -316,14 +309,19 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_api_update_group_with_old_avatar(self):
-        file = SimpleUploadedFile("old_av.png", b"old", content_type="image/png")
+        file = image_upload("old_av.png")
         group = Group.objects.create(name='Old Av', owner=self.user, avatar=file)
-        new_file = SimpleUploadedFile("new_av.png", b"new", content_type="image/png")
+        old_path = group.avatar.path
+        new_file = image_upload("new_av.png")
         response = self.client.post(f'/groups/{group.id}/settings/', {
             'name': 'New Av',
             'avatar': new_file
         })
         self.assertEqual(response.status_code, 200)
+        group.refresh_from_db()
+        self.assertTrue(group.avatar)
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(group.avatar.name.endswith('.png'))
 
     def test_send_message_invalid_image_rejected(self):
         file = SimpleUploadedFile("weird.png", b'\x00\x00\x00', content_type="image/png")
