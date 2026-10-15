@@ -6,7 +6,9 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from chat.models import Channel, ChannelMember, Message
+from chat.utils import html_429, rate_limit
 from chat.utils.uploads import normalize_avatar
 
 POSTS_PER_PAGE = 30
@@ -63,6 +65,7 @@ def channel_view(request, channel_id):
 
 
 @login_required
+@rate_limit('create_channel', limit=10, period=300, on_limited=html_429)
 def create_channel(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -75,6 +78,7 @@ def create_channel(request):
 
 
 @login_required
+@rate_limit('edit_channel', limit=20, period=300, on_limited=html_429)
 def edit_channel(request, channel_id):
     channel = get_object_or_404(Channel, id=channel_id)
     if not channel.is_admin(request.user):
@@ -121,7 +125,9 @@ def delete_channel(request, channel_id):
 
 
 @login_required
+@require_POST
 def join_channel(request, channel_id):
+    """Подписка на публичный канал. Только POST (problems.md, П-9)."""
     channel = get_object_or_404(Channel, id=channel_id)
     if channel.is_private:
         messages.error(request, 'Это приватный канал — подписка только по приглашению')
@@ -135,7 +141,9 @@ def join_channel(request, channel_id):
 
 
 @login_required
+@require_POST
 def leave_channel(request, channel_id):
+    """Отписка от канала. Только POST (problems.md, П-9)."""
     channel = get_object_or_404(Channel, id=channel_id)
     if channel.owner == request.user:
         messages.error(request, 'Владелец не может отписаться')

@@ -5,7 +5,9 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.views.decorators.http import require_POST
 from chat.models import Group, GroupMember, Message
+from chat.utils import html_429, rate_limit
 from chat.utils.uploads import normalize_avatar
 
 User = get_user_model()
@@ -74,6 +76,7 @@ def group_chat(request, group_id):
 
 
 @login_required
+@rate_limit('create_group', limit=10, period=300, on_limited=html_429)
 def create_group(request):
     """Создание новой группы"""
     if request.method == 'POST':
@@ -89,6 +92,7 @@ def create_group(request):
 
 
 @login_required
+@rate_limit('edit_group', limit=20, period=300, on_limited=html_429)
 def edit_group(request, group_id):
     """Редактирование группы (только владелец)"""
     group = get_object_or_404(Group, id=group_id)
@@ -116,6 +120,7 @@ def edit_group(request, group_id):
 
 
 @login_required
+@rate_limit('add_member', limit=20, period=300, on_limited=html_429)
 def add_member(request, group_id):
     """Добавление участника в группу"""
     group = get_object_or_404(Group, id=group_id)
@@ -137,8 +142,13 @@ def add_member(request, group_id):
 
 
 @login_required
+@require_POST
 def remove_member(request, group_id, user_id):
-    """Удаление участника из группы"""
+    """Удаление участника из группы.
+
+    Только POST: GET-эндпоинт, меняющий состояние, уязвим к CSRF
+    (problems.md, П-9).
+    """
     group = get_object_or_404(Group, id=group_id)
     current = GroupMember.objects.filter(group=group, user=request.user).first()
     if not current or current.role not in ['owner', 'admin']:
@@ -153,8 +163,13 @@ def remove_member(request, group_id, user_id):
 
 
 @login_required
+@require_POST
 def change_role(request, group_id, user_id, new_role):
-    """Изменение роли участника (только владелец)"""
+    """Изменение роли участника (только владелец).
+
+    Только POST: GET-эндпоинт, меняющий состояние, уязвим к CSRF
+    (problems.md, П-9).
+    """
     group = get_object_or_404(Group, id=group_id)
     if group.owner != request.user:
         return redirect('group_chat', group_id=group_id)

@@ -135,13 +135,45 @@ class IPBanMiddlewareTests(TestCase):
         response = IPBanMiddleware(lambda r: None)(request)
         self.assertIsNone(response)
 
-    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=True)
+    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['10.0.0.1'])
     def test_middleware_x_forwarded_for(self):
+        """П-8: от доверенного прокси берётся правый недоверенный адрес."""
         request = self.factory.get('/')
-        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99, 10.0.0.1'
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99'
         BannedIP.objects.create(ip_address='10.0.0.99', reason='proxy')
         response = IPBanMiddleware(lambda r: None)(request)
         self.assertEqual(response.status_code, 403)
+
+    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['10.0.0.1'])
+    def test_middleware_ignores_spoofed_leftmost_hop(self):
+        """П-8: подделанное левое значение не становится IP клиента."""
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+        # клиент подставил себе забаненный IP, прокси дописал реальный
+        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99, 10.0.0.77'
+        BannedIP.objects.create(ip_address='10.0.0.99', reason='spoofed')
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertIsNone(response)
+
+    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['10.0.0.1'])
+    def test_middleware_bans_real_client_behind_proxy(self):
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99, 10.0.0.77'
+        BannedIP.objects.create(ip_address='10.0.0.77', reason='real client')
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['10.0.0.1'])
+    def test_middleware_ignores_forwarded_from_untrusted_source(self):
+        """П-8: заголовок от недоверенного источника не учитывается вовсе."""
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '10.0.0.5'
+        request.META['HTTP_X_FORWARDED_FOR'] = '10.0.0.99'
+        BannedIP.objects.create(ip_address='10.0.0.99', reason='spoofed')
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertIsNone(response)
 
     @override_settings(DEBUG=False, USE_X_FORWARDED_FOR=False)
     def test_middleware_ignores_x_forwarded_for_by_default(self):
@@ -221,8 +253,13 @@ class AuthViewTests(TestCase):
 
     def test_logout(self):
         self.client.login(username='loginuser', password='pass123')
-        response = self.client.get('/logout/')
+        response = self.client.post('/logout/')  # П-9: выход только POST
         self.assertEqual(response.status_code, 302)
+
+    def test_logout_rejects_get(self):
+        self.client.login(username='loginuser', password='pass123')
+        response = self.client.get('/logout/')
+        self.assertEqual(response.status_code, 405)
 
     def test_registration_mode(self):
         response = self.client.get('/auth/?mode=reg')
@@ -355,10 +392,46 @@ class ClientIPTests(TestCase):
         )
         self.assertEqual(get_client_ip(request), '1.2.3.4')
 
-    @override_settings(USE_X_FORWARDED_FOR=True)
-    def test_trusts_x_forwarded_for_when_enabled(self):
+    @override_settings(USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['1.2.3.4'])
+    def test_uses_rightmost_untrusted_hop(self):
+        """П-8: берётся ближайший к приложению недоверенный адрес, не левый."""
+        from users.utils import get_client_ip
+        request = self.factory.get(
+            '/', REMOTE_ADDR='1.2.3.4', HTTP_X_FORWARDED_FOR='9.9.9.9, 8.8.8.8'
+        )
+        self.assertEqual(get_client_ip(request), '8.8.8.8')
+
+    @override_settings(USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['1.2.3.4', '8.8.8.8'])
+    def test_skips_trusted_hops(self):
         from users.utils import get_client_ip
         request = self.factory.get(
             '/', REMOTE_ADDR='1.2.3.4', HTTP_X_FORWARDED_FOR='9.9.9.9, 8.8.8.8'
         )
         self.assertEqual(get_client_ip(request), '9.9.9.9')
+
+    @override_settings(USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['1.2.3.4'])
+    def test_ignores_header_from_untrusted_source(self):
+        """П-8: без доверенного источника заголовок игнорируется полностью."""
+        from users.utils import get_client_ip
+        request = self.factory.get(
+            '/', REMOTE_ADDR='7.7.7.7', HTTP_X_FORWARDED_FOR='9.9.9.9'
+        )
+        self.assertEqual(get_client_ip(request), '7.7.7.7')
+
+    @override_settings(USE_X_FORWARDED_FOR=True, TRUSTED_PROXIES=['1.2.3.4'])
+    def test_garbage_header_falls_back_to_remote_addr(self):
+        from users.utils import get_client_ip
+        request = self.factory.get(
+            '/', REMOTE_ADDR='1.2.3.4', HTTP_X_FORWARDED_FOR='not-an-ip'
+        )
+        self.assertEqual(get_client_ip(request), '1.2.3.4')
+
+    def test_ipv6_is_normalized(self):
+        """П-33: разные записи одного адреса сравниваются одинаково."""
+        from users.utils import normalize_ip
+        self.assertEqual(normalize_ip('::ffff:127.0.0.1'), '127.0.0.1')
+        self.assertEqual(normalize_ip(' 10.0.0.1 '), '10.0.0.1')
+        self.assertEqual(normalize_ip('2001:0db8::1'), '2001:db8::1')
+        self.assertIsNone(normalize_ip('nonsense'))
+        # ведущие нули ipaddress не принимает: значение считается не-адресом
+        self.assertIsNone(normalize_ip('127.000.000.001'))

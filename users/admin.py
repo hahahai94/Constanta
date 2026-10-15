@@ -1,8 +1,10 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils import timezone
 from django.utils.html import format_html
 from django.http import HttpResponse
+from users.audit import log_admin_action
 from users.models import BannedIP, AdminLog, Notification
 import csv
 
@@ -32,7 +34,9 @@ class UltimateUserAdmin(BaseUserAdmin):
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'groups', 'last_login')
     search_fields = ('username', 'nick', 'email', 'first_name', 'last_name')
     ordering = ('-last_login',)
-    readonly_fields = ('date_joined', 'last_login', 'last_seen', 'password', 'banned_at')
+    # `banned_at` больше не readonly: иначе бан нельзя было выставить даже из
+    # админки, и подсистема бана оставалась нерабочей (problems.md, П-4).
+    readonly_fields = ('date_joined', 'last_login', 'last_seen', 'password')
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -94,6 +98,93 @@ class UltimateUserAdmin(BaseUserAdmin):
     is_banned.boolean = True
     is_banned.short_description = "Забанен"
 
+    @admin.action(description="🚫 Забанить выбранных пользователей")
+    def ban_users(self, request, queryset):
+        banned = 0
+        skipped_self = False
+        for user in queryset:
+            if user.pk == request.user.pk:
+                # иначе администратор заблокировал бы себе доступ
+                skipped_self = True
+                continue
+            if user.banned_at is not None:
+                continue
+            user.banned_at = timezone.now()
+            user.banned_by = request.user
+            user.save(update_fields=['banned_at', 'banned_by'])
+            log_admin_action(
+                request.user, 'ban_user', f'Забанен пользователь {user.username}',
+                target_user=user, request=request,
+            )
+            banned += 1
+        message = f'Забанено пользователей: {banned}'
+        if skipped_self:
+            message += ' (собственный аккаунт пропущен)'
+        self.message_user(request, message, messages.SUCCESS)
+
+    @admin.action(description="✅ Разбанить выбранных пользователей")
+    def unban_users(self, request, queryset):
+        unbanned = 0
+        for user in queryset.filter(banned_at__isnull=False):
+            user.banned_at = None
+            user.banned_by = None
+            user.save(update_fields=['banned_at', 'banned_by'])
+            log_admin_action(
+                request.user, 'unban_user', f'Разбанен пользователь {user.username}',
+                target_user=user, request=request,
+            )
+            unbanned += 1
+        self.message_user(request, f'Разбанено пользователей: {unbanned}', messages.SUCCESS)
+
+    @admin.action(description="📄 Экспорт пользователей в CSV")
+    def export_users_csv(self, request, queryset):
+        return export_to_csv(
+            self, request, queryset, 'users',
+            ['username', 'nick', 'email', 'is_active', 'last_seen'],
+            ['Логин', 'Никнейм', 'Email', 'Активен', 'Последний вход'],
+        )
+
+    actions = ['ban_users', 'unban_users', 'export_users_csv']
+
+    def save_model(self, request, obj, form, change):
+        """Проставляет автора бана и пишет действие в аудит (problems.md, П-5)."""
+        previous_banned_at = None
+        if change and obj.pk:
+            previous_banned_at = User.objects.filter(
+                pk=obj.pk).values_list('banned_at', flat=True).first()
+
+        if obj.banned_at and not obj.banned_by:
+            obj.banned_by = request.user
+
+        super().save_model(request, obj, form, change)
+
+        if previous_banned_at is None and obj.banned_at is not None:
+            action = 'ban_user'
+        elif previous_banned_at is not None and obj.banned_at is None:
+            action = 'unban_user'
+        else:
+            action = 'edit_profile'
+        log_admin_action(
+            request.user, action,
+            f'{obj.username}: {", ".join(form.changed_data) or "создан"}',
+            target_user=obj, request=request,
+        )
+
+    def delete_model(self, request, obj):
+        log_admin_action(
+            request.user, 'delete_user', f'Удалён пользователь {obj.username}',
+            target_user=None, request=request,
+        )
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for username in list(queryset.values_list('username', flat=True)):
+            log_admin_action(
+                request.user, 'delete_user', f'Удалён пользователь {username}',
+                request=request,
+            )
+        super().delete_queryset(request, queryset)
+
 
 @admin.register(BannedIP)
 class BannedIPAdmin(admin.ModelAdmin):
@@ -106,6 +197,25 @@ class BannedIPAdmin(admin.ModelAdmin):
         if not obj.pk:
             obj.banned_by = request.user
         super().save_model(request, obj, form, change)
+        if not change:
+            log_admin_action(
+                request.user, 'ban_ip', f'Забанен IP {obj.ip_address}',
+                request=request,
+            )
+
+    def delete_model(self, request, obj):
+        log_admin_action(
+            request.user, 'unban_ip', f'Разбанен IP {obj.ip_address}',
+            request=request,
+        )
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for ip in list(queryset.values_list('ip_address', flat=True)):
+            log_admin_action(
+                request.user, 'unban_ip', f'Разбанен IP {ip}', request=request,
+            )
+        super().delete_queryset(request, queryset)
 
 
 @admin.register(AdminLog)

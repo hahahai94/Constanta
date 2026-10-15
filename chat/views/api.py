@@ -19,6 +19,10 @@ from chat.utils.uploads import detect_attachment_type, normalize_avatar, normali
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+# Сколько новых сообщений отдавать за один опрос. Без ограничения запрос без
+# курсора выгружал все сообщения группы или канала (problems.md, П-6).
+POLL_MAX_MESSAGES = 200
+
 # Логика определения типа переехала в chat/utils/uploads.py; алиас сохранён,
 # потому что на него опираются тесты.
 _detect_attachment_type = detect_attachment_type
@@ -411,13 +415,19 @@ def api_channel_post(request, channel_id):
 
 
 @login_required
-@rate_limit('api_poll', limit=30, period=60)
+@rate_limit('api_poll', limit=180, period=60)
 def api_poll(request):
     """Получение новых сообщений (созданных после курсора `after`) — для автообновления.
 
     Курсор — ISO-8601 метка времени `created_at` последнего известного сообщения.
     Так как `Message.id` — UUID, а не автоинкремент, сравнение по времени корректно
     упорядочивает сообщения и не зависит от порядка создания UUID.
+
+    Лимит поднят до 180/мин: клиент опрашивает эндпоинт раз в 2 секунды, то
+    есть ~30 запросов в минуту на вкладку, и прежние 30/60 заблокировали бы
+    обычную работу теперь, когда лимит действительно применяется (П-6).
+    Ответ ограничен `POLL_MAX_MESSAGES`, чтобы запрос без курсора не выгружал
+    весь канал целиком (П-6).
     """
     if request.method != 'GET':
         return JsonResponse({'status': 'error', 'message': 'Только GET'}, status=405)
@@ -464,7 +474,7 @@ def api_poll(request):
             return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
         messages_qs = Message.objects.filter(
             channel=channel, is_deleted=False
-        ).order_by('-created_at')
+        ).order_by('created_at')
         template_name = 'parts/channel_post_list.html'
 
     else:
@@ -473,7 +483,10 @@ def api_poll(request):
     if after_dt is not None:
         messages_qs = messages_qs.filter(created_at__gt=after_dt)
 
-    messages = list(messages_qs)
+    # Все выборки упорядочены по возрастанию `created_at`, поэтому ограничение
+    # отдаёт самые старые из новых, а курсор указывает на последнее отданное
+    # сообщение — клиент продолжит с него и ничего не потеряет.
+    messages = list(messages_qs[:POLL_MAX_MESSAGES])
 
     from django.template.loader import render_to_string
     html = render_to_string(template_name, {

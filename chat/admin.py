@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.db.models import Count
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
+from users.audit import log_admin_action
 import csv, os
 
 User = get_user_model()
@@ -72,10 +73,16 @@ class UltimateGroupAdmin(admin.ModelAdmin):
 
     @admin.action(description="Удалить группу и файлы")
     def hard_delete_groups(self, request, queryset):
+        names = list(queryset.values_list('name', flat=True))
         for group in queryset:
             if group.avatar and os.path.isfile(group.avatar.path):
                 os.remove(group.avatar.path)
         count, _ = queryset.delete()
+        for name in names:
+            log_admin_action(
+                request.user, 'delete_group', f'Удалена группа «{name}» и её файлы',
+                request=request,
+            )
         self.message_user(request, f"Удалено {count} групп + очищены аватарки", messages.SUCCESS)
 
     @admin.action(description="Экспорт участников в CSV")
@@ -122,6 +129,11 @@ class UltimateMessageAdmin(admin.ModelAdmin):
                 os.remove(msg.attachment.path)
             deleted_count += 1
         queryset.delete()
+        log_admin_action(
+            request.user, 'delete_message',
+            f'Удалено сообщений: {deleted_count} (вместе с вложениями)',
+            request=request,
+        )
         self.message_user(request, f"Удалено {deleted_count} сообщений + вложения", messages.SUCCESS)
 
     @admin.action(description="Экспорт в CSV")
@@ -141,17 +153,31 @@ class UltimateGroupMemberAdmin(admin.ModelAdmin):
 
     @admin.action(description="Сделать админами")
     def promote_to_admin(self, request, queryset):
+        count = queryset.count()
         queryset.update(role='admin')
-        self.message_user(request, f"{queryset.count()} пользователей стали админами", messages.SUCCESS)
+        log_admin_action(
+            request.user, 'change_role',
+            f'Роль изменена на admin у {count} участников', request=request,
+        )
+        self.message_user(request, f"{count} пользователей стали админами", messages.SUCCESS)
 
     @admin.action(description="Понизить до участников")
     def demote_to_member(self, request, queryset):
+        count = queryset.count()
         queryset.update(role='member')
-        self.message_user(request, f"{queryset.count()} пользователей понижены", messages.INFO)
+        log_admin_action(
+            request.user, 'change_role',
+            f'Роль изменена на member у {count} участников', request=request,
+        )
+        self.message_user(request, f"{count} пользователей понижены", messages.INFO)
 
     @admin.action(description="Исключить из групп")
     def kick_from_groups(self, request, queryset):
         count, _ = queryset.delete()
+        log_admin_action(
+            request.user, 'kick_member',
+            f'Исключено участников: {count}', request=request,
+        )
         self.message_user(request, f"Исключено {count} участников", messages.WARNING)
 
     actions = ['promote_to_admin', 'demote_to_member', 'kick_from_groups']

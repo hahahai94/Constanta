@@ -91,17 +91,36 @@ class GroupTests(TestCase):
         group = Group.objects.create(name='G', owner=self.owner)
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
         GroupMember.objects.create(group=group, user=self.member, role='member')
-        response = self.client.get(reverse('change_role', args=[group.id, self.member.id, 'admin']))
+        response = self.client.post(reverse('change_role', args=[group.id, self.member.id, 'admin']))
         self.assertEqual(response.status_code, 302)
         gm = GroupMember.objects.get(group=group, user=self.member)
         self.assertEqual(gm.role, 'admin')
+
+    def test_remove_member_rejects_get(self):
+        """П-9: удаление участника через GET больше не работает."""
+        group = Group.objects.create(name='G', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        GroupMember.objects.create(group=group, user=self.member, role='member')
+        response = self.client.get(reverse('remove_member', args=[group.id, self.member.id]))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(GroupMember.objects.filter(group=group, user=self.member).exists())
+
+    def test_change_role_rejects_get(self):
+        """П-9: смена роли через GET больше не работает (защита от CSRF)."""
+        group = Group.objects.create(name='G', owner=self.owner)
+        GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        GroupMember.objects.create(group=group, user=self.member, role='member')
+        response = self.client.get(reverse('change_role', args=[group.id, self.member.id, 'admin']))
+        self.assertEqual(response.status_code, 405)
+        gm = GroupMember.objects.get(group=group, user=self.member)
+        self.assertEqual(gm.role, 'member')
 
     def test_change_role_not_owner(self):
         group = Group.objects.create(name='G', owner=self.owner)
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
         GroupMember.objects.create(group=group, user=self.member, role='member')
         self.client.login(username='worker', password='123')
-        response = self.client.get(reverse('change_role', args=[group.id, self.member.id, 'admin']))
+        response = self.client.post(reverse('change_role', args=[group.id, self.member.id, 'admin']))
         self.assertEqual(response.status_code, 302)
         gm = GroupMember.objects.get(group=group, user=self.member)
         self.assertNotEqual(gm.role, 'admin')
@@ -206,7 +225,7 @@ class GroupTests(TestCase):
     def test_change_role_protect_owner(self):
         group = Group.objects.create(name='Owner Protected', owner=self.owner)
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
-        response = self.client.get(reverse('change_role', args=[group.id, self.owner.id, 'member']))
+        response = self.client.post(reverse('change_role', args=[group.id, self.owner.id, 'member']))
         self.assertRedirects(response, reverse('group_chat', args=[group.id]))
         gm = GroupMember.objects.get(group=group, user=self.owner)
         self.assertEqual(gm.role, 'owner')

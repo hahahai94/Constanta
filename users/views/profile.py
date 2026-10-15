@@ -8,9 +8,11 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from users.models import User
 from users.forms import ChangeUsernameForm, ChangePasswordForm, ProfileForm
+from users.ratelimit import html_429, rate_limit
 
 
 @login_required
+@rate_limit('profile_update', limit=20, period=60, on_limited=html_429)
 def profile_view(request):
     if request.method == 'POST':
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
@@ -44,6 +46,7 @@ def users_catalog(request):
 
 
 @login_required
+@rate_limit('change_username', limit=5, period=300, on_limited=html_429)
 def change_username(request):
     if request.method == 'POST':
         form = ChangeUsernameForm(request.POST, user=request.user)
@@ -57,6 +60,7 @@ def change_username(request):
 
 
 @login_required
+@rate_limit('change_password', limit=5, period=300, on_limited=html_429)
 def change_password(request):
     if request.method == 'POST':
         form = ChangePasswordForm(request.user, request.POST)

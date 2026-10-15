@@ -35,16 +35,16 @@
 
             <h4 class="text-danger mb-3">Ваш аккаунт был заблокирован</h4>
 
-            {% if user.ban_reason %}
+            {% if banned_user.ban_reason %}
             <div class="alert alert-warning" role="alert">
                 <strong>📋 Причина блокировки:</strong><br>
-                {{ user.ban_reason }}
+                {{ banned_user.ban_reason }}
             </div>
             {% endif %}
 
-            {% if user.banned_at %}
+            {% if banned_user.banned_at %}
             <p class="text-muted small">
-                Заблокирован: {{ user.banned_at|date:"d.m.Y H:i" }}
+                Заблокирован: {{ banned_user.banned_at|date:"d.m.Y H:i" }}
             </p>
             {% endif %}
 
@@ -65,7 +65,7 @@
             </div>
         </div>
         <div class="card-footer text-muted text-center small">
-            Ваш username: <strong>@{{ user.username }}</strong><br>
+            Ваш username: <strong>@{{ banned_user.username }}</strong><br>
             Укажите его при обращении к администратору
         </div>
     </div>

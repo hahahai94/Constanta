@@ -45,6 +45,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'users.middleware.BannedUserMiddleware',
     'users.middleware.IPBanMiddleware',
 ]
 
@@ -127,9 +128,12 @@ LOGIN_URL = '/auth/'
 LOGIN_REDIRECT_URL = '/main/'
 LOGOUT_REDIRECT_URL = '/auth/'
 
+# CustomAuthBackend — наследник ModelBackend, поэтому отдельный ModelBackend
+# здесь не нужен и вреден: он использует собственную `user_can_authenticate`,
+# которая не знает про бан, и перебор бэкендов пустил бы забаненного
+# пользователя внутрь (problems.md, П-4).
 AUTHENTICATION_BACKENDS = [
     'users.backends.CustomAuthBackend',
-    'django.contrib.auth.backends.ModelBackend',
 ]
 
 EMAIL_HOST = env('EMAIL_HOST', default='')
@@ -159,6 +163,12 @@ CACHES = {
 # Доверять заголовку X-Forwarded-For только если приложение реально стоит за прокси.
 # Иначе клиент может подделать IP и обойти IP-бан / rate-limit.
 USE_X_FORWARDED_FOR = env.bool('USE_X_FORWARDED_FOR', default=False)
+
+# Заголовку X-Forwarded-For доверяем только от перечисленных адресов прокси.
+# Без этого списка включение USE_X_FORWARDED_FOR открывает обход лимитов: nginx
+# дописывает заголовок, поэтому его левое значение контролирует клиент.
+# Пример: TRUSTED_PROXIES=127.0.0.1,10.0.0.5
+TRUSTED_PROXIES = env.list('TRUSTED_PROXIES', default=[])
 
 SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=86400)
 SESSION_SAVE_EVERY_REQUEST = env.bool('SESSION_SAVE_EVERY_REQUEST', default=False)

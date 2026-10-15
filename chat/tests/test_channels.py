@@ -61,6 +61,25 @@ class ChannelViewTests(TestCase):
         response = self.client.get(reverse('channel_view', args=[self.channel.id]))
         self.assertEqual(response.status_code, 200)
 
+    def test_join_channel_rejects_get(self):
+        """П-9: подписка через GET больше не работает."""
+        public = Channel.objects.create(name='Public', owner=self.owner)
+        response = self.client.get(reverse('join_channel', args=[public.id]))
+        self.assertEqual(response.status_code, 405)
+        self.assertFalse(
+            ChannelMember.objects.filter(channel=public, user=self.owner).exists()
+        )
+
+    def test_leave_channel_rejects_get(self):
+        """П-9: отписка через GET больше не работает."""
+        self.client.login(username='ch_user', password='123')
+        ChannelMember.objects.create(channel=self.channel, user=self.user, role='subscriber')
+        response = self.client.get(reverse('leave_channel', args=[self.channel.id]))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(
+            ChannelMember.objects.filter(channel=self.channel, user=self.user).exists()
+        )
+
     def test_create_channel_post(self):
         response = self.client.post(reverse('create_channel'), {'name': 'NewChan'})
         self.assertTrue(Channel.objects.filter(name='NewChan').exists())

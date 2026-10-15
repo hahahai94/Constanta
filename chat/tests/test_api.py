@@ -7,6 +7,7 @@ from chat.models import Message, Group, GroupMember, Channel, ChannelMember
 from chat.views.api import _detect_attachment_type, _content_disposition_header
 from chat.tests.factories import image_upload, make_png
 from django.utils.dateparse import parse_datetime
+from unittest import mock
 import json, io, os
 
 User = get_user_model()
@@ -410,12 +411,67 @@ class PollAPITests(TestCase):
         response = self.client.get('/api/poll/', {'after': cursor, 'channel_id': channel.id})
         data = json.loads(response.content)
         self.assertEqual(data['count'], 1)
-        self.assertIn('c2', data['html'])
-        self.assertNotIn('c1', data['html'])
+        # сверяем по идентификаторам: короткие строки вроде 'c1' встречаются
+        # внутри случайных UUID и делают проверку по подстроке флаки
+        self.assertIn(str(m2.id), data['html'])
+        self.assertNotIn(str(m1.id), data['html'])
         self.assertEqual(parse_datetime(data['cursor']), m2.created_at)
 
         second = self.client.get('/api/poll/', {'after': data['cursor'], 'channel_id': channel.id})
         self.assertEqual(json.loads(second.content)['count'], 0)
+
+    def _create_posts(self, channel, count):
+        """Создаёт посты со строго возрастающими метками времени.
+
+        `bulk_create` может выдать одинаковые `created_at`, а курсор опирается
+        на время, поэтому метки задаются явно.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        base = timezone.now()
+        posts = Message.objects.bulk_create([
+            Message(sender=self.a, channel=channel, content=f'post {i}')
+            for i in range(count)
+        ])
+        for index, post in enumerate(posts):
+            Message.objects.filter(pk=post.pk).update(
+                created_at=base + timedelta(seconds=index))
+        return posts
+
+    @mock.patch('chat.views.api.POLL_MAX_MESSAGES', 3)
+    def test_poll_response_is_capped(self):
+        """П-6: опрос без курсора не выгружает весь канал целиком."""
+        channel = Channel.objects.create(name='HugeChannel', owner=self.a)
+        ChannelMember.objects.create(channel=channel, user=self.a, role='owner')
+        self._create_posts(channel, 5)
+
+        response = self.client.get('/api/poll/', {'channel_id': channel.id})
+        self.assertEqual(json.loads(response.content)['count'], 3)
+
+    @mock.patch('chat.views.api.POLL_MAX_MESSAGES', 3)
+    def test_poll_cursor_advances_without_losing_posts(self):
+        """Ограничение не теряет посты: курсор ведёт к следующей порции."""
+        channel = Channel.objects.create(name='CursorCap', owner=self.a)
+        ChannelMember.objects.create(channel=channel, user=self.a, role='owner')
+        self._create_posts(channel, 5)
+
+        first = json.loads(
+            self.client.get('/api/poll/', {'channel_id': channel.id}).content)
+        self.assertEqual(first['count'], 3)
+
+        second = json.loads(self.client.get(
+            '/api/poll/', {'after': first['cursor'], 'channel_id': channel.id}).content)
+        self.assertEqual(second['count'], 2)
+
+    def test_poll_channel_posts_are_chronological(self):
+        """П-21: посты канала приходят по возрастанию времени."""
+        channel = Channel.objects.create(name='Ordered', owner=self.a)
+        ChannelMember.objects.create(channel=channel, user=self.a, role='owner')
+        self._create_posts(channel, 2)
+
+        response = self.client.get('/api/poll/', {'channel_id': channel.id})
+        html = json.loads(response.content)['html']
+        self.assertLess(html.index('post 0'), html.index('post 1'))
 
 
 class AttachmentAccessTests(TestCase):

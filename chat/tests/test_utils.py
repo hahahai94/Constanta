@@ -137,7 +137,8 @@ class RateLimitTests(TestCase):
         self.assertEqual(resp3.status_code, 429)
         self.assertEqual(call_count[0], 2)
 
-    def test_rate_limit_get_not_limited(self):
+    def test_rate_limit_applies_to_get(self):
+        """П-6: GET больше не исключается — иначе лимит на `api_poll` не работал."""
         from chat.utils import rate_limit
         from django.http import HttpResponse
 
@@ -154,7 +155,40 @@ class RateLimitTests(TestCase):
         req.method = 'GET'
         req.path = '/test/'
 
-        my_view(req)
-        my_view(req)
-        my_view(req)
-        self.assertEqual(call_count[0], 3)
+        self.assertEqual(my_view(req).status_code, 200)
+        self.assertEqual(my_view(req).status_code, 429)
+        self.assertEqual(my_view(req).status_code, 429)
+        self.assertEqual(call_count[0], 1)
+
+    def test_rate_limit_key_ignores_path(self):
+        """П-6: ключ не включает путь, иначе лимит обходится сменой UUID."""
+        from chat.utils import rate_limit
+        from django.http import HttpRequest, HttpResponse
+
+        call_count = [0]
+
+        @rate_limit('test_path', limit=1, period=10)
+        def my_view(request):
+            call_count[0] += 1
+            return HttpResponse('ok')
+
+        first = HttpRequest()
+        first.META = {'REMOTE_ADDR': '127.0.0.1'}
+        first.method = 'POST'
+        first.path = '/groups/11111111-1111-1111-1111-111111111111/settings/'
+
+        second = HttpRequest()
+        second.META = {'REMOTE_ADDR': '127.0.0.1'}
+        second.method = 'POST'
+        second.path = '/groups/22222222-2222-2222-2222-222222222222/settings/'
+
+        self.assertEqual(my_view(first).status_code, 200)
+        self.assertEqual(my_view(second).status_code, 429)
+        self.assertEqual(call_count[0], 1)
+
+    def test_rate_limit_counter_is_atomic(self):
+        """П-6: параллельные запросы не проходят все сразу (нет пары get/set)."""
+        from users.ratelimit import hit
+
+        allowed = [hit('atomic', limit=3, period=10)[0] for _ in range(6)]
+        self.assertEqual(allowed, [True, True, True, False, False, False])

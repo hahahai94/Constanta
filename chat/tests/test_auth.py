@@ -46,12 +46,18 @@ class AuthAndProfileTests(TestCase):
         self.assertTrue(User.objects.filter(username='new_guy').exists())
 
     def test_logout(self):
-        """Тест: Выход из аккаунта"""
-        response = self.client.get(reverse('logout'))
+        """Тест: Выход из аккаунта (только POST, см. П-9)"""
+        response = self.client.post(reverse('logout'))
         self.assertEqual(response.status_code, 302)
         # После редиректа пользователь должен быть анонимным
         final_response = self.client.get(response.url)
         self.assertFalse(final_response.context['user'].is_authenticated)
+
+    def test_logout_rejects_get(self):
+        """П-9: выход через GET больше не работает (защита от CSRF)."""
+        response = self.client.get(reverse('logout'))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(self.client.get(reverse('profile')).status_code == 200)
 
     def test_change_username(self):
         """Тест: Смена логина в профиле"""

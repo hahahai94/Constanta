@@ -54,6 +54,12 @@ class AdminLog(models.Model):
         ('edit_profile', 'Изменение профиля'),
         ('ban_user', 'Бан пользователя'),
         ('unban_user', 'Разбан пользователя'),
+        ('delete_message', 'Удаление сообщения'),
+        ('delete_group', 'Удаление группы'),
+        ('change_role', 'Изменение роли'),
+        ('kick_member', 'Исключение из группы'),
+        ('ban_ip', 'Блокировка IP'),
+        ('unban_ip', 'Разблокировка IP'),
     ]
 
     admin = models.ForeignKey(User, related_name='admin_actions', on_delete=models.CASCADE)
