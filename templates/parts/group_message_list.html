@@ -13,14 +13,21 @@
         {% if msg.reply_to %}
         <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
             <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>
-            <span class="reply-quote-text">{{ msg.reply_to.content|default:"📎 Вложение" }}</span>
+            <span class="reply-quote-text">{{ msg.reply_to.preview_text|default:"📎 Вложение" }}</span>
         </div>
         {% endif %}
         {% if msg.sender != request.user %}
             <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #764ba2;">{{ msg.sender.username }}</div>
         {% endif %}
         {% if msg.attachment_type == 'image' and msg.attachment %}
-            <img src="{{ msg.attachment.url }}" class="img-fluid rounded mb-2" style="max-height: 250px; max-width: 100%;">
+            <img src="{{ msg.attachment.url }}"
+                 class="img-fluid rounded mb-2 chat-image"
+                 style="max-height: 250px; max-width: 100%;"
+                 alt="Изображение"
+                 loading="lazy"
+                 data-image-viewer="{{ msg.attachment.url }}"
+                 data-image-download="{% url 'download_attachment' msg.id %}"
+                 data-image-name="{{ msg.attachment_original_name|default:'image' }}">
         {% endif %}
         {% if msg.attachment_type == 'file' and msg.attachment %}
             <a href="{% url 'download_attachment' msg.id %}" class="text-decoration-none d-block mb-2 p-2 rounded"

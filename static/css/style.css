@@ -433,3 +433,37 @@ body {
 }
 .message-bubble:hover .delete-btn { opacity: 0.6; }
 .delete-btn:hover { opacity: 1 !important; }
+
+/* ===== Просмотр изображения в полный экран ===== */
+.chat-image {
+    cursor: zoom-in;
+    transition: filter 0.15s;
+}
+.chat-image:hover { filter: brightness(0.92); }
+
+.image-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px 20px;
+}
+.image-viewer[hidden] { display: none; }
+.image-viewer img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.image-viewer-toolbar {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    display: flex;
+    gap: 8px;
+    z-index: 2001;
+}

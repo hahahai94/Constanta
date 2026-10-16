@@ -192,6 +192,9 @@ def send_message(request):
             'html': html,
             'message_id': msg.id,
             'cursor': msg.created_at.isoformat(),
+            # Превью для списка чатов: обновляется без перезагрузки страницы.
+            'preview': msg.preview_text,
+            'peer_id': receiver.id if receiver is not None else None,
         })
 
     except Http404:
@@ -568,8 +571,14 @@ def api_poll(request):
 
     newest = max((m.created_at for m in messages), default=None)
 
+    # Превью последнего сообщения для списка чатов: обновляется без
+    # перезагрузки страницы, чтобы под ником не оставался старый текст.
+    last_message = messages[-1] if messages else None
+
     return JsonResponse({
         'html': html,
+        'preview': last_message.preview_text if last_message else '',
+        'peer_id': peer.id if user_id else None,
         'count': len(messages),
         'cursor': newest.isoformat() if newest else (after_raw or ''),
     })

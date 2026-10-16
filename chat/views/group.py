@@ -12,8 +12,6 @@ from chat.utils.uploads import normalize_avatar
 
 User = get_user_model()
 
-MESSAGES_PER_PAGE = 30
-
 
 @login_required
 def groups_list(request):
@@ -47,29 +45,11 @@ def group_chat(request, group_id):
     messages_qs = Message.objects.filter(
         group=group, is_deleted=False
     ).order_by('created_at')
-    paginator = Paginator(messages_qs, MESSAGES_PER_PAGE)
-    page_number = request.GET.get('page', paginator.num_pages)
-    messages_page = paginator.get_page(page_number)
-
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and 'page' in request.GET:
-        from django.template.loader import render_to_string
-        html = render_to_string('parts/group_message_list.html', {
-            'messages': messages_page,
-            'request': request,
-            'user': request.user,
-        })
-        from django.http import JsonResponse
-        return JsonResponse({
-            'html': html,
-            'has_previous': messages_page.has_previous(),
-            'page': messages_page.number,
-        })
 
     return render(request, 'group_chat.html', {
         'group': group,
         'members': members,
-        'messages': messages_page.object_list,
-        'messages_page': messages_page,
+        'messages': messages_qs,
         'is_owner': is_owner,
         'is_admin': is_admin,
     })

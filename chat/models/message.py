@@ -76,6 +76,25 @@ class Message(models.Model):
             return self.attachment.name.split('/')[-1]
         return None
 
+    @property
+    def preview_text(self):
+        """Короткое описание сообщения для списка чатов и цитат.
+
+        Без этого у сообщения с одним вложением (фото, файл, голосовое) в
+        списке чатов под ником было пусто: шаблон печатал только `content`,
+        а он у таких сообщений пустой.
+        """
+        if self.content:
+            return self.content
+        if self.attachment_type == 'image':
+            return '📷 Фото'
+        if self.attachment_type == 'voice':
+            return '🎤 Голосовое сообщение'
+        if self.attachment_type == 'file':
+            name = self.get_attachment_name()
+            return f'📎 {name}' if name else '📎 Файл'
+        return '📎 Вложение' if self.attachment else ''
+
     def save(self, *args, **kwargs):
         if self.attachment:
             if not self.attachment_hash:

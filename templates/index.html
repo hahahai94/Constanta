@@ -73,15 +73,16 @@
         <div class="flex-grow-1 overflow-auto">
             {% for chat in chats %}
             <a href="?user_id={{ chat.user.id }}"
+               data-chat-user="{{ chat.user.id }}"
                class="chat-item d-flex align-items-center p-3 text-decoration-none text-dark {% if active_user and active_user.id == chat.user.id %}active{% endif %}">
                 <img src="{{ chat.user.get_avatar_url }}"
                      class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
                 <div class="flex-grow-1 min-width-0">
                     <h6 class="mb-1 text-truncate fw-bold">{{ chat.user.get_display_name|default:chat.user.username }}</h6>
                     {% if chat.last_message %}
-                    <small class="text-muted text-truncate d-block">{{ chat.last_message.content|truncatewords:5 }}</small>
+                    <small class="text-muted text-truncate d-block chat-preview">{{ chat.last_message.preview_text|truncatewords:5 }}</small>
                     {% else %}
-                    <small class="text-muted">Начните общение...</small>
+                    <small class="text-muted chat-preview">Начните общение...</small>
                     {% endif %}
                 </div>
             </a>
@@ -120,15 +121,6 @@
 
         <!-- Сообщения (скролл только здесь!) -->
         <div class="flex-grow-1 overflow-auto p-4" id="messages-container" style="background: #f5f7fa;">
-            {% if messages_page and messages_page.has_previous %}
-            <div class="text-center mb-3">
-                <button class="btn btn-outline-primary btn-sm rounded-pill" id="load-more-btn"
-                        onclick="loadMoreMessages()"
-                        data-page="{{ messages_page.previous_page_number }}">
-                    <i class="bi bi-arrow-up-circle me-1"></i>Загрузить ещё
-                </button>
-            </div>
-            {% endif %}
             {% include 'parts/message_list.html' %}
         </div>
 
@@ -358,7 +350,8 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
         if (d.status === 'ok' && d.html) {
             container.insertAdjacentHTML('beforeend', d.html);
             if (window.pollState && d.cursor) pollState.cursor = d.cursor;
-            container.scrollTop = container.scrollHeight;
+            scrollToBottom();
+            updateChatPreview(d.peer_id, d.preview);
             messageInput.value = '';
             fileUpload.value = '';
             fileTagContainer.innerHTML = '';
@@ -378,40 +371,27 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
     });
 });
 
-// ===== ЗАГРУЗКА СТАРЫХ СООБЩЕНИЙ =====
-function loadMoreMessages() {
-    const btn = document.getElementById('load-more-btn');
-    if (!btn || btn.disabled) return;
-    btn.disabled = true;
+// ===== ПРОКРУТКА К ПОСЛЕДНЕМУ СООБЩЕНИЮ =====
+// Переписка отдаётся целиком, поэтому к последнему сообщению нужно вернуться
+// и после загрузки страницы, и после того, как догрузятся картинки: без этого
+// высота контейнера меняется уже после прокрутки.
+window.scrollToBottom = function() {
+    const container = document.getElementById('messages-container');
+    if (container) container.scrollTop = container.scrollHeight;
+};
 
-    const page = btn.dataset.page;
-    const url = new URL(window.location.href);
-    url.searchParams.set('page', page);
+window.updateChatPreview = function(peerId, preview) {
+    if (!peerId || !preview) return;
+    const item = document.querySelector('.chat-item[data-chat-user="' + peerId + '"]');
+    if (!item) return;
+    const target = item.querySelector('.chat-preview');
+    if (target) target.textContent = preview;
+};
 
-    fetch(url.toString(), { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-        .then(r => r.json())
-        .then(data => {
-            const container = document.getElementById('messages-container');
-            const temp = document.createElement('div');
-            temp.innerHTML = data.html;
-            // вставляем после кнопки (первый элемент в контейнере)
-            const btnWrapper = container.querySelector('#load-more-btn')?.parentElement;
-            if (btnWrapper) {
-                btnWrapper.after(...temp.children);
-            } else {
-                container.insertAdjacentHTML('afterbegin', data.html);
-            }
-            if (data.has_previous) {
-                btn.dataset.page = data.page - 1;
-                btn.disabled = false;
-            } else {
-                btn.remove();
-            }
-        })
-        .catch(() => {
-            btn.disabled = false;
-        });
-}
+document.querySelectorAll('#messages-container img').forEach(function(image) {
+    if (!image.complete) image.addEventListener('load', window.scrollToBottom, {once: true});
+});
+window.addEventListener('load', window.scrollToBottom);
 
 // ===== ПОЛЛЕР (вызывается и по таймеру, и после отправки) =====
 window.latestCursor = function() {
@@ -434,7 +414,9 @@ window.doPoll = function() {
                 const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
                 container.insertAdjacentHTML('beforeend', data.html);
                 if (data.cursor) pollState.cursor = data.cursor;
-                if (wasAtBottom) container.scrollTop = container.scrollHeight;
+                if (wasAtBottom) window.scrollToBottom();
+                // под ником в списке чатов тоже должно быть актуальное превью
+                window.updateChatPreview(data.peer_id, data.preview);
             }
         })
         .catch(() => {});
@@ -453,9 +435,8 @@ if (!window.pollState) {
     window.doPoll();
 }
 
-// Прокрутка вниз при загрузке
-const container = document.getElementById('messages-container');
-if (container) container.scrollTop = container.scrollHeight;
+// Прокрутка к последнему сообщению
+window.scrollToBottom();
 </script>
 {% endblock %}
 {% endblock %}
