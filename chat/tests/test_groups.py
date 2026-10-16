@@ -17,7 +17,7 @@ class GroupTests(TestCase):
         response = self.client.post(reverse('create_group'), {
             'name': 'Test Group'
         })
-        self.assertIn(response.status_code, [302, 200])
+        self.assertEqual(response.status_code, 302)
         self.assertTrue(Group.objects.filter(name='Test Group').exists())
 
     def test_add_member(self):
@@ -215,12 +215,17 @@ class GroupTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_add_member_already_exists(self):
+        """П-41: раньше тест не создавал членство, которое якобы проверял."""
         group = Group.objects.create(name='Existing Group', owner=self.owner)
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
+        GroupMember.objects.create(group=group, user=self.member, role='member')
+
         response = self.client.post(reverse('add_member', args=[group.id]), {
-            'username': 'worker'
+            'username': self.member.username
         })
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            GroupMember.objects.filter(group=group, user=self.member).count(), 1)
 
     def test_change_role_protect_owner(self):
         group = Group.objects.create(name='Owner Protected', owner=self.owner)

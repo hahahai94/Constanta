@@ -112,13 +112,28 @@ class CustomAuthBackendTests(TestCase):
 
 class IPBanMiddlewareTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        # кеш списка банов не откатывается вместе с транзакцией теста
+        cache.clear()
         self.factory = RequestFactory()
 
-    def test_middleware_allows_local_in_debug(self):
+    @override_settings(DEBUG=True)
+    def test_middleware_allows_banned_local_ip_in_debug(self):
+        """П-41: проверка осмысленна только если адрес действительно забанен."""
+        BannedIP.objects.create(ip_address='127.0.0.1', reason='local')
         request = self.factory.get('/')
         request.META['REMOTE_ADDR'] = '127.0.0.1'
         response = IPBanMiddleware(lambda r: None)(request)
         self.assertIsNone(response)
+
+    @override_settings(DEBUG=False)
+    def test_middleware_bans_local_ip_when_debug_is_off(self):
+        """То же исключение не должно работать вне DEBUG."""
+        BannedIP.objects.create(ip_address='127.0.0.1', reason='local')
+        request = self.factory.get('/')
+        request.META['REMOTE_ADDR'] = '127.0.0.1'
+        response = IPBanMiddleware(lambda r: None)(request)
+        self.assertEqual(response.status_code, 403)
 
     @override_settings(DEBUG=False)
     def test_middleware_bans_ip(self):
@@ -314,9 +329,15 @@ class ProfileViewTests(TestCase):
         self.assertEqual(self.user.email, 'new@test.com')
 
     def test_profile_form_errors(self):
-        other = User.objects.create_user(username='nick_taken', password='pass123', nick='taken')
+        """П-41: раньше проверялся только код ответа, который совпадает и при успехе."""
+        User.objects.create_user(username='nick_taken', password='pass123', nick='taken')
+        self.user.nick = 'original'
+        self.user.save(update_fields=['nick'])
+
         response = self.client.post('/profile/', {'nick': 'taken'})
         self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.nick, 'original')
 
     def test_change_username(self):
         response = self.client.post('/profile/change-username/', {

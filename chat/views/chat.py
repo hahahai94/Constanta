@@ -16,11 +16,15 @@ def main_chat(request):
 
     last_msg_subq = Message.objects.filter(
         Q(sender=user, receiver=OuterRef('id')) |
-        Q(sender=OuterRef('id'), receiver=user)
+        Q(sender=OuterRef('id'), receiver=user),
+        is_deleted=False,
     ).order_by('-created_at').values('id')[:1]
 
+    # Удалённые сообщения не должны ни создавать чат, ни попадать в превью
+    # списка слева (problems.md, П-20).
     chat_users = User.objects.filter(
-        Q(sent_messages__receiver=user) | Q(received_messages__sender=user)
+        Q(sent_messages__receiver=user, sent_messages__is_deleted=False) |
+        Q(received_messages__sender=user, received_messages__is_deleted=False)
     ).exclude(id=user.id).distinct().annotate(
         last_msg_id=Subquery(last_msg_subq)
     )[:100]
@@ -38,7 +42,8 @@ def main_chat(request):
         active_user = get_object_or_404(User, id=user_id)
         messages_qs = Message.objects.filter(
             Q(sender=user, receiver=active_user) |
-            Q(sender=active_user, receiver=user)
+            Q(sender=active_user, receiver=user),
+            is_deleted=False,
         ).order_by('created_at')
         paginator = Paginator(messages_qs, MESSAGES_PER_PAGE)
         page_number = request.GET.get('page', paginator.num_pages)

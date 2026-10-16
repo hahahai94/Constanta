@@ -55,7 +55,7 @@
                 <div class="task-list-card">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h5 class="fw-bold text-dark mb-0">{{ lst.name }}</h5>
-                        <span class="badge bg-light text-dark rounded-pill">{{ lst.tasks.count }}</span>
+                        <span class="badge bg-light text-dark rounded-pill">{{ lst.task_count }}</span>
                     </div>
                     {% if lst.description %}
                     <p class="text-muted small mb-2">{{ lst.description }}</p>
@@ -70,6 +70,7 @@
         </div>
         {% endfor %}
     </div>
+    {% include 'parts/pagination.html' with page_obj=lists %}
     {% else %}
     <div class="text-center py-5 text-muted">
         <i class="bi bi-list-task" style="font-size: 4rem; opacity: 0.3;"></i>

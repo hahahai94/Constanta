@@ -13,8 +13,8 @@ class TaskModelTests(TestCase):
     def test_create_task_list(self):
         lst = TaskList.objects.create(name='Test List', owner=self.user)
         self.assertEqual(str(lst), 'Test List')
-        self.assertEqual(lst.task_count(), 0)
-        self.assertEqual(lst.done_count(), 0)
+        self.assertEqual(lst.task_count, 0)
+        self.assertEqual(lst.done_count, 0)
 
     def test_create_task(self):
         lst = TaskList.objects.create(name='Test List', owner=self.user)
@@ -39,8 +39,122 @@ class TaskModelTests(TestCase):
         lst = TaskList.objects.create(name='Test List', owner=self.user)
         Task.objects.create(task_list=lst, title='A', created_by=self.user, is_done=True)
         Task.objects.create(task_list=lst, title='B', created_by=self.user, is_done=False)
-        self.assertEqual(lst.task_count(), 2)
-        self.assertEqual(lst.done_count(), 1)
+        self.assertEqual(lst.task_count, 2)
+        self.assertEqual(lst.done_count, 1)
+
+    def test_counters_use_annotations_when_present(self):
+        """П-18: аннотированные значения не должны вызывать новых запросов."""
+        from django.db.models import Count, Q
+        lst = TaskList.objects.create(name='Annotated', owner=self.user)
+        Task.objects.create(task_list=lst, title='A', created_by=self.user, is_done=True)
+        Task.objects.create(task_list=lst, title='B', created_by=self.user, is_done=False)
+
+        annotated = TaskList.objects.annotate(
+            _task_count=Count('tasks', distinct=True),
+            _done_count=Count('tasks', filter=Q(tasks__is_done=True), distinct=True),
+        ).get(pk=lst.pk)
+        with self.assertNumQueries(0):
+            self.assertEqual(annotated.task_count, 2)
+            self.assertEqual(annotated.done_count, 1)
+
+
+class TaskValidationTests(TestCase):
+    """П-19: длина проверяется формой, а не «как получится»."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='valid_user', password='pass1234')
+        self.client.login(username='valid_user', password='pass1234')
+        self.task_list = TaskList.objects.create(name='List', owner=self.user)
+
+    def test_overlong_list_name_rejected(self):
+        self.client.post(reverse('create_task_list'), {'name': 'x' * 101, 'description': ''})
+        self.assertFalse(TaskList.objects.filter(name='x' * 101).exists())
+
+    def test_overlong_task_title_rejected(self):
+        self.client.post(reverse('task_list_detail', args=[self.task_list.id]), {
+            'action': 'add_task', 'title': 'x' * 201, 'description': '',
+        })
+        self.assertFalse(Task.objects.filter(task_list=self.task_list).exists())
+
+    def test_boundary_length_accepted(self):
+        self.client.post(reverse('task_list_detail', args=[self.task_list.id]), {
+            'action': 'add_task', 'title': 'x' * 200, 'description': '',
+        })
+        self.assertTrue(Task.objects.filter(title='x' * 200).exists())
+
+
+class TaskPaginationTests(TestCase):
+    """П-18: и списки, и задачи выводятся постранично."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='page_user', password='pass1234')
+        self.client.login(username='page_user', password='pass1234')
+
+    def test_task_lists_pagination(self):
+        for index in range(25):
+            TaskList.objects.create(name=f'List {index}', owner=self.user)
+
+        first = self.client.get(reverse('task_lists'))
+        self.assertEqual(len(first.context['lists']), 20)
+
+        second = self.client.get(reverse('task_lists'), {'page': 2})
+        self.assertEqual(len(second.context['lists']), 5)
+
+    def test_tasks_pagination(self):
+        task_list = TaskList.objects.create(name='Big', owner=self.user)
+        for index in range(35):
+            Task.objects.create(
+                task_list=task_list, title=f'Task {index}', created_by=self.user)
+
+        response = self.client.get(reverse('task_list_detail', args=[task_list.id]))
+        self.assertEqual(len(response.context['tasks']), 30)
+
+
+class CompletedAtTests(TestCase):
+    """П-40: completed_at выставляется и снимается вместе с флагом."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='done_user', password='pass1234')
+        self.client.login(username='done_user', password='pass1234')
+        self.task_list = TaskList.objects.create(name='L', owner=self.user)
+        self.task = Task.objects.create(
+            task_list=self.task_list, title='T', created_by=self.user)
+
+    def _toggle(self):
+        return self.client.post(reverse('task_list_detail', args=[self.task_list.id]), {
+            'action': 'toggle_task', 'task_id': self.task.id,
+        })
+
+    def test_completed_at_set_and_cleared(self):
+        self._toggle()
+        self.task.refresh_from_db()
+        self.assertTrue(self.task.is_done)
+        self.assertIsNotNone(self.task.completed_at)
+
+        self._toggle()
+        self.task.refresh_from_db()
+        self.assertFalse(self.task.is_done)
+        self.assertIsNone(self.task.completed_at)
+
+
+class UnknownActionTests(TestCase):
+    """П-19: неизвестное действие не должно молча ничего не делать."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='action_user', password='pass1234')
+        self.client.login(username='action_user', password='pass1234')
+        self.task_list = TaskList.objects.create(name='L', owner=self.user)
+
+    def test_unknown_action_redirects_without_changes(self):
+        response = self.client.post(reverse('task_list_detail', args=[self.task_list.id]), {
+            'action': 'drop_database',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(TaskList.objects.filter(pk=self.task_list.pk).exists())
 
 
 class TaskViewTests(TestCase):
@@ -51,7 +165,7 @@ class TaskViewTests(TestCase):
 
     def test_task_lists_redirect_anonymous(self):
         response = self.client.get(reverse('task_lists'))
-        self.assertNotEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
 
     def test_task_lists_authenticated(self):
         self.client.login(username='testuser', password='pass1234')

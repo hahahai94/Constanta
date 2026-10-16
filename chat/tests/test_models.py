@@ -56,14 +56,18 @@ class MessageModelTests(TestCase):
         )
         self.assertEqual(reply.reply_to, original)
 
-    def test_soft_delete_message(self):
+    def test_soft_delete_keeps_row_but_hides_it(self):
+        """П-20/П-41: раньше тест выставлял флаг вручную и читал его обратно."""
         msg = Message.objects.create(
             sender=self.sender, receiver=self.receiver,
             content='To be deleted'
         )
         msg.is_deleted = True
-        msg.save()
-        self.assertTrue(Message.objects.get(id=msg.id).is_deleted)
+        msg.save(update_fields=['is_deleted'])
+
+        # строка сохраняется, но выборки её больше не отдают
+        self.assertTrue(Message.objects.filter(id=msg.id).exists())
+        self.assertFalse(Message.objects.filter(id=msg.id, is_deleted=False).exists())
 
 
 class GroupModelTests(TestCase):

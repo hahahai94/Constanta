@@ -34,10 +34,12 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 405)
 
     def test_send_empty_message(self):
+        """П-41: раньше запрос падал на 404 и проверка содержимого не работала."""
         response = self.client.post('/api/send/', {
-            'user_id': '999', 'content': ''
+            'user_id': str(self.other.id), 'content': '',
         })
-        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Message.objects.filter(sender=self.user).exists())
 
     def test_send_message_no_recipient(self):
         response = self.client.post('/api/send/', {'content': 'hello'})

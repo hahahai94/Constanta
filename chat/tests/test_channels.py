@@ -93,11 +93,14 @@ class ChannelViewTests(TestCase):
         self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
 
     def test_join_channel_already_subscribed(self):
+        """П-41: проверяем отсутствие дубликата подписки, а не только редирект."""
         ChannelMember.objects.create(channel=self.channel, user=self.user, role='subscriber')
         self.client.logout()
         self.client.login(username='ch_user', password='123')
         response = self.client.post(reverse('join_channel', args=[self.channel.id]))
         self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+        self.assertEqual(
+            ChannelMember.objects.filter(channel=self.channel, user=self.user).count(), 1)
 
     def test_leave_channel(self):
         ChannelMember.objects.create(channel=self.channel, user=self.user, role='subscriber')

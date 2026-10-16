@@ -16,27 +16,35 @@ name = "constanta"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "coverage" },
     { name = "dj-database-url" },
     { name = "django" },
     { name = "django-cors-headers" },
     { name = "environs" },
+    { name = "gunicorn" },
     { name = "pillow" },
     { name = "psycopg2-binary" },
     { name = "whitenoise" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "coverage" },
+]
+
 [package.metadata]
 requires-dist = [
-    { name = "coverage", specifier = ">=7.14.1" },
     { name = "dj-database-url" },
     { name = "django" },
     { name = "django-cors-headers" },
     { name = "environs" },
+    { name = "gunicorn" },
     { name = "pillow" },
     { name = "psycopg2-binary" },
     { name = "whitenoise", specifier = ">=6.12.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "coverage", specifier = ">=7.14.1" }]
 
 [[package]]
 name = "coverage"
@@ -127,6 +135,15 @@ dependencies = [
 sdist = { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/77/08/2b7d9cacf2b27482c9218ee6762336aa47bdb9d07ee26a136d072a328297/environs-11.2.1.tar.gz", hash = "sha256:e068ae3174cef52ba4b95ead22e639056a02465f616e62323e04ae08e86a75a4", size = 27485, upload-time = "2024-11-20T17:38:40.795Z" }
 wheels = [
     { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/1a/21/1e0d8de234e9d0c675ea8fd50f9e7ad66fae32c207bc982f1d14f7c0835b/environs-11.2.1-py3-none-any.whl", hash = "sha256:9d2080cf25807a26fc0d4301e2d7b62c64fbf547540f21e3a30cc02bc5fbe948", size = 12923, upload-time = "2024-11-20T17:38:39.013Z" },
+]
+
+[[package]]
+name = "gunicorn"
+version = "26.2.0"
+source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }
+sdist = { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/d9/8a/e4ef6ee11701b6cd64702848415ffb69eeff85cb388a3c6c7fe86f22f3f8/gunicorn-26.2.0.tar.gz", hash = "sha256:62b864895d9ebff0b2f9867ba04fe811c93121596540830c9c916d0769668447", size = 787921, upload-time = "2026-08-24T15:05:59.3Z" }
+wheels = [
+    { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/fe/85/7522a52e5e2f42faf1a129113ab63e548c42e103e9af395b7bfe65e403e2/gunicorn-26.2.0-py3-none-any.whl", hash = "sha256:bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3", size = 228389, upload-time = "2026-08-24T15:05:57.67Z" },
 ]
 
 [[package]]

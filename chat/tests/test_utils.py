@@ -61,33 +61,33 @@ class UtilsMentionTests(TestCase):
         self.sender = User.objects.create_user(username='sender_user', password='123')
 
     def test_parse_no_mentions(self):
-        text, ids = parse_mentions('Hello world')
-        self.assertEqual(ids, [])
+        self.assertEqual(parse_mentions('Hello world'), [])
 
     def test_parse_mention_user(self):
-        text, ids = parse_mentions(f'Hey @{self.user.username}')
-        self.assertIn(self.user.id, ids)
+        self.assertIn(self.user.id, parse_mentions(f'Hey @{self.user.username}'))
 
     def test_parse_mention_all_in_group(self):
         group = Group.objects.create(name='Test Group', owner=self.sender)
         GroupMember.objects.create(group=group, user=self.user, role='member')
-        text, ids = parse_mentions('@all', group=group)
-        self.assertIn(self.user.id, ids)
-        self.assertIn('mention-all', text)
+        self.assertIn(self.user.id, parse_mentions('@all', group=group))
 
     def test_parse_mention_all_no_group(self):
-        text, ids = parse_mentions('@all')
-        self.assertEqual(ids, [])
+        self.assertEqual(parse_mentions('@all'), [])
 
     def test_parse_mention_all_in_group_multiple_members(self):
         group = Group.objects.create(name='G2', owner=self.sender)
         u2 = User.objects.create_user(username='another_user', password='123')
         GroupMember.objects.create(group=group, user=self.user, role='member')
         GroupMember.objects.create(group=group, user=u2, role='member')
-        text, ids = parse_mentions('@all check', group=group)
+        ids = parse_mentions('@all check', group=group)
         self.assertIn(self.user.id, ids)
         self.assertIn(u2.id, ids)
         self.assertEqual(len(ids), 2)
+
+    def test_parse_mentions_returns_plain_ids(self):
+        """П-16: функция отдаёт id, а не разметку — HTML собирался и выбрасывался."""
+        ids = parse_mentions(f'@{self.user.username}')
+        self.assertTrue(all(isinstance(value, int) for value in ids))
 
 class UtilsNotificationTests(TransactionTestCase):
     def setUp(self):

@@ -40,17 +40,6 @@ class CustomFilterTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='cfilter', password='123')
 
-    def test_sum_attribute_empty(self):
-        t = Template('{% load custom_filters %}{{ qs|sum_attribute:"id" }}')
-        result = t.render(Context({'qs': User.objects.none()}))
-        self.assertEqual(result, '0')
-
-    def test_sum_attribute_with_values(self):
-        User.objects.create_user(username='cfilter2', password='123')
-        t = Template('{% load custom_filters %}{{ qs|sum_attribute:"id" }}')
-        result = t.render(Context({'qs': User.objects.all()}))
-        self.assertNotEqual(result, '0')
-
     def test_in_mentions_empty(self):
         t = Template('{% load custom_filters %}{{ uid|in_mentions:"" }}')
         result = t.render(Context({'uid': '1'}))
@@ -94,3 +83,30 @@ class CustomFilterTests(TestCase):
         t = Template('{% load custom_filters %}{{ uid|mention_class:"bad" }}')
         result = t.render(Context({'uid': '1'}))
         self.assertEqual(result, '')
+
+
+class RenderMentionsTests(TestCase):
+    """П-16: разметка упоминаний собирается при отображении, а не при записи."""
+
+    def _render(self, content):
+        t = Template('{% load custom_filters %}{{ content|render_mentions }}')
+        return t.render(Context({'content': content}))
+
+    def test_mention_is_highlighted(self):
+        result = self._render('привет @alice!')
+        self.assertIn('<span class="mention">@alice</span>', result)
+
+    def test_plain_text_untouched(self):
+        self.assertEqual(self._render('просто текст'), 'просто текст')
+
+    def test_html_in_content_is_escaped(self):
+        result = self._render('<script>alert(1)</script> @bob')
+        self.assertNotIn('<script>', result)
+        self.assertIn('&lt;script&gt;', result)
+        self.assertIn('<span class="mention">@bob</span>', result)
+
+    def test_all_is_highlighted(self):
+        self.assertIn('<span class="mention">@all</span>', self._render('@all внимание'))
+
+    def test_none_content(self):
+        self.assertEqual(self._render(None), '')

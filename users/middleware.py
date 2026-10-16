@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model, logout
+from django.core.cache import cache
 from django.http import HttpResponseForbidden
 from django.conf import settings
 from django.shortcuts import render
@@ -54,8 +55,26 @@ class BannedUserMiddleware:
 
 
 class IPBanMiddleware:
+    """Блокирует запросы с забаненных адресов.
+
+    Список банов кешируется: раньше проверка выполняла запрос в базу на
+    каждом запросе, включая статику (problems.md, П-32). Кеш сбрасывается
+    сигналами при изменении `BannedIP`, поэтому бан действует сразу.
+    """
+
+    CACHE_KEY = 'banned_ips'
+    CACHE_TTL = 300
+
     def __init__(self, get_response):
         self.get_response = get_response
+
+    @classmethod
+    def banned_ips(cls):
+        ips = cache.get(cls.CACHE_KEY)
+        if ips is None:
+            ips = set(BannedIP.objects.values_list('ip_address', flat=True))
+            cache.set(cls.CACHE_KEY, ips, cls.CACHE_TTL)
+        return ips
 
     def __call__(self, request):
         ip = get_client_ip(request)
@@ -63,7 +82,7 @@ class IPBanMiddleware:
         if settings.DEBUG and ip in ['127.0.0.1', '::1', '0.0.0.0']:
             return self.get_response(request)
 
-        if ip and BannedIP.objects.filter(ip_address=ip).exists():
+        if ip and ip in self.banned_ips():
             return HttpResponseForbidden(
                 "<h1>Доступ запрещён</h1>"
                 "<p>Ваш IP-адрес заблокирован администрацией Constanta.</p>"

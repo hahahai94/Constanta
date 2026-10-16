@@ -73,6 +73,7 @@ def change_password(request):
     return render(request, 'change_password.html', {'form': form})
 
 
+@login_required
 def password_done(request):
     return render(request, 'password_done.html')
 

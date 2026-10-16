@@ -1,8 +1,10 @@
 import uuid
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models
+from django.db.models.signals import post_delete, post_save
 from django.contrib.auth.models import AbstractUser
-from django.conf import settings
+from django.dispatch import receiver
 from django.utils import timezone
 from datetime import timedelta
 
@@ -137,3 +139,10 @@ class BannedIP(models.Model):
 
     def __str__(self):
         return f"IP: {self.ip_address}"
+
+
+@receiver([post_save, post_delete], sender=BannedIP)
+def _invalidate_banned_ip_cache(sender, **kwargs):
+    """Сбрасывает кеш списка банов, чтобы бан действовал сразу (П-32)."""
+    from users.middleware import IPBanMiddleware
+    cache.delete(IPBanMiddleware.CACHE_KEY)

@@ -371,8 +371,21 @@ fileUpload.addEventListener('change', function() {
         const sizeKB = (file.size / 1024).toFixed(1);
         const tag = document.createElement('div');
         tag.className = 'file-tag mb-2';
-        tag.innerHTML = `📎 <span style="margin: 0 5px;">${file.name}</span> <small>(${sizeKB} КБ)</small>
-                         <button type="button" onclick="this.parentElement.remove(); document.getElementById('file-upload').value='';">×</button>`;
+        // Имя файла подставляется через textContent: в шаблонной строке с
+        // innerHTML оно исполнялось бы как разметка (problems.md, П-36).
+        const nameSpan = document.createElement('span');
+        nameSpan.style.margin = '0 5px';
+        nameSpan.textContent = file.name;
+        const sizeSpan = document.createElement('small');
+        sizeSpan.textContent = `(${sizeKB} КБ)`;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', function() {
+            tag.remove();
+            document.getElementById('file-upload').value = '';
+        });
+        tag.append('📎 ', nameSpan, ' ', sizeSpan, ' ', removeBtn);
         fileTagContainer.appendChild(tag);
     }
 });
@@ -410,6 +423,23 @@ document.getElementById('messages-container')?.addEventListener('click', functio
     const btn = e.target.closest('.reply-btn');
     if (!btn) return;
     window.startReply(btn.dataset.replyId, btn.dataset.replyAuthor, btn.dataset.replyText || '');
+});
+
+// Удаление своего сообщения (problems.md, П-20): мягкое удаление на сервере,
+// из разметки убираем после успешного ответа.
+document.getElementById('messages-container')?.addEventListener('click', function(e) {
+    const btn = e.target.closest('.delete-btn');
+    if (!btn) return;
+    if (!confirm('Удалить сообщение?')) return;
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    fetch('/api/message/' + btn.dataset.deleteId + '/delete/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': meta ? meta.content : '', 'X-Requested-With': 'XMLHttpRequest'}
+    }).then(function(response) {
+        if (!response.ok) return;
+        const container = btn.closest('[data-message-id]');
+        if (container) container.remove();
+    }).catch(function() {});
 });
 
 // ===== 4. ОТПРАВКА СООБЩЕНИЙ =====

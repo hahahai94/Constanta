@@ -31,7 +31,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'chat.apps.ChatConfig',
     'users.apps.UsersConfig',
-    'tasks',
+    'tasks.apps.TasksConfig',
 ]
 
 MIDDLEWARE = [
@@ -61,12 +61,17 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'users.context_processors.notifications',
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = 'Constanta.wsgi.application'
+
+# Прогон тестов пишет загруженные файлы во временный каталог, а не в media/
+# проекта (problems.md, П-14).
+TEST_RUNNER = 'Constanta.test_runner.IsolatedMediaRunner'
 
 DATABASES = {
     'default': env.dj_db_url('DATABASE_URL', default='sqlite:///db.sqlite3')
@@ -185,14 +190,26 @@ SECURE_REFERRER_POLICY = 'same-origin'
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 CORS_ALLOW_CREDENTIALS = True
 
-if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Настройки безопасности вынесены в переменные окружения с безопасными
+# значениями по умолчанию. Раньше они включались только по `not DEBUG`, из-за
+# чего прод-окружение, унаследовавшее dev-`.env`, оставалось без защиты
+# (problems.md, П-26), а жёсткий `SECURE_SSL_REDIRECT` давал цикл редиректов
+# за прокси без `X-Forwarded-Proto` (problems.md, П-27).
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=not DEBUG)
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=not DEBUG)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0 if DEBUG else 31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
+    'SECURE_HSTS_INCLUDE_SUBDOMAINS', default=not DEBUG)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)
+
+# Доверять `X-Forwarded-Proto` можно только когда прокси его действительно
+# проставляет. Иначе Django не видит HTTPS и `SECURE_SSL_REDIRECT` зацикливается:
+# выключите либо редирект, либо эту опцию.
+USE_X_FORWARDED_PROTO = env.bool('USE_X_FORWARDED_PROTO', default=not DEBUG)
+SECURE_PROXY_SSL_HEADER = (
+    ('HTTP_X_FORWARDED_PROTO', 'https') if USE_X_FORWARDED_PROTO else None
+)
 
 MAX_GROUPS_PER_USER = env.int('MAX_GROUPS_PER_USER', default=50)
 MAX_CHANNELS_PER_USER = env.int('MAX_CHANNELS_PER_USER', default=50)

@@ -116,6 +116,7 @@ def send_message(request):
             elif group_id and reply_msg.group_id is not None and str(reply_msg.group_id) != group_id:
                 reply_msg = None
 
+    receiver = None
     try:
         if user_id:
             receiver = get_object_or_404(User, id=user_id)
@@ -150,11 +151,14 @@ def send_message(request):
 
         if content:
             try:
-                parsed_content, mentioned_users = parse_mentions(content, group=msg.group)
-                if mentioned_users:
-                    msg.mentions = json.dumps(mentioned_users)
+                mentioned_ids = parse_mentions(content, group=msg.group)
+                if mentioned_ids:
+                    msg.mentions = json.dumps(mentioned_ids)
                     msg.save(update_fields=['mentions'])
-                    for mentioned_user in mentioned_users:
+                    # один запрос вместо обращения к базе на каждое упоминание
+                    recipients = User.objects.filter(
+                        id__in=mentioned_ids).exclude(pk=request.user.pk)
+                    for mentioned_user in recipients:
                         create_notification(
                             user=mentioned_user,
                             notification_type='mention',
@@ -165,6 +169,17 @@ def send_message(request):
                         )
             except Exception:
                 logger.exception('Failed to process mentions for message %s', msg.id)
+
+        if receiver is not None:
+            # уведомления о личных сообщениях не создавались вообще (П-29)
+            create_notification(
+                user=receiver,
+                notification_type='message',
+                title='Новое сообщение',
+                message=f'{request.user.username}: {content[:50] or "вложение"}',
+                url=f'/?user_id={request.user.id}',
+                related_message=msg,
+            )
 
         from django.template.loader import render_to_string
         html = render_to_string(template_name, {
@@ -343,7 +358,12 @@ def api_remove_member(request):
 
 
 def _user_can_access_message(msg, user):
-    """Доступ к вложению: отправитель/получатель, участник группы или подписчик канала."""
+    """Доступ к вложению: отправитель/получатель, участник группы или подписчик канала.
+
+    Удалённое сообщение недоступно никому, включая отправителя (П-20).
+    """
+    if msg.is_deleted:
+        return False
     if msg.sender_id == user.id or msg.receiver_id == user.id:
         return True
     if msg.group_id and GroupMember.objects.filter(group_id=msg.group_id, user=user).exists():
@@ -351,6 +371,30 @@ def _user_can_access_message(msg, user):
     if msg.channel_id and ChannelMember.objects.filter(channel_id=msg.channel_id, user=user).exists():
         return True
     return False
+
+
+@login_required
+@rate_limit('api_delete_message', limit=30, period=60)
+def delete_message(request, message_id):
+    """Мягкое удаление сообщения его отправителем.
+
+    Поле `is_deleted` существовало с самого начала, но не выставлялось нигде,
+    а в выборках уже стояли фильтры — то есть удаление сообщений отсутствовало
+    как функция (problems.md, П-20).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Только POST'}, status=405)
+
+    msg = get_object_or_404(Message, id=message_id, is_deleted=False)
+    if msg.sender_id != request.user.id:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Можно удалять только свои сообщения'},
+            status=403,
+        )
+
+    msg.is_deleted = True
+    msg.save(update_fields=['is_deleted', 'updated_at'])
+    return JsonResponse({'status': 'ok'})
 
 
 @login_required
@@ -416,21 +460,21 @@ def api_channel_post(request, channel_id):
         )
         if content:
             try:
-                parsed_content, mentioned_users = parse_mentions(content, group=None)
-                if mentioned_users:
-                    msg.mentions = json.dumps(mentioned_users)
+                mentioned_ids = parse_mentions(content, group=None)
+                if mentioned_ids:
+                    msg.mentions = json.dumps(mentioned_ids)
                     msg.save(update_fields=['mentions'])
-                    for uid in mentioned_users:
-                        mentioned_user = User.objects.filter(id=uid).first()
-                        if mentioned_user:
-                            create_notification(
-                                user=mentioned_user,
-                                notification_type='mention',
-                                title='Упоминание в канале',
-                                message=f'{request.user.username} упомянул вас в канале: {content[:50]}',
-                                url=f'/channel/{channel_id}/',
-                                related_message=msg,
-                            )
+                    recipients = User.objects.filter(
+                        id__in=mentioned_ids).exclude(pk=request.user.pk)
+                    for mentioned_user in recipients:
+                        create_notification(
+                            user=mentioned_user,
+                            notification_type='mention',
+                            title='Упоминание в канале',
+                            message=f'{request.user.username} упомянул вас в канале: {content[:50]}',
+                            url=f'/channel/{channel_id}/',
+                            related_message=msg,
+                        )
             except Exception:
                 logger.exception('Failed to process mentions for channel post')
         return JsonResponse({'status': 'ok', 'cursor': msg.created_at.isoformat()})
@@ -480,7 +524,8 @@ def api_poll(request):
             return JsonResponse({'status': 'error', 'message': 'Неверный user_id'}, status=400)
         peer = get_object_or_404(User, id=user_id)
         messages_qs = Message.objects.filter(
-            Q(sender=user, receiver=peer) | Q(sender=peer, receiver=user)
+            Q(sender=user, receiver=peer) | Q(sender=peer, receiver=user),
+            is_deleted=False,
         ).order_by('created_at')
         template_name = 'parts/message_list.html'
 

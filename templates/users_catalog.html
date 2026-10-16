@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load status_tags %}
 
 {% block extra_css %}
 <style>
@@ -116,6 +117,7 @@
                             <div class="user-name">{{ user.get_display_name|default:user.username }}</div>
                             <div class="user-username">@{{ user.username }}</div>
                         </a>
+                        <div class="mt-1">{{ user|user_status }}</div>
                         <a href="{% url 'main' %}?user_id={{ user.id }}" class="btn-write">
                             <i class="bi bi-chat-left-fill"></i> Написать
                         </a>

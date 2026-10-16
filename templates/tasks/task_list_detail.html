@@ -146,6 +146,7 @@
         </div>
         {% endfor %}
     </div>
+    {% include 'parts/pagination.html' with page_obj=tasks %}
     {% else %}
     <div class="text-center py-5 text-muted">
         <i class="bi bi-check2-square" style="font-size: 4rem; opacity: 0.3;"></i>

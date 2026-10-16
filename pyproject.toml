@@ -8,12 +8,47 @@ dependencies = [
     "django",
     "django-cors-headers",
     "environs",
+    "gunicorn",
     "psycopg2-binary",
     "pillow",
     "whitenoise>=6.12.0",
+]
+
+[dependency-groups]
+dev = [
     "coverage>=7.14.1",
 ]
 
+# ВНИМАНИЕ: по умолчанию используется зеркало Tsinghua. Это осознанный
+# компромисс ради доступности установки в текущей сети (обращение к
+# pypi.org отсюда не проходит, из-за чего `uv lock` падает).
+# Если сеть позволяет, верните официальный индекс:
+#   UV_DEFAULT_INDEX=https://pypi.org/simple uv lock && uv sync
+# и удалите блок ниже.
 [[tool.uv.index]]
 url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
 default = true
+
+# Конфигурация покрытия. Раньше её не было вовсе: отчёт собирался без
+# `source`, без ветвлений и устаревал (problems.md, П-15).
+[tool.coverage.run]
+branch = true
+source = ["chat", "users", "tasks", "Constanta"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/tests.py",
+    "*/tests_*.py",
+    "manage.py",
+    "Constanta/asgi.py",
+    "Constanta/wsgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

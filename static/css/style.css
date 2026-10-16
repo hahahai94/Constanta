@@ -402,3 +402,34 @@ body {
 }
 
 @media (min-width: 769px) { .mobile-menu-btn, .sidebar-overlay { display: none !important; } }
+/* ===== Упоминания (problems.md, П-16, П-17) ===== */
+.mention {
+    background: rgba(102, 126, 234, 0.15);
+    color: #4c5bd4;
+    border-radius: 4px;
+    padding: 0 3px;
+    font-weight: 600;
+}
+.message-bubble.mentioned {
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.85);
+}
+.mention-badge {
+    font-size: 0.85rem;
+    margin-right: 2px;
+}
+.notification-unread {
+    background: rgba(102, 126, 234, 0.08);
+}
+
+/* ===== Удаление сообщений (problems.md, П-20) ===== */
+.delete-btn {
+    float: right;
+    background: transparent;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: opacity 0.15s;
+}
+.message-bubble:hover .delete-btn { opacity: 0.6; }
+.delete-btn:hover { opacity: 1 !important; }

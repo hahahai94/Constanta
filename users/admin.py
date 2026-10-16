@@ -3,23 +3,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils import timezone
 from django.utils.html import format_html
-from django.http import HttpResponse
+from Constanta.csv_export import export_to_csv
 from users.audit import log_admin_action
 from users.models import BannedIP, AdminLog, Notification
-import csv
 
 User = get_user_model()
-
-
-def export_to_csv(modeladmin, request, queryset, filename, fields, headers):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
-    writer = csv.writer(response)
-    writer.writerow(headers)
-    for obj in queryset:
-        row = [getattr(obj, field, '') for field in fields]
-        writer.writerow(row)
-    return response
 
 
 @admin.register(User)

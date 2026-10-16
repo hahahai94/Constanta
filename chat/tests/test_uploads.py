@@ -2,6 +2,7 @@
 
 import io
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -40,6 +41,31 @@ def make_webp_bytes():
     buffer = io.BytesIO()
     Image.new('RGB', (2, 2), (0, 255, 0)).save(buffer, format='WEBP')
     return buffer.getvalue()
+
+
+class MediaIsolationTests(TestCase):
+    """П-14: тесты не должны писать в реальный `media/` проекта."""
+
+    def test_media_root_points_to_a_temporary_directory(self):
+        self.assertIn('constanta-test-media-', str(settings.MEDIA_ROOT))
+        self.assertNotEqual(
+            str(settings.MEDIA_ROOT), str(settings.BASE_DIR / 'media'))
+
+    def test_upload_lands_outside_the_project(self):
+        user = User.objects.create_user(username='media_user', password='123')
+        other = User.objects.create_user(username='media_other', password='456')
+        self.client.login(username='media_user', password='123')
+
+        response = self.client.post('/api/send/', {
+            'user_id': other.id,
+            'content': 'файл',
+            'attachment': fake_upload('note.txt', b'hello', 'text/plain'),
+        })
+        self.assertEqual(response.status_code, 200)
+
+        message = Message.objects.get(sender=user, receiver=other)
+        self.assertIn('constanta-test-media-', message.attachment.path)
+        self.assertNotIn(str(settings.BASE_DIR / 'media'), message.attachment.path)
 
 
 class DetectAttachmentTypeTests(TestCase):

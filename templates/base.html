@@ -7,6 +7,9 @@
     <meta name="description" content="Constanta Messenger — современный мессенджер с групповыми чатами и задачами">
     <meta name="keywords" content="мессенджер, чат, групповые чаты, Constanta">
     <meta name="theme-color" content="#667eea">
+    {# Токен доступен всегда, а не только на страницах с формой: иначе
+       фоновый heartbeat уходил без CSRF и молча получал 403 (П-38). #}
+    <meta name="csrf-token" content="{{ csrf_token }}">
 
     <meta property="og:title" content="{% block og_title %}Constanta Messenger{% endblock %}">
     <meta property="og:description" content="{% block og_description %}Современный мессенджер с групповыми чатами и задачами{% endblock %}">
@@ -61,6 +64,16 @@
                 </li>
                 <li class="nav-item me-1">
                      <a class="nav-link" href="{% url 'profile' %}">👤 Профиль</a>
+                </li>
+                <li class="nav-item me-1">
+                    <a class="nav-link position-relative" href="{% url 'notifications' %}" title="Уведомления">
+                        🔔
+                        {% if unread_notifications_count %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            {{ unread_notifications_count }}
+                        </span>
+                        {% endif %}
+                    </a>
                 </li>
                 <li class="nav-item">
                     <form method="post" action="{% url 'logout' %}" class="d-inline">

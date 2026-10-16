@@ -17,11 +17,17 @@ class TaskList(models.Model):
     def __str__(self):
         return self.name
 
+    # Счётчики читаются из аннотаций, если они есть: иначе на каждую строку
+    # списка приходило несколько COUNT-запросов (problems.md, П-18).
+    @property
     def task_count(self):
-        return self.tasks.count()
+        annotated = getattr(self, '_task_count', None)
+        return self.tasks.count() if annotated is None else annotated
 
+    @property
     def done_count(self):
-        return self.tasks.filter(is_done=True).count()
+        annotated = getattr(self, '_done_count', None)
+        return self.tasks.filter(is_done=True).count() if annotated is None else annotated
 
 
 class Task(models.Model):
@@ -30,7 +36,6 @@ class Task(models.Model):
     description = models.TextField(blank=True, default='', verbose_name="Описание")
     is_done = models.BooleanField(default=False, verbose_name="Выполнена")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='created_tasks', on_delete=models.CASCADE, verbose_name="Создал")
-    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='assigned_tasks', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Назначена")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создана")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлена")
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Выполнена")
