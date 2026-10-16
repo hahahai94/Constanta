@@ -11,6 +11,23 @@
     --text-muted: #6b7280;
     --message-own: #667eea;
     --navbar-height: 56px;
+
+    /* Дополнено на этапе унификации: раньше эти цвета были захардкожены
+       в правилах ниже и в инлайновых стилях шаблонов. */
+    --success: #2f9e6e;
+    --danger: #d9534f;
+    --warning: #d9873a;
+    --info: #3d8fd4;
+    --surface-muted: #fafbfc;
+    --surface-hover: #f8f9fa;
+    --chat-bg: #f5f7fa;
+    --text-on-accent: #ffffff;
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-pill: 20px;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --sidebar-width: 320px;
 }
 
 body {
@@ -95,20 +112,30 @@ body {
 .grad-orange { background: #d9873a !important; }
 
 /* ===== Чат ===== */
-.chat-page body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+/* Мёртвый селектор `.chat-page body` убран: класса `chat-page` не было ни в
+   одном шаблоне. Высоту задаёт `.chat-wrapper`. */
 
 .chat-wrapper {
     display: flex;
-    height: calc(100vh - var(--navbar-height)) !important;
+    /* dvh, а не vh: на мобильных адресная строка меняет высоту, и поле ввода
+       уезжало за край экрана. */
+    height: calc(100dvh - var(--navbar-height));
     overflow: hidden;
 }
 
+@supports not (height: 100dvh) {
+    .chat-wrapper { height: calc(100vh - var(--navbar-height)); }
+}
+
 .sidebar {
-    width: 320px;
-    background: #fff;
-    overflow-y: auto;
-    flex-shrink: 0;
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    background: var(--surface);
     border-right: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
@@ -308,16 +335,8 @@ body {
     background: var(--accent-dark);
 }
 
-/* ===== Боковая панель (groups) ===== */
-.chat-sidebar {
-    width: 320px;
-    min-width: 320px;
-    background: #fff;
-    border-right: 1px solid var(--border);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
+/* Дубликат `.chat-sidebar` удалён: обе панели (личные чаты и группы)
+   используют общий класс `.sidebar` выше. */
 
 /* ===== Карточки пользователей ===== */
 .user-card {
@@ -389,19 +408,61 @@ body {
 .alert-container { max-width: 600px; margin: 0 auto 16px; }
 
 /* ===== Адаптив ===== */
-@media (max-width: 768px) {
-    .sidebar {
-        position: fixed; left: 0; top: 0; height: 100vh;
-        width: 100%; max-width: 320px; z-index: 1000;
-        transform: translateX(-100%); transition: transform 0.3s ease;
-    }
-    .sidebar.show { transform: translateX(0); }
-    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; }
-    .sidebar-overlay.show { display: block; }
-    .message-bubble { max-width: 85%; }
+.mobile-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
 }
 
-@media (min-width: 769px) { .mobile-menu-btn, .sidebar-overlay { display: none !important; } }
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        /* под шапкой, иначе панель перекрывает навигацию */
+        top: var(--navbar-height);
+        height: calc(100dvh - var(--navbar-height));
+        width: 100%;
+        max-width: var(--sidebar-width);
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+    }
+    .sidebar.show { transform: translateX(0); }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: var(--navbar-height);
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+    .sidebar-overlay.show { display: block; }
+
+    .mobile-menu-btn { display: inline-flex; }
+
+    .message-bubble { max-width: 85%; }
+
+    /* Кнопки сообщения видны только по наведению, а на тач-устройствах
+       наведения нет — показываем их постоянно. */
+    .reply-btn,
+    .delete-btn { opacity: 0.55; }
+}
+
+@media (min-width: 769px) {
+    .sidebar-overlay { display: none !important; }
+}
 /* ===== Упоминания (problems.md, П-16, П-17) ===== */
 .mention {
     background: rgba(102, 126, 234, 0.15);

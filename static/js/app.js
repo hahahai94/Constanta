@@ -24,6 +24,36 @@
     heartbeat();
     setInterval(heartbeat, 60000);
 
+    // ===== Выдвижная панель на мобильных =====
+    // Разметка есть только на страницах чатов, поэтому всё под проверками.
+    var sidebar = document.getElementById('chat-sidebar') || document.querySelector('.sidebar');
+    var sidebarOverlay = document.getElementById('sidebar-overlay');
+    var sidebarToggle = document.getElementById('mobile-menu-btn');
+
+    function setSidebar(open) {
+        if (!sidebar) return;
+        sidebar.classList.toggle('show', open);
+        if (sidebarOverlay) sidebarOverlay.classList.toggle('show', open);
+        if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function(event) {
+            event.stopPropagation();
+            setSidebar(!sidebar.classList.contains('show'));
+        });
+    }
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', function() { setSidebar(false); });
+    }
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') setSidebar(false);
+    });
+    // при переходе к широкому экрану панель должна вернуться в обычное состояние
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) setSidebar(false);
+    });
+
     // ===== Просмотр изображения в полный экран =====
     var viewer = document.getElementById('image-viewer');
     var viewerImg = document.getElementById('image-viewer-img');

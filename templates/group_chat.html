@@ -2,106 +2,13 @@
 {% load static %}
 
 {% block extra_css %}
-<style>
-    .chat-sidebar {
-        width: 320px;
-        min-width: 320px;
-        background: white;
-        border-right: 1px solid #e0e0e0;
-        display: flex;
-        flex-direction: column;
-    }
-    .chat-main {
-        flex: 1;
-        background: #f5f7fa;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .message-bubble { position: relative; }
-
-    .participant-item { transition: all 0.2s; border-bottom: 1px solid #f0f0f0; }
-    .participant-item:hover { background: #f8f9fa; }
-
-    .modal-header-gradient {
-        background: var(--accent);
-        color: white;
-    }
-
-    .avatar-upload-wrapper { position: relative; display: inline-block; }
-    .avatar-upload-overlay {
-        position: absolute;
-        bottom: 5px;
-        right: 5px;
-        background: rgba(102, 126, 234, 0.95);
-        color: white;
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: 3px solid white;
-    }
-    .avatar-upload-overlay:hover {
-        background: var(--accent-dark);
-        transform: scale(1.1);
-    }
-
-    .reply-btn {
-        position: absolute; top: 8px; right: 8px;
-        background: rgba(255,255,255,0.2); border: none; border-radius: 50%;
-        width: 28px; height: 28px; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        opacity: 0; transition: opacity 0.2s; font-size: 14px;
-    }
-    .message-bubble:hover .reply-btn { opacity: 1; }
-    .reply-btn:hover { background: rgba(255,255,255,0.4); }
-
-    .reply-quote {
-        background: rgba(0,0,0,0.05); border-left: 3px solid #667eea;
-        padding: 6px 10px; margin-bottom: 8px; border-radius: 6px;
-        cursor: pointer; font-size: 0.85rem;
-    }
-    .message-own .reply-quote {
-        background: rgba(255,255,255,0.15); border-left-color: rgba(255,255,255,0.8);
-    }
-    .reply-quote-author { font-weight: 600; color: #667eea; display: block; margin-bottom: 2px; }
-    .message-own .reply-quote-author { color: rgba(255,255,255,0.9); }
-    .reply-quote-text { color: #666; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
-    .message-own .reply-quote-text { color: rgba(255,255,255,0.8); }
-
-    .reply-panel { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 10px 15px; display: none; }
-    .reply-panel.active { display: block; }
-    .reply-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-    .reply-panel-author { font-weight: 600; color: #667eea; }
-    .reply-panel-text { color: #666; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .file-tag button { background: none; border: none; color: #0d6efd; cursor: pointer; margin-left: 6px; padding: 0; font-size: 1rem; }
-
-    #emoji-picker {
-        display: none;
-        grid-template-columns: repeat(8, 1fr);
-        gap: 4px;
-        padding: 12px;
-        max-height: 280px;
-        overflow-y: auto;
-        position: absolute;
-        bottom: 70px;
-        left: 20px;
-        width: 320px;
-        z-index: 1050;
-    }
-    #emoji-picker.active { display: grid; }
-</style>
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
 {% endblock %}
 
 {% block content %}
 
-<div class="d-flex" style="height: calc(100vh - 56px);">
-    <div class="chat-sidebar">
+<div class="chat-wrapper">
+    <div class="sidebar" id="chat-sidebar">
         <div class="p-3 border-bottom">
             <a href="{% url 'profile' %}" class="btn-grad grad-purple w-100 mb-2 rounded-pill" style="padding: 8px 15px; font-size: 14px;">
                 <i class="bi bi-person me-2"></i>Профиль
@@ -169,8 +76,13 @@
         {% endif %}
     </div>
 
+    <!-- Затемнение под выдвижной панелью (только мобильные) -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     <div class="chat-main">
         <div class="bg-white border-bottom p-3 d-flex align-items-center shadow-sm">
+            <button type="button" class="mobile-menu-btn me-2" id="mobile-menu-btn"
+                    aria-label="О группе" aria-controls="chat-sidebar" aria-expanded="false">☰</button>
             <img src="{{ group.get_avatar_url }}"
                  class="rounded-circle me-3 shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
             <div>

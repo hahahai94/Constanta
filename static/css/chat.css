@@ -1,0 +1,177 @@
+/* Стили страниц чата (личного и группового).
+ *
+ * Раньше эти правила лежали в инлайновых <style> внутри index.html и
+ * group_chat.html, причём большая часть дублировалась дословно. Теперь это
+ * один файл, который подключают обе страницы.
+ */
+
+/* Страница чата не должна прокручиваться целиком — прокрутка живёт внутри
+   области сообщений. */
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+/* ===== Область чата ===== */
+.chat-main {
+    flex: 1;
+    background: var(--chat-bg);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.message-bubble { position: relative; }
+
+/* ===== Кнопка ответа ===== */
+.reply-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 14px;
+    color: inherit;
+}
+
+.message-bubble:hover .reply-btn { opacity: 1; }
+.reply-btn:hover { background: rgba(255, 255, 255, 0.4); }
+
+/* ===== Цитата в сообщении ===== */
+.reply-quote {
+    background: rgba(0, 0, 0, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.message-own .reply-quote {
+    background: rgba(255, 255, 255, 0.15);
+    border-left-color: rgba(255, 255, 255, 0.8);
+}
+
+.reply-quote-author {
+    font-weight: 600;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.message-own .reply-quote-author { color: rgba(255, 255, 255, 0.9); }
+
+.reply-quote-text {
+    color: var(--text-muted);
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.message-own .reply-quote-text { color: rgba(255, 255, 255, 0.8); }
+
+/* ===== Панель ответа над полем ввода ===== */
+.reply-panel {
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 15px;
+    display: none;
+}
+
+.reply-panel.active { display: block; }
+
+.reply-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.reply-panel-author { font-weight: 600; color: var(--accent); }
+
+.reply-panel-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== Плашка прикреплённого файла ===== */
+.file-tag button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    margin-left: 6px;
+    padding: 0;
+    font-size: 1rem;
+}
+
+/* ===== Выбор эмодзи ===== */
+#emoji-picker {
+    display: none;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    padding: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+    position: absolute;
+    bottom: 70px;
+    left: 20px;
+    width: 320px;
+    z-index: 1050;
+}
+
+#emoji-picker.active { display: grid; }
+
+/* ===== Участники группы ===== */
+.participant-item {
+    transition: all 0.2s;
+    border-bottom: 1px solid var(--border);
+}
+
+.participant-item:hover { background: var(--surface-hover); }
+
+/* ===== Загрузка аватара группы ===== */
+.avatar-upload-wrapper { position: relative; display: inline-block; }
+
+.avatar-upload-overlay {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(102, 126, 234, 0.95);
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 3px solid white;
+}
+
+.avatar-upload-overlay:hover {
+    background: var(--accent-dark);
+    transform: scale(1.1);
+}
+
+.modal-header-gradient {
+    background: var(--accent);
+    color: white;
+}

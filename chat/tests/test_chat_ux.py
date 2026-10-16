@@ -7,7 +7,9 @@
 """
 
 import json
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
@@ -89,6 +91,49 @@ class WholeConversationTests(TestCase):
 
         response = self.client.get(reverse('main'), {'user_id': self.peer.id})
         self.assertContains(response, '📷 Фото')
+
+
+class MobileLayoutTests(TestCase):
+    """Мобильная вёрстка: панель уезжает в выдвижной ящик.
+
+    В `style.css` правила для неё были написаны с самого начала, но шаблоны
+    использовали свои классы и жёсткую ширину, поэтому на телефоне чатом было
+    пользоваться нельзя.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='mobile_user', password='123')
+        self.peer = User.objects.create_user(username='mobile_peer', password='456')
+        self.client.login(username='mobile_user', password='123')
+
+    def test_private_chat_has_drawer_markup(self):
+        response = self.client.get(reverse('main'), {'user_id': self.peer.id})
+        self.assertContains(response, 'class="sidebar"')
+        self.assertContains(response, 'id="sidebar-overlay"')
+        self.assertContains(response, 'id="mobile-menu-btn"')
+        self.assertContains(response, 'class="chat-wrapper"')
+
+    def test_group_chat_has_drawer_markup(self):
+        group = Group.objects.create(name='MobileGroup', owner=self.user)
+        GroupMember.objects.create(group=group, user=self.user, role='owner')
+
+        response = self.client.get(reverse('group_chat', args=[group.id]))
+        self.assertContains(response, 'class="sidebar"')
+        self.assertContains(response, 'id="sidebar-overlay"')
+        self.assertContains(response, 'id="mobile-menu-btn"')
+        self.assertContains(response, 'class="chat-wrapper"')
+
+    def test_no_hardcoded_sidebar_width(self):
+        """Ширина задаётся классом, иначе мобильные правила не применяются."""
+        response = self.client.get(reverse('main'), {'user_id': self.peer.id})
+        self.assertNotContains(response, 'width: 350px')
+
+    def test_stylesheet_has_mobile_breakpoint(self):
+        css = (Path(settings.BASE_DIR) / 'static' / 'css' / 'style.css').read_text(
+            encoding='utf-8')
+        self.assertIn('@media (max-width: 768px)', css)
+        self.assertIn('.sidebar.show', css)
+        self.assertIn('.sidebar-overlay.show', css)
 
 
 class ImageViewerTests(TestCase):
