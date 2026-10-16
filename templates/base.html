@@ -7,8 +7,12 @@
     <meta name="description" content="Constanta Messenger — современный мессенджер с групповыми чатами и задачами">
     <meta name="keywords" content="мессенджер, чат, групповые чаты, Constanta">
     <meta name="theme-color" content="#667eea">
-    {# Токен доступен всегда, а не только на страницах с формой: иначе
-       фоновый heartbeat уходил без CSRF и молча получал 403 (П-38). #}
+    {% comment %}
+    Токен доступен всегда, а не только на страницах с формой: иначе фоновый
+    heartbeat уходил без CSRF и молча получал 403 (П-38).
+    Внимание: здесь нужен именно многострочный тег. Короткая форма комментария
+    в Django работает только в пределах одной строки, иначе текст печатается.
+    {% endcomment %}
     <meta name="csrf-token" content="{{ csrf_token }}">
 
     <meta property="og:title" content="{% block og_title %}Constanta Messenger{% endblock %}">

@@ -27,10 +27,12 @@ def _first_error(form):
 def task_lists(request):
     # Аннотации вместо счётчиков по строкам: раньше на каждый список уходило
     # несколько COUNT-запросов (problems.md, П-18).
+    # Сортировка задана явно: без неё пагинация аннотированного набора даёт
+    # нестабильные страницы — запись может попасть на две или пропасть.
     lists = TaskList.objects.filter(owner=request.user).annotate(
         _task_count=Count('tasks', distinct=True),
         _done_count=Count('tasks', filter=Q(tasks__is_done=True), distinct=True),
-    )
+    ).order_by('-created_at')
     return render(request, 'tasks/task_lists.html', {
         'lists': _paginate(request, lists, TASK_LISTS_PER_PAGE),
     })
