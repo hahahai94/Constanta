@@ -2,6 +2,10 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
+
+from chat.utils.uploads import normalize_avatar
 from users.models import User
 
 
@@ -20,6 +24,11 @@ class RegistrationForm(UserCreationForm):
 
 
 class ProfileForm(forms.ModelForm):
+    avatar = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={'class': 'form-control'}),
+    )
+
     class Meta:
         model = User
         fields = ['nick', 'email', 'avatar', 'bio']
@@ -29,6 +38,15 @@ class ProfileForm(forms.ModelForm):
             'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'avatar': forms.FileInput(attrs={'class': 'form-control'}),
         }
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get('avatar')
+        if isinstance(avatar, UploadedFile):
+            try:
+                normalize_avatar(avatar)
+            except ValidationError as exc:
+                raise forms.ValidationError(exc.messages) from exc
+        return avatar
 
 
 class ChangeUsernameForm(forms.Form):

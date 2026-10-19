@@ -66,7 +66,8 @@ class Message(models.Model):
 
     def get_attachment_url(self):
         if self.attachment:
-            return self.attachment.url
+            from django.urls import reverse
+            return reverse('download_attachment', args=[self.pk])
         return None
 
     def get_attachment_name(self):

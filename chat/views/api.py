@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import json
 import logging
@@ -413,9 +414,29 @@ def download_attachment(request, message_id):
     file_path = msg.attachment.path if hasattr(msg.attachment, 'path') else msg.attachment.name
     original_name = msg.attachment_original_name or os.path.basename(file_path)
 
+    inline = (
+        request.GET.get('inline') == '1'
+        and msg.attachment_type in {'image', 'voice'}
+    )
+    content_type = None
+    if inline:
+        content_type, _ = mimetypes.guess_type(original_name)
+        if not (content_type or '').startswith(('image/', 'audio/', 'video/')):
+            inline = False
+            content_type = None
+
     try:
-        response = FileResponse(open(file_path, 'rb'), as_attachment=True)
-        response['Content-Disposition'] = _content_disposition_header(original_name)
+        response = FileResponse(
+            open(file_path, 'rb'),
+            as_attachment=not inline,
+            content_type=content_type,
+        )
+        if inline:
+            response['Content-Disposition'] = (
+                f'inline; filename="{_safe_filename(original_name)}"')
+        else:
+            response['Content-Disposition'] = _content_disposition_header(original_name)
+        response['X-Content-Type-Options'] = 'nosniff'
         return response
     except FileNotFoundError:
         return JsonResponse({'status': 'error', 'message': 'Файл не найден'}, status=404)

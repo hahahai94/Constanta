@@ -8,10 +8,12 @@ from django.dispatch import receiver
 from django.utils import timezone
 from datetime import timedelta
 
+from chat.utils.uploads import user_avatar_upload_to
+
 
 class User(AbstractUser):
     nick = models.CharField(max_length=50, unique=True, null=True, blank=True)
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    avatar = models.ImageField(upload_to=user_avatar_upload_to, null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True, default='')
     last_seen = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Последний вход")
 

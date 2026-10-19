@@ -15,9 +15,14 @@ from users.ratelimit import html_429, rate_limit
 @rate_limit('profile_update', limit=20, period=60, on_limited=html_429)
 def profile_view(request):
     if request.method == 'POST':
+        old_avatar = request.user.avatar
+        old_name = old_avatar.name if old_avatar else ''
+        old_storage = old_avatar.storage if old_avatar else None
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
+            if old_name and old_name != request.user.avatar.name:
+                old_storage.delete(old_name)
         else:
             for field, errors in form.errors.items():
                 for error in errors:

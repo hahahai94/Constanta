@@ -83,6 +83,14 @@ python manage.py test
 - Перед выкладкой полезно прогнать `python manage.py check --deploy` — он проверяет боевые настройки безопасности.
 - **Безопасность cookie и HSTS**: настройки (`SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`) включаются по умолчанию при `DEBUG=False`, но теперь управляются переменными окружения. Задайте их явно, если прод-окружение может унаследовать dev-`.env`.
 - **За прокси**: включите `USE_X_FORWARDED_FOR=True` **и обязательно** перечислите адреса прокси в `TRUSTED_PROXIES` (например `TRUSTED_PROXIES=127.0.0.1,10.0.0.5`). По умолчанию заголовок игнорируется, а от недоверенного источника игнорируется всегда: nginx дописывает `X-Forwarded-For`, поэтому его левое значение подделывается клиентом, и доверять можно только адресу, который действительно видел прокси.
+- **MEDIA**: приложение отдаёт только аватары через `/media/...`, а вложения — исключительно через `/download/<id>/` с проверкой доступа. Если nginx раздаёт `/media/` напрямую, запретите вложения и добавьте `nosniff`:
+  ```nginx
+  location /media/attachments/ { return 404; }
+  location /media/ {
+      add_header X-Content-Type-Options nosniff always;
+      add_header Content-Disposition inline;
+  }
+  ```
 - **Осторожно с HTTPS-редиректом**: если после включения `SECURE_SSL_REDIRECT` браузер зацикливается, значит прокси не проставляет `X-Forwarded-Proto`. В этом случае либо настройте прокси (`proxy_set_header X-Forwarded-Proto $scheme;`), либо выставьте `USE_X_FORWARDED_PROTO=False` или `SECURE_SSL_REDIRECT=False`.
 - **Rate-limit / кеш**: по умолчанию используется файловый кэш (`CACHE_LOCATION`, по умолчанию `.cache/` в корне проекта) — общий для воркеров на одном хосте. Для нескольких хостов задайте `CACHE_BACKEND` (например, `django_redis.cache.RedisCache`) и `CACHE_LOCATION`.
 - **Индекс пакетов**: в `pyproject.toml` по умолчанию прописано зеркало Tsinghua — обращение к `pypi.org` из текущей сети не проходит, иначе `uv lock` падает. Если сеть позволяет, верните официальный индекс: `UV_DEFAULT_INDEX=https://pypi.org/simple uv lock && uv sync`, после чего удалите блок `[[tool.uv.index]]`.

@@ -1,8 +1,12 @@
+from pathlib import Path
+
+from django.conf import settings
 from django.test import TestCase, RequestFactory, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from chat.tests.factories import fake_upload, image_upload
 from users.models import BannedIP, AdminLog, Notification
 from users.forms import RegistrationForm, ChangeUsernameForm, ProfileForm, ChangePasswordForm
 from users.backends import CustomAuthBackend
@@ -338,6 +342,39 @@ class ProfileViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.user.refresh_from_db()
         self.assertEqual(self.user.nick, 'original')
+
+    def test_profile_avatar_extension_comes_from_content(self):
+        response = self.client.post('/profile/', {
+            'avatar': fake_upload('payload.html', image_upload().read(), 'image/png'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.avatar.name.endswith('.png'))
+        self.assertFalse(self.user.avatar.name.endswith('.html'))
+
+    def test_profile_avatar_rejects_non_image(self):
+        old_name = self.user.avatar.name if self.user.avatar else None
+        response = self.client.post('/profile/', {
+            'avatar': fake_upload(
+                'payload.html', b'<script>alert(1)</script>', 'text/html'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.avatar.name if self.user.avatar else None, old_name)
+
+    def test_profile_avatar_removes_previous_file(self):
+        self.user.avatar = image_upload('old.png')
+        self.user.save()
+        old_name = self.user.avatar.name
+        old_path = Path(settings.MEDIA_ROOT) / old_name
+
+        response = self.client.post('/profile/', {
+            'avatar': image_upload('new.png'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertNotEqual(self.user.avatar.name, old_name)
+        self.assertFalse(old_path.exists())
 
     def test_change_username(self):
         response = self.client.post('/profile/change-username/', {

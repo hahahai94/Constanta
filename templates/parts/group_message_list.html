@@ -20,12 +20,12 @@
             <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #764ba2;">{{ msg.sender.username }}</div>
         {% endif %}
         {% if msg.attachment_type == 'image' and msg.attachment %}
-            <img src="{{ msg.attachment.url }}"
+            <img src="{% url 'download_attachment' msg.id %}?inline=1"
                  class="img-fluid rounded mb-2 chat-image"
                  style="max-height: 250px; max-width: 100%;"
                  alt="Изображение"
                  loading="lazy"
-                 data-image-viewer="{{ msg.attachment.url }}"
+                 data-image-viewer="{% url 'download_attachment' msg.id %}?inline=1"
                  data-image-download="{% url 'download_attachment' msg.id %}"
                  data-image-name="{{ msg.attachment_original_name|default:'image' }}">
         {% endif %}
@@ -38,7 +38,7 @@
             </a>
         {% endif %}
         {% if msg.attachment_type == 'voice' and msg.attachment %}
-            <audio controls class="w-100 mb-2"><source src="{{ msg.attachment.url }}"></audio>
+            <audio controls class="w-100 mb-2"><source src="{% url 'download_attachment' msg.id %}?inline=1"></audio>
         {% endif %}
         {% if msg.content %}
             <p class="mb-1" style="white-space: pre-wrap;">{% if user.id|in_mentions:msg.mentions %}<span class="mention-badge" title="Вас упомянули">🔔</span> {% endif %}{{ msg.content|render_mentions|linebreaksbr }}</p>

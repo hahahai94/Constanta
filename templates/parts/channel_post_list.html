@@ -13,12 +13,12 @@
     {% if post.attachment %}
     <div class="mt-2">
         {% if post.attachment_type == 'image' %}
-            <img src="{{ post.attachment.url }}"
+            <img src="{% url 'download_attachment' post.id %}?inline=1"
                  class="img-fluid rounded chat-image"
                  style="max-height:400px"
                  alt="Изображение"
                  loading="lazy"
-                 data-image-viewer="{{ post.attachment.url }}"
+                 data-image-viewer="{% url 'download_attachment' post.id %}?inline=1"
                  data-image-download="{% url 'download_attachment' post.id %}"
                  data-image-name="{{ post.attachment_original_name|default:'image' }}">
         {% else %}

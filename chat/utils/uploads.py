@@ -241,6 +241,11 @@ def _avatar_storage_path(subdir, instance):
     return os.path.join(subdir, f"{uuid.uuid4().hex}{image_extension(image_format)}")
 
 
+def user_avatar_upload_to(instance, filename):
+    """``upload_to`` для ``User.avatar``."""
+    return _avatar_storage_path('avatars', instance)
+
+
 def group_avatar_upload_to(instance, filename):
     """``upload_to`` для ``Group.avatar`` (см. П-3)."""
     return _avatar_storage_path('group_avatars', instance)
