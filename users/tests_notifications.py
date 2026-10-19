@@ -11,6 +11,8 @@ User = get_user_model()
 
 class NotificationCreationTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
         self.sender = User.objects.create_user(username='note_sender', password='123')
         self.receiver = User.objects.create_user(username='note_receiver', password='456')
         self.client.login(username='note_sender', password='123')
@@ -99,6 +101,16 @@ class NotificationViewTests(TestCase):
         response = self.client.get(reverse('notification_open', args=[self.note.id]))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse('main'))
+
+    def test_open_refuses_protocol_relative_redirect(self):
+        for target in ('//evil.example/steal', '/\\evil.example/steal'):
+            with self.subTest(target=target):
+                self.note.url = target
+                self.note.save(update_fields=['url'])
+                response = self.client.get(
+                    reverse('notification_open', args=[self.note.id]))
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.url, reverse('main'))
 
     def test_mark_all_read(self):
         response = self.client.post(reverse('notifications_read_all'))

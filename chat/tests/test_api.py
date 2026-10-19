@@ -15,6 +15,8 @@ User = get_user_model()
 
 class APITests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
         self.user = User.objects.create_user(username='api_tester', password='123')
         self.other = User.objects.create_user(username='api_other', password='456')
         self.client.login(username='api_tester', password='123')
@@ -197,6 +199,51 @@ class APITests(TestCase):
             'content': 'Hack'
         })
         self.assertEqual(response.status_code, 403)
+
+    def test_private_reply_to_group_message_ignored(self):
+        group = Group.objects.create(name='Reply Group', owner=self.other)
+        reply_to = Message.objects.create(
+            sender=self.other, group=group, content='Group original')
+
+        response = self.client.post('/api/send/', {
+            'user_id': str(self.other.id),
+            'content': 'Private reply',
+            'reply_to_id': str(reply_to.id),
+        })
+        self.assertEqual(response.status_code, 200)
+        message = Message.objects.get(
+            sender=self.user, receiver=self.other, content='Private reply')
+        self.assertIsNone(message.reply_to)
+
+    def test_group_reply_to_private_message_ignored(self):
+        group = Group.objects.create(name='Reply Group 2', owner=self.user)
+        GroupMember.objects.create(group=group, user=self.user, role='owner')
+        reply_to = Message.objects.create(
+            sender=self.other, receiver=self.user, content='Private original')
+
+        response = self.client.post('/api/send/', {
+            'group_id': str(group.id),
+            'content': 'Group reply',
+            'reply_to_id': str(reply_to.id),
+        })
+        self.assertEqual(response.status_code, 200)
+        message = Message.objects.get(group=group, content='Group reply')
+        self.assertIsNone(message.reply_to)
+
+    def test_reply_to_deleted_message_ignored(self):
+        reply_to = Message.objects.create(
+            sender=self.other, receiver=self.user, content='Deleted original',
+            is_deleted=True)
+
+        response = self.client.post('/api/send/', {
+            'user_id': str(self.other.id),
+            'content': 'Reply to deleted',
+            'reply_to_id': str(reply_to.id),
+        })
+        self.assertEqual(response.status_code, 200)
+        message = Message.objects.get(
+            sender=self.user, receiver=self.other, content='Reply to deleted')
+        self.assertIsNone(message.reply_to)
 
     def test_reply_to_wrong_group_ignored(self):
         group1 = Group.objects.create(name='Group One', owner=self.user)

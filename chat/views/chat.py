@@ -36,6 +36,8 @@ def main_chat(request):
     messages = []
 
     if user_id:
+        if not str(user_id).isdigit():
+            return redirect('main')
         active_user = get_object_or_404(User, id=user_id)
         # Вся переписка отдаётся сразу: страница прокручивается к последнему
         # сообщению. Постраничная подгрузка «Загрузить ещё» только мешала.

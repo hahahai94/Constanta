@@ -108,14 +108,24 @@ def send_message(request):
 
     reply_msg = None
     if reply_to_id:
-        reply_msg = Message.objects.filter(id=reply_to_id).first()
+        reply_msg = Message.objects.filter(id=reply_to_id, is_deleted=False).first()
         if reply_msg:
             if user_id:
                 ids = {request.user.id, user_id}
-                if reply_msg.sender.id not in ids or (reply_msg.receiver_id not in ids and reply_msg.receiver_id is not None):
+                if (
+                    reply_msg.group_id is not None
+                    or reply_msg.channel_id is not None
+                    or reply_msg.sender_id not in ids
+                    or reply_msg.receiver_id not in ids
+                ):
                     reply_msg = None
-            elif group_id and reply_msg.group_id is not None and str(reply_msg.group_id) != group_id:
-                reply_msg = None
+            elif group_id:
+                if (
+                    reply_msg.group_id is None
+                    or str(reply_msg.group_id) != str(group_id)
+                    or reply_msg.channel_id is not None
+                ):
+                    reply_msg = None
 
     receiver = None
     try:

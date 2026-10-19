@@ -40,6 +40,11 @@ def open_notification(request, notification_id):
     # Ссылку строит сервер, но проверяем её на всякий случай: редирект на
     # внешний адрес из уведомления был бы открытым редиректом.
     target = notification.url or ''
-    if not target.startswith('/'):
+    if (
+        not target.startswith('/')
+        or target.startswith('//')
+        or '\\' in target
+        or ':' in target.split('/', 1)[0]
+    ):
         target = 'main'
     return redirect(target)

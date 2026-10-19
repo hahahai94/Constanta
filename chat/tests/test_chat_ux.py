@@ -84,6 +84,16 @@ class WholeConversationTests(TestCase):
         self.assertEqual(len(response.context['messages']), 35)
         self.assertNotContains(response, 'Загрузить ещё')
 
+    def test_private_chat_script_is_loaded_once(self):
+        response = self.client.get(reverse('main'), {'user_id': self.peer.id})
+        self.assertEqual(
+            response.content.decode().count('js/chat-private.js'), 1)
+
+    def test_invalid_user_id_does_not_crash(self):
+        response = self.client.get(reverse('main'), {'user_id': 'not-a-number'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('main'))
+
     def test_sidebar_shows_attachment_placeholder(self):
         Message.objects.create(
             sender=self.peer, receiver=self.user,
