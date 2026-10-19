@@ -148,3 +148,12 @@ def _invalidate_banned_ip_cache(sender, **kwargs):
     """Сбрасывает кеш списка банов, чтобы бан действовал сразу (П-32)."""
     from users.middleware import IPBanMiddleware
     cache.delete(IPBanMiddleware.CACHE_KEY)
+
+
+@receiver(post_delete, sender=User)
+def _delete_user_avatar(sender, instance, **kwargs):
+    """Удаляет файл аватара вместе с пользователем (П-48)."""
+    avatar = instance.avatar
+    name = getattr(avatar, 'name', '')
+    if name and avatar.storage.exists(name):
+        avatar.storage.delete(name)

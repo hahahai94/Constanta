@@ -122,6 +122,27 @@ class ChannelViewTests(TestCase):
         self.assertFalse(Channel.objects.filter(id=ch.id).exists())
         self.assertRedirects(response, reverse('channel_list'))
 
+    def test_delete_channel_removes_avatar_and_posts(self):
+        """П-48: удаление канала не оставляет файлы на диске."""
+        import os
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from chat.models import Message
+
+        ch = Channel.objects.create(name='Temp files', owner=self.owner)
+        ch.avatar = SimpleUploadedFile('channel.png', b'avatar', content_type='image/png')
+        ch.save()
+        avatar_path = ch.avatar.path
+        post = Message.objects.create(
+            sender=self.owner, channel=ch, content='post',
+            attachment=SimpleUploadedFile('post.txt', b'content'),
+        )
+        attachment_path = post.attachment.path
+
+        response = self.client.post(reverse('delete_channel', args=[ch.id]))
+        self.assertRedirects(response, reverse('channel_list'))
+        self.assertFalse(os.path.exists(avatar_path))
+        self.assertFalse(os.path.exists(attachment_path))
+
     def test_delete_channel_not_owner(self):
         ch = Channel.objects.create(name='Temp2', owner=self.user)
         ChannelMember.objects.create(channel=ch, user=self.user, role='owner')

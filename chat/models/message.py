@@ -3,6 +3,7 @@ import os
 from django.conf import settings
 from django.db import models
 from chat.utils import generate_file_hash
+from chat.utils.storage import attachment_storage
 
 
 def _attachment_upload_to(instance, filename):
@@ -11,7 +12,7 @@ def _attachment_upload_to(instance, filename):
     else:
         h = generate_file_hash(instance.attachment, instance.sender.id)
     ext = os.path.splitext(filename)[1].lower()
-    return os.path.join('attachments', h[:2], f"{h}{ext}")
+    return f"attachments/{h[:2]}/{h}{ext}"
 
 
 class Message(models.Model):
@@ -39,7 +40,10 @@ class Message(models.Model):
         ('file', 'Файл'),
         ('voice', 'Голосовое'),
     ], default='none')
-    attachment = models.FileField(upload_to=_attachment_upload_to, null=True, blank=True)
+    attachment = models.FileField(
+        upload_to=_attachment_upload_to, storage=attachment_storage,
+        null=True, blank=True,
+    )
     attachment_hash = models.CharField(max_length=64, blank=True, default='')
     attachment_original_name = models.CharField(max_length=255, blank=True, default='')
     attachment_size = models.BigIntegerField(default=0)

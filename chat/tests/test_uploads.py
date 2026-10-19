@@ -304,3 +304,38 @@ class AttachmentStorageTests(TestCase):
         msg = Message.objects.get(sender=self.user, receiver=self.other)
         self.assertEqual(msg.attachment_type, 'image')
         self.assertTrue(msg.attachment.name.endswith('.png'))
+
+
+class AttachmentDeduplicationTests(TestCase):
+    def setUp(self):
+        self.sender = User.objects.create_user(username='dedupe_user', password='123')
+
+    def test_identical_files_share_one_path(self):
+        """П-49: одинаковые вложения получают одинаковый детерминированный путь."""
+        first = Message.objects.create(
+            sender=self.sender, receiver=self.sender, content='one',
+            attachment=SimpleUploadedFile('one.txt', b'same content'),
+        )
+        second = Message.objects.create(
+            sender=self.sender, receiver=self.sender, content='two',
+            attachment=SimpleUploadedFile('two.txt', b'same content'),
+        )
+        self.assertEqual(first.attachment_hash, second.attachment_hash)
+        self.assertEqual(first.attachment.name, second.attachment.name)
+
+    def test_shared_file_survives_until_last_message_is_deleted(self):
+        first = Message.objects.create(
+            sender=self.sender, receiver=self.sender, content='one',
+            attachment=SimpleUploadedFile('one.txt', b'shared content'),
+        )
+        second = Message.objects.create(
+            sender=self.sender, receiver=self.sender, content='two',
+            attachment=SimpleUploadedFile('two.txt', b'shared content'),
+        )
+        path = first.attachment.path
+
+        first.delete()
+        self.assertTrue(Path(path).exists())
+
+        second.delete()
+        self.assertFalse(Path(path).exists())

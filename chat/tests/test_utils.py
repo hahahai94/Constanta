@@ -29,6 +29,14 @@ class UtilsHashTests(TestCase):
         h = generate_file_hash(fake_file, user_id=1)
         self.assertEqual(len(h), 64)
 
+    def test_generate_file_hash_is_deterministic_without_timestamp(self):
+        """П-49: хеш больше не зависит от текущего времени."""
+        fake_file = io.BytesIO(b'stable content')
+        first = generate_file_hash(fake_file, user_id=1)
+        fake_file.seek(0)
+        second = generate_file_hash(fake_file, user_id=1)
+        self.assertEqual(first, second)
+
     def test_generate_file_hash_no_chunks(self):
         class FakeFile:
             def __init__(self, data):

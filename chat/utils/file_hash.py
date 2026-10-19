@@ -1,11 +1,8 @@
 import hashlib
 import os
-from datetime import datetime
 
 
 def generate_file_hash(file, user_id, timestamp=None):
-    if timestamp is None:
-        timestamp = datetime.now().isoformat()
     hasher = hashlib.sha256()
     if hasattr(file, 'chunks'):
         for chunk in file.chunks():
@@ -17,7 +14,9 @@ def generate_file_hash(file, user_id, timestamp=None):
                 break
             hasher.update(chunk)
     file.seek(0)
-    hasher.update(f"{user_id}{timestamp}".encode('utf-8'))
+    hasher.update(f"{user_id}".encode('utf-8'))
+    if timestamp is not None:
+        hasher.update(str(timestamp).encode('utf-8'))
     return hasher.hexdigest()
 
 

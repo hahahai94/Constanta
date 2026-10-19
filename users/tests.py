@@ -376,6 +376,15 @@ class ProfileViewTests(TestCase):
         self.assertNotEqual(self.user.avatar.name, old_name)
         self.assertFalse(old_path.exists())
 
+    def test_user_deletion_removes_avatar(self):
+        """П-48: аватар не остаётся на диске после удаления пользователя."""
+        self.user.avatar = image_upload('deleted.png')
+        self.user.save()
+        avatar_path = Path(self.user.avatar.path)
+
+        self.user.delete()
+        self.assertFalse(avatar_path.exists())
+
     def test_change_username(self):
         response = self.client.post('/profile/change-username/', {
             'username': 'changedname'

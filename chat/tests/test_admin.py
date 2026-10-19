@@ -43,12 +43,35 @@ class ChatAdminTests(TestCase):
         file = SimpleUploadedFile("del_msg.txt", b"content", content_type="text/plain")
         msg = Message.objects.create(sender=self.user, receiver=self.admin, content='delete me', attachment=file)
         msg_pk = msg.pk
+        attachment_path = msg.attachment.path
         response = self.client.post('/admin/chat/message/', {
             'action': 'hard_delete_messages',
             '_selected_action': [msg_pk],
         })
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Message.objects.filter(pk=msg_pk).exists())
+        self.assertFalse(os.path.exists(attachment_path))
+
+    def test_admin_hard_delete_group_removes_avatar_and_attachments(self):
+        """П-48: каскадное удаление группы чистит файлы, а не только БД."""
+        group = Group.objects.create(name='With Files', owner=self.admin)
+        group.avatar = SimpleUploadedFile('group.png', b'avatar', content_type='image/png')
+        group.save()
+        avatar_path = group.avatar.path
+        message = Message.objects.create(
+            sender=self.admin, group=group, content='attachment',
+            attachment=SimpleUploadedFile('group.txt', b'content'),
+        )
+        attachment_path = message.attachment.path
+
+        response = self.client.post('/admin/chat/group/', {
+            'action': 'hard_delete_groups',
+            '_selected_action': [group.pk],
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Group.objects.filter(pk=group.pk).exists())
+        self.assertFalse(os.path.exists(avatar_path))
+        self.assertFalse(os.path.exists(attachment_path))
 
     def test_admin_export_group_members(self):
         GroupMember.objects.create(group=self.group, user=self.user, role='member')

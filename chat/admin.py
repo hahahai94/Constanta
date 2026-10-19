@@ -7,7 +7,7 @@ from django.db.models import Count
 from Constanta.csv_export import export_to_csv
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from users.audit import log_admin_action
-import csv, os
+import csv
 
 User = get_user_model()
 
@@ -64,9 +64,6 @@ class UltimateGroupAdmin(admin.ModelAdmin):
     @admin.action(description="Удалить группу и файлы")
     def hard_delete_groups(self, request, queryset):
         names = list(queryset.values_list('name', flat=True))
-        for group in queryset:
-            if group.avatar and os.path.isfile(group.avatar.path):
-                os.remove(group.avatar.path)
         count, _ = queryset.delete()
         for name in names:
             log_admin_action(
@@ -113,11 +110,7 @@ class UltimateMessageAdmin(admin.ModelAdmin):
 
     @admin.action(description="Удалить сообщения и файлы")
     def hard_delete_messages(self, request, queryset):
-        deleted_count = 0
-        for msg in queryset:
-            if msg.attachment and os.path.isfile(msg.attachment.path):
-                os.remove(msg.attachment.path)
-            deleted_count += 1
+        deleted_count = queryset.count()
         queryset.delete()
         log_admin_action(
             request.user, 'delete_message',
