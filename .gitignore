@@ -215,3 +215,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Временный MEDIA_ROOT тестового прогона (problems.md, П-14)
+constanta-test-media-*/
+.test-media/*
+!.test-media/.gitkeep
+

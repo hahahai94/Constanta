@@ -1,6 +1,7 @@
 """Тесты валидации и нормализации загрузок (problems.md, П-3, П-10)."""
 
 import io
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -46,12 +47,13 @@ def make_webp_bytes():
 class MediaIsolationTests(TestCase):
     """П-14: тесты не должны писать в реальный `media/` проекта."""
 
-    def test_media_root_points_to_a_temporary_directory(self):
-        self.assertIn('constanta-test-media-', str(settings.MEDIA_ROOT))
+    def test_media_root_is_isolated_from_real_media(self):
         self.assertNotEqual(
-            str(settings.MEDIA_ROOT), str(settings.BASE_DIR / 'media'))
+            Path(settings.MEDIA_ROOT).resolve(),
+            (Path(settings.BASE_DIR) / 'media').resolve(),
+        )
 
-    def test_upload_lands_outside_the_project(self):
+    def test_upload_lands_in_isolated_media_root(self):
         user = User.objects.create_user(username='media_user', password='123')
         other = User.objects.create_user(username='media_other', password='456')
         self.client.login(username='media_user', password='123')
@@ -64,8 +66,10 @@ class MediaIsolationTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         message = Message.objects.get(sender=user, receiver=other)
-        self.assertIn('constanta-test-media-', message.attachment.path)
-        self.assertNotIn(str(settings.BASE_DIR / 'media'), message.attachment.path)
+        attachment = Path(message.attachment.path).resolve()
+        self.assertTrue(attachment.is_relative_to(Path(settings.MEDIA_ROOT).resolve()))
+        self.assertNotIn(
+            str(Path(settings.BASE_DIR) / 'media'), str(attachment))
 
 
 class DetectAttachmentTypeTests(TestCase):
