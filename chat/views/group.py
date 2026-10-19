@@ -5,9 +5,14 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.http import JsonResponse
+from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 from chat.models import Group, GroupMember, Message
 from chat.utils import html_429, rate_limit
+from chat.utils.history import (
+    build_earlier_url, load_message_page, parse_before,
+)
 from chat.utils.uploads import normalize_avatar
 
 User = get_user_model()
@@ -42,14 +47,29 @@ def group_chat(request, group_id):
     members = GroupMember.objects.filter(group=group).select_related('user').order_by(
         '-role', 'user__username'
     )
-    messages_qs = Message.objects.filter(
-        group=group, is_deleted=False
-    ).order_by('created_at')
+    history = Message.objects.filter(group=group, is_deleted=False)
+    messages_page, has_earlier = load_message_page(
+        history, parse_before(request.GET.get('before')))
+    earlier_url = build_earlier_url(request, messages_page, has_earlier)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        html = render_to_string('parts/group_message_list.html', {
+            'messages': messages_page,
+            'user': request.user,
+            'request': request,
+        })
+        return JsonResponse({
+            'html': html,
+            'has_earlier': has_earlier,
+            'earlier_url': earlier_url,
+        })
 
     return render(request, 'group_chat.html', {
         'group': group,
         'members': members,
-        'messages': messages_qs,
+        'messages': messages_page,
+        'has_earlier': has_earlier,
+        'earlier_url': earlier_url,
         'is_owner': is_owner,
         'is_admin': is_admin,
     })

@@ -48,7 +48,9 @@ def channel_view(request, channel_id):
     invite_url = ''
     if can_post:
         invite_url = request.build_absolute_uri(reverse('channel_invite', args=[channel.invite_token]))
-    posts_qs = Message.objects.filter(channel=channel, is_deleted=False).order_by('-created_at')
+    posts_qs = Message.objects.filter(
+        channel=channel, is_deleted=False
+    ).select_related('sender').order_by('-created_at')
     paginator = Paginator(posts_qs, POSTS_PER_PAGE)
     page_number = request.GET.get('page', 1)
     posts_page = paginator.get_page(page_number)
@@ -120,7 +122,9 @@ def edit_channel(request, channel_id):
         channel.save()
         return redirect('channel_view', channel_id=channel_id)
     membership = ChannelMember.objects.filter(channel=channel, user=request.user).first()
-    posts_qs = Message.objects.filter(channel=channel, is_deleted=False).order_by('-created_at')
+    posts_qs = Message.objects.filter(
+        channel=channel, is_deleted=False
+    ).select_related('sender').order_by('-created_at')
     paginator = Paginator(posts_qs, POSTS_PER_PAGE)
     posts_page = paginator.get_page(1)
     return render(request, 'channel_view.html', {

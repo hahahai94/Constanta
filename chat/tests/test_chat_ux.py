@@ -103,6 +103,60 @@ class WholeConversationTests(TestCase):
         self.assertContains(response, '📷 Фото')
 
 
+class BoundedHistoryTests(TestCase):
+    """История ограничена 200 сообщениями, остальное — по кнопке (П-50)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='history_user', password='123')
+        self.peer = User.objects.create_user(username='history_peer', password='456')
+        self.client.login(username='history_user', password='123')
+
+    def test_private_history_is_limited_and_loads_earlier(self):
+        Message.objects.bulk_create([
+            Message(sender=self.peer, receiver=self.user, content=f'msg-{i:03d}')
+            for i in range(205)
+        ])
+
+        response = self.client.get(reverse('main'), {'user_id': self.peer.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['messages']), 200)
+        self.assertContains(response, 'msg-204')
+        self.assertNotContains(response, 'msg-000')
+        self.assertTrue(response.context['has_earlier'])
+
+        ajax = self.client.get(
+            response.context['earlier_url'],
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(ajax.status_code, 200)
+        data = ajax.json()
+        self.assertFalse(data['has_earlier'])
+        self.assertIn('msg-000', data['html'])
+
+    def test_group_history_is_limited_and_loads_earlier(self):
+        group = Group.objects.create(name='HistoryGroup', owner=self.user)
+        GroupMember.objects.create(group=group, user=self.user, role='owner')
+        Message.objects.bulk_create([
+            Message(sender=self.user, group=group, content=f'group-{i:03d}')
+            for i in range(205)
+        ])
+
+        response = self.client.get(reverse('group_chat', args=[group.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['messages']), 200)
+        self.assertContains(response, 'group-204')
+        self.assertNotContains(response, 'group-000')
+        self.assertTrue(response.context['has_earlier'])
+
+        ajax = self.client.get(
+            response.context['earlier_url'],
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        data = ajax.json()
+        self.assertFalse(data['has_earlier'])
+        self.assertIn('group-000', data['html'])
+
+
 class MobileLayoutTests(TestCase):
     """Мобильная вёрстка: панель уезжает в выдвижной ящик.
 

@@ -76,6 +76,12 @@
 
         <!-- Сообщения (скролл только здесь!) -->
         <div class="flex-grow-1 overflow-auto p-4" id="messages-container" style="background: #f5f7fa;">
+            {% if has_earlier %}
+            <div class="text-center mb-3" id="load-earlier-container">
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill"
+                        id="load-earlier-btn" data-url="{{ earlier_url }}">Загрузить ещё</button>
+            </div>
+            {% endif %}
             {% include 'parts/message_list.html' %}
         </div>
 
@@ -125,5 +131,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{% static 'js/chat-history.js' %}"></script>
 <script src="{% static 'js/chat-private.js' %}"></script>
 {% endblock %}
