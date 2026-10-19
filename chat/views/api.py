@@ -494,7 +494,7 @@ def api_channel_post(request, channel_id):
         )
         if content:
             try:
-                mentioned_ids = parse_mentions(content, group=None)
+                mentioned_ids = parse_mentions(content, group=None, channel=channel)
                 if mentioned_ids:
                     msg.mentions = json.dumps(mentioned_ids)
                     msg.save(update_fields=['mentions'])

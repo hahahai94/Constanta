@@ -18,22 +18,28 @@ def extract_mentioned_usernames(content):
     return [name for name in MENTION_PATTERN.findall(content or '') if name != 'all']
 
 
-def parse_mentions(content, group=None, receiver=None):
+def parse_mentions(content, group=None, channel=None, receiver=None):
     """Возвращает список id упомянутых пользователей.
 
-    `@all` разворачивается в участников группы; в личных чатах и каналах он
-    никого не уведомляет, потому что группы там нет.
+    `@all` разворачивается в участников группы или подписчиков канала; в личных
+    чатах он никого не уведомляет.
     """
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
     mentioned_ids = []
 
-    if group is not None and '@all' in (content or ''):
-        from chat.models import GroupMember
-        mentioned_ids.extend(
-            GroupMember.objects.filter(group=group).values_list('user_id', flat=True)
-        )
+    if '@all' in (content or ''):
+        if group is not None:
+            from chat.models import GroupMember
+            mentioned_ids.extend(
+                GroupMember.objects.filter(group=group).values_list('user_id', flat=True)
+            )
+        elif channel is not None:
+            from chat.models import ChannelMember
+            mentioned_ids.extend(
+                ChannelMember.objects.filter(channel=channel).values_list('user_id', flat=True)
+            )
 
     usernames = extract_mentioned_usernames(content)
     if usernames:

@@ -81,8 +81,12 @@ def rate_limit(key_prefix, limit=30, period=60, on_limited=None):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
-            ip = get_client_ip(request) or 'unknown'
-            allowed, _ = hit(f'{key_prefix}:{ip}', limit, period)
+            user = getattr(request, 'user', None)
+            if user is not None and getattr(user, 'is_authenticated', False):
+                identity = f'user:{user.pk}'
+            else:
+                identity = f'ip:{get_client_ip(request) or "unknown"}'
+            allowed, _ = hit(f'{key_prefix}:{identity}', limit, period)
             if not allowed:
                 responder = on_limited or json_429
                 return responder(request, *args, **kwargs)

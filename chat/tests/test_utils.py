@@ -1,6 +1,6 @@
 from django.test import TestCase, TransactionTestCase
 from chat.utils import generate_file_hash, parse_mentions, create_notification
-from chat.models import Group, GroupMember
+from chat.models import Channel, ChannelMember, Group, GroupMember
 from django.contrib.auth import get_user_model
 from users.models import Notification
 import io
@@ -81,6 +81,20 @@ class UtilsMentionTests(TestCase):
 
     def test_parse_mention_all_no_group(self):
         self.assertEqual(parse_mentions('@all'), [])
+
+    def test_parse_mention_all_in_channel(self):
+        """П-16: @all в канале уведомляет подписчиков, а не молчит."""
+        channel = Channel.objects.create(name='Mention Channel', owner=self.sender)
+        ChannelMember.objects.create(channel=channel, user=self.user, role='subscriber')
+        self.assertIn(self.user.id, parse_mentions('@all', channel=channel))
+
+    def test_parse_mention_all_in_channel_skips_unrelated_users(self):
+        channel = Channel.objects.create(name='Mention Channel 2', owner=self.sender)
+        outsider = User.objects.create_user(username='channel_outsider', password='123')
+        ChannelMember.objects.create(channel=channel, user=self.user, role='subscriber')
+        ids = parse_mentions('@all', channel=channel)
+        self.assertEqual(ids, [self.user.id])
+        self.assertNotIn(outsider.id, ids)
 
     def test_parse_mention_all_in_group_multiple_members(self):
         group = Group.objects.create(name='G2', owner=self.sender)
@@ -200,3 +214,25 @@ class RateLimitTests(TestCase):
 
         allowed = [hit('atomic', limit=3, period=10)[0] for _ in range(6)]
         self.assertEqual(allowed, [True, True, True, False, False, False])
+
+    def test_rate_limit_is_per_user_behind_same_ip(self):
+        """П-54: общий IP (NAT) не должен расходовать чужой лимит."""
+        from types import SimpleNamespace
+        from django.http import HttpRequest, HttpResponse
+        from chat.utils import rate_limit
+
+        @rate_limit('test_user_limit', limit=1, period=10)
+        def my_view(request):
+            return HttpResponse('ok')
+
+        first = HttpRequest()
+        first.META = {'REMOTE_ADDR': '10.0.0.1'}
+        first.user = SimpleNamespace(is_authenticated=True, pk=1)
+
+        second = HttpRequest()
+        second.META = {'REMOTE_ADDR': '10.0.0.1'}
+        second.user = SimpleNamespace(is_authenticated=True, pk=2)
+
+        self.assertEqual(my_view(first).status_code, 200)
+        self.assertEqual(my_view(second).status_code, 200)
+        self.assertEqual(my_view(first).status_code, 429)
