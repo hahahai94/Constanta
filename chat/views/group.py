@@ -13,6 +13,7 @@ from chat.utils import html_429, normalize_conversation_name, rate_limit
 from chat.utils.history import (
     build_earlier_url, load_message_page, parse_before,
 )
+from chat.utils.notifications import mark_conversation_read, message_unread_counts
 from chat.utils.uploads import normalize_avatar
 
 User = get_user_model()
@@ -28,6 +29,10 @@ def groups_list(request):
     paginator = Paginator(memberships_qs, 20)
     page_number = request.GET.get('page', 1)
     memberships = paginator.get_page(page_number)
+    unread_counts = message_unread_counts(request.user)
+    for membership in memberships.object_list:
+        membership.unread_count = unread_counts.get(
+            f'group:{membership.group_id}', 0)
     return render(request, 'groups.html', {'memberships': memberships})
 
 
@@ -43,6 +48,7 @@ def group_chat(request, group_id):
 
     is_owner = group.owner == request.user
     is_admin = (membership.role == 'admin') or is_owner
+    mark_conversation_read(request.user, f'group:{group.id}')
 
     members = GroupMember.objects.filter(group=group).select_related('user').order_by(
         '-role', 'user__username'
@@ -72,6 +78,7 @@ def group_chat(request, group_id):
         'earlier_url': earlier_url,
         'is_owner': is_owner,
         'is_admin': is_admin,
+        'active_conversation_key': f'group:{group.id}',
     })
 
 
@@ -174,6 +181,7 @@ def remove_member(request, group_id, user_id):
     if target.role == 'owner':
         messages.error(request, '🚫 Нельзя удалить владельца')
     else:
+        mark_conversation_read(target.user, f'group:{group.id}')
         target.delete()
     return redirect('group_chat', group_id=group_id)
 

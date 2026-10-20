@@ -183,8 +183,12 @@ document.getElementById('chat-form')?.addEventListener('submit', function(e) {
     .then(d => {
         sendingDiv.remove();
         if (d.status === 'ok' && d.html) {
-            container.insertAdjacentHTML('beforeend', d.html);
-            if (window.pollState && d.cursor) pollState.cursor = d.cursor;
+            if (window.appendUniqueMessages) {
+                window.appendUniqueMessages(container, d.html);
+            } else {
+                container.insertAdjacentHTML('beforeend', d.html);
+            }
+            if (window.pollState) window.advanceCursor(pollState, d.cursor);
             scrollToBottom();
             updateChatPreview(d.peer_id, d.preview);
             messageInput.value = '';
@@ -247,9 +251,11 @@ window.doPoll = function() {
             if (data.count > 0) {
                 const container = document.getElementById('messages-container');
                 const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-                container.insertAdjacentHTML('beforeend', data.html);
-                if (data.cursor) pollState.cursor = data.cursor;
-                if (wasAtBottom) window.scrollToBottom();
+                const inserted = window.appendUniqueMessages
+                    ? window.appendUniqueMessages(container, data.html)
+                    : (container.insertAdjacentHTML('beforeend', data.html), true);
+                window.advanceCursor(pollState, data.cursor);
+                if (inserted && wasAtBottom) window.scrollToBottom();
                 // под ником в списке чатов тоже должно быть актуальное превью
                 window.updateChatPreview(data.peer_id, data.preview);
             }

@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 from users.models import User
 from users.forms import ChangeUsernameForm, ChangePasswordForm, ProfileForm
 from users.ratelimit import html_429, rate_limit
+from users.utils import form_error_messages
 
 
 @login_required
@@ -24,9 +25,8 @@ def profile_view(request):
             if old_name and old_name != request.user.avatar.name:
                 old_storage.delete(old_name)
         else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field}: {error}')
+            for error in form_error_messages(form):
+                messages.error(request, error)
         return redirect('profile')
 
     return render(request, 'profile.html', {'user': request.user})

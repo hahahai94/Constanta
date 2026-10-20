@@ -15,7 +15,12 @@
           <div class="d-flex align-items-center mb-3">
             <img src="{{ m.channel.get_avatar_url }}" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
             <div class="flex-grow-1">
-              <a href="{% url 'channel_view' m.channel.id %}" class="text-decoration-none"><h5 class="mb-0">{{ m.channel.name }}</h5></a>
+              <div class="d-flex justify-content-between align-items-center gap-2">
+                <a href="{% url 'channel_view' m.channel.id %}" class="text-decoration-none"><h5 class="mb-0">{{ m.channel.name }}</h5></a>
+                {% if m.unread_count %}
+                <span class="badge bg-primary rounded-pill">{{ m.unread_count }}</span>
+                {% endif %}
+              </div>
               <small class="text-muted">{{ m.channel.description|default:'Нет описания' }}</small>
             </div>
           </div>

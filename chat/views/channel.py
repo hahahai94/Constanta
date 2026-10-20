@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from chat.models import Channel, ChannelMember, Message
 from chat.utils import html_429, normalize_conversation_name, rate_limit
+from chat.utils.notifications import mark_conversation_read, message_unread_counts
 from chat.utils.uploads import normalize_avatar
 
 POSTS_PER_PAGE = 30
@@ -31,6 +32,10 @@ def channel_list(request):
     discover_channels = Channel.objects.filter(
         is_private=False
     ).exclude(id__in=subscribed_ids).order_by('name')[:DISCOVER_LIST_LIMIT]
+    unread_counts = message_unread_counts(request.user)
+    for membership in memberships:
+        membership.unread_count = unread_counts.get(
+            f'channel:{membership.channel_id}', 0)
     return render(request, 'channels.html', {
         'memberships': memberships,
         'discover_channels': discover_channels,
@@ -44,6 +49,7 @@ def channel_view(request, channel_id):
     if not membership:
         messages.error(request, 'Вы не подписаны на этот канал')
         return redirect('channel_list')
+    mark_conversation_read(request.user, f'channel:{channel.id}')
     can_post = membership.role in ['owner', 'admin']
     invite_url = ''
     if can_post:
@@ -75,6 +81,7 @@ def channel_view(request, channel_id):
         'can_post': can_post,
         'invite_url': invite_url,
         'membership': membership,
+        'active_conversation_key': f'channel:{channel.id}',
     })
 
 
@@ -185,6 +192,7 @@ def leave_channel(request, channel_id):
     if channel.owner == request.user:
         messages.error(request, 'Владелец не может отписаться')
         return redirect('channel_view', channel_id=channel_id)
+    mark_conversation_read(request.user, f'channel:{channel.id}')
     ChannelMember.objects.filter(channel=channel, user=request.user).delete()
     messages.success(request, 'Вы отписались от канала')
     return redirect('channel_list')

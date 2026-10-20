@@ -113,16 +113,32 @@ class Notification(models.Model):
     url = models.CharField(max_length=500, blank=True, default='')
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    # Одна запись на непрочитанный чат: direct:<id>, group:<uuid>, channel:<uuid>.
+    conversation_key = models.CharField(
+        max_length=80, blank=True, default='', db_index=True)
+    unread_count = models.PositiveIntegerField(default=1)
 
     related_message = models.ForeignKey('chat.Message', related_name='notifications', on_delete=models.CASCADE, null=True,
                                         blank=True)
 
     class Meta:
         db_table = 'notifications'
-        ordering = ['-created_at']
+        ordering = ['-updated_at', '-created_at']
         indexes = [
-            models.Index(fields=['user', '-created_at']),
-            models.Index(fields=['user', 'is_read', '-created_at']),
+            models.Index(fields=['user', '-updated_at']),
+            models.Index(fields=['user', 'is_read', '-updated_at']),
+            models.Index(fields=['user', 'conversation_key', 'is_read']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'conversation_key'],
+                condition=models.Q(
+                    notification_type='message',
+                    is_read=False,
+                ) & ~models.Q(conversation_key=''),
+                name='uniq_unread_message_notification',
+            ),
         ]
 
     def __str__(self):

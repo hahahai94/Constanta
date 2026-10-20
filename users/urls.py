@@ -13,6 +13,7 @@ urlpatterns = [
 
     path('notifications/', views.notification_list, name='notifications'),
     path('notifications/read-all/', views.mark_all_read, name='notifications_read_all'),
+    path('notifications/poll/', views.notification_poll, name='notifications_poll'),
     path('notifications/<uuid:notification_id>/', views.open_notification, name='notification_open'),
 
 ]

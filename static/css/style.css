@@ -528,3 +528,19 @@ body {
     gap: 8px;
     z-index: 2001;
 }
+
+.notification-toast {
+    color: var(--text);
+    border-left: 4px solid var(--accent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+.notification-toast .toast-header {
+    gap: 4px;
+}
+.notification-toast .toast-body {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.min-width-0 { min-width: 0; }
+.chat-unread-badge { font-size: 11px; }

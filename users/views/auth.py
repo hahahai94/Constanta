@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from users.forms import RegistrationForm
 from users.ratelimit import clear, hit, peek
-from users.utils import get_client_ip
+from users.utils import form_error_messages, get_client_ip
 
 User = get_user_model()
 
@@ -84,9 +84,8 @@ def auth_view(request):
                 user.backend = settings.AUTHENTICATION_BACKENDS[0]
                 login(request, user)
                 return redirect('main')
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field}: {error}')
+            for error in form_error_messages(form):
+                messages.error(request, error)
             mode = 'reg'
         else:
             username = request.POST.get('username', '')
@@ -123,9 +122,8 @@ def auth_view(request):
                         f'🚫 Аккаунт заблокирован: {banned.ban_reason or "без указания причины"}',
                     )
                 else:
-                    for field, errors in form.errors.items():
-                        for error in errors:
-                            messages.error(request, f'{field}: {error}')
+                    for error in form_error_messages(form):
+                        messages.error(request, error)
 
     if mode == 'reg':
         form = RegistrationForm()

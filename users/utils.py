@@ -3,6 +3,20 @@ import ipaddress
 from django.conf import settings
 
 
+def form_error_messages(form):
+    """Человекочитаемые ошибки формы без служебных имён полей."""
+    result = []
+    for field_name, errors in form.errors.items():
+        if field_name == '__all__':
+            label = ''
+        else:
+            field = form.fields.get(field_name)
+            label = field.label if field and field.label else field_name
+        for error in errors:
+            result.append(f'{label}: {error}' if label else str(error))
+    return result
+
+
 def normalize_ip(value):
     """Возвращает каноническую форму IP или ``None``, если это не адрес.
 

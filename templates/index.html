@@ -20,28 +20,8 @@
         </div>
 
         <!-- Список чатов с прокруткой -->
-        <div class="flex-grow-1 overflow-auto">
-            {% for chat in chats %}
-            <a href="?user_id={{ chat.user.id }}"
-               data-chat-user="{{ chat.user.id }}"
-               class="chat-item d-flex align-items-center p-3 text-decoration-none text-dark {% if active_user and active_user.id == chat.user.id %}active{% endif %}">
-                <img src="{{ chat.user.get_avatar_url }}"
-                     class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
-                <div class="flex-grow-1 min-width-0">
-                    <h6 class="mb-1 text-truncate fw-bold">{{ chat.user.get_display_name|default:chat.user.username }}</h6>
-                    {% if chat.last_message %}
-                    <small class="text-muted text-truncate d-block chat-preview">{{ chat.last_message.preview_text|truncatewords:5 }}</small>
-                    {% else %}
-                    <small class="text-muted chat-preview">Начните общение...</small>
-                    {% endif %}
-                </div>
-            </a>
-            {% empty %}
-            <div class="text-center text-muted p-4 mt-5">
-                <i class="bi bi-chat-square-text" style="font-size: 2rem;"></i>
-                <p class="mt-2">У вас пока нет чатов</p>
-            </div>
-            {% endfor %}
+        <div class="flex-grow-1 overflow-auto" id="chat-list">
+            {% include 'parts/chat_list.html' %}
         </div>
     </div>
 
@@ -131,6 +111,8 @@
 {% endblock %}
 
 {% block scripts %}
+{% if active_user %}
 <script src="{% static 'js/chat-history.js' %}"></script>
 <script src="{% static 'js/chat-private.js' %}"></script>
+{% endif %}
 {% endblock %}

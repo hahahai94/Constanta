@@ -18,6 +18,12 @@ from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from chat.utils import (
     create_notification, normalize_conversation_name, parse_mentions, rate_limit,
 )
+from chat.utils.notifications import (
+    adjust_notifications_after_message_delete,
+    conversation_key_for_message,
+    mark_conversation_read,
+    notify_message_recipients,
+)
 from chat.utils.uploads import detect_attachment_type, normalize_avatar, normalize_upload
 
 logger = logging.getLogger(__name__)
@@ -202,19 +208,19 @@ def send_message(request):
                             message=f'{request.user.username} упомянул вас: {content[:50]}',
                             url=mention_url,
                             related_message=msg,
+                            conversation_key=conversation_key_for_message(
+                                msg, mentioned_user),
                         )
             except Exception:
                 logger.exception('Failed to process mentions for message %s', msg.id)
 
         if receiver is not None:
-            # уведомления о личных сообщениях не создавались вообще (П-29)
-            create_notification(
-                user=receiver,
-                notification_type='message',
-                title='Новое сообщение',
-                message=f'{request.user.username}: {content[:50] or "вложение"}',
-                url=f'/?user_id={request.user.id}',
-                related_message=msg,
+            notify_message_recipients(msg, [receiver.id])
+        elif msg.group_id is not None:
+            notify_message_recipients(
+                msg,
+                GroupMember.objects.filter(group_id=msg.group_id).values_list(
+                    'user_id', flat=True),
             )
 
         from django.template.loader import render_to_string
@@ -397,6 +403,7 @@ def api_remove_member(request):
         if target_user == group.owner:
             return JsonResponse({'status': 'error', 'message': 'Нельзя удалить владельца'}, status=400)
 
+        mark_conversation_read(target_user, f'group:{group.id}')
         GroupMember.objects.filter(group=group, user=target_user).delete()
         return JsonResponse({'status': 'ok'})
 
@@ -444,6 +451,7 @@ def delete_message(request, message_id):
 
     msg.is_deleted = True
     msg.save(update_fields=['is_deleted', 'updated_at'])
+    adjust_notifications_after_message_delete(msg)
     return JsonResponse({'status': 'ok'})
 
 
@@ -541,9 +549,17 @@ def api_channel_post(request, channel_id):
                             message=f'{request.user.username} упомянул вас в канале: {content[:50]}',
                             url=f'/channel/{channel_id}/',
                             related_message=msg,
+                            conversation_key=conversation_key_for_message(
+                                msg, mentioned_user),
                         )
             except Exception:
                 logger.exception('Failed to process mentions for channel post')
+
+        notify_message_recipients(
+            msg,
+            ChannelMember.objects.filter(channel_id=channel.id).values_list(
+                'user_id', flat=True),
+        )
         return JsonResponse({'status': 'ok', 'cursor': msg.created_at.isoformat()})
     except Exception:
         logger.exception('Failed to create channel post')
@@ -595,6 +611,7 @@ def api_poll(request):
             is_deleted=False,
         ).order_by('created_at')
         template_name = 'parts/message_list.html'
+        conversation_key = f'direct:{peer.id}'
 
     elif group_id:
         try:
@@ -608,6 +625,7 @@ def api_poll(request):
             group=group, is_deleted=False
         ).order_by('created_at')
         template_name = 'parts/group_message_list.html'
+        conversation_key = f'group:{group.id}'
 
     elif channel_id:
         try:
@@ -621,6 +639,7 @@ def api_poll(request):
             channel=channel, is_deleted=False
         ).order_by('created_at')
         template_name = 'parts/channel_post_list.html'
+        conversation_key = f'channel:{channel.id}'
 
     else:
         return JsonResponse({'status': 'error', 'message': 'Укажите user_id, group_id или channel_id'}, status=400)
@@ -646,6 +665,10 @@ def api_poll(request):
     # Превью последнего сообщения для списка чатов: обновляется без
     # перезагрузки страницы, чтобы под ником не оставался старый текст.
     last_message = messages[-1] if messages else None
+
+    # Пока чат открыт, его уведомления не должны копиться и показываться
+    # в других вкладках/на странице уведомлений.
+    mark_conversation_read(user, conversation_key)
 
     return JsonResponse({
         'html': html,

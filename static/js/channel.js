@@ -47,8 +47,13 @@ function doPoll() {
         .then(r => r.json())
         .then(data => {
             if (data.count > 0) {
-                postsContainer.insertAdjacentHTML('afterbegin', data.html);
-                if (data.cursor) pollState.cursor = data.cursor;
+                if (window.appendUniqueMessages) {
+                    window.appendUniqueMessages(
+                        postsContainer, data.html, 'afterbegin');
+                } else {
+                    postsContainer.insertAdjacentHTML('afterbegin', data.html);
+                }
+                window.advanceCursor(pollState, data.cursor);
             }
         })
         .catch(() => {});

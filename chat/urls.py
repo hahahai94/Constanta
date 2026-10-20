@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/send/', views.send_message, name='api_send'),
     path('api/heartbeat/', views.api_heartbeat, name='api_heartbeat'),
     path('api/poll/', views.api_poll, name='api_poll'),
+    path('api/chat-list/', views.chat_list_api, name='api_chat_list'),
     path('api/channel/<uuid:channel_id>/post/', views.api_channel_post, name='api_channel_post'),
     path('download/<uuid:message_id>/', views.download_attachment, name='download_attachment'),
     path('api/message/<uuid:message_id>/delete/', views.delete_message, name='api_delete_message'),

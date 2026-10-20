@@ -190,8 +190,14 @@ document.getElementById('chat-form').addEventListener('submit', function(e) {
         .then(d => {
             sendingDiv.remove();
             if (d.status === 'ok' && d.html) {
-                container.insertAdjacentHTML('beforeend', d.html);
-                if (window.pollGroupState && d.cursor) pollGroupState.cursor = d.cursor;
+                if (window.appendUniqueMessages) {
+                    window.appendUniqueMessages(container, d.html);
+                } else {
+                    container.insertAdjacentHTML('beforeend', d.html);
+                }
+                if (window.pollGroupState) {
+                    window.advanceCursor(pollGroupState, d.cursor);
+                }
                 container.scrollTop = container.scrollHeight;
                 messageInput.value = '';
                 fileUpload.value = '';
@@ -249,9 +255,11 @@ window.latestCursor = function() {
                 if (data.count > 0) {
                     const container = document.getElementById('messages-container');
                     const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-                    container.insertAdjacentHTML('beforeend', data.html);
-                    if (data.cursor) pollGroupState.cursor = data.cursor;
-                    if (wasAtBottom) container.scrollTop = container.scrollHeight;
+                    const inserted = window.appendUniqueMessages
+                        ? window.appendUniqueMessages(container, data.html)
+                        : (container.insertAdjacentHTML('beforeend', data.html), true);
+                    window.advanceCursor(pollGroupState, data.cursor);
+                    if (inserted && wasAtBottom) container.scrollTop = container.scrollHeight;
                 }
             })
             .catch(() => {});
