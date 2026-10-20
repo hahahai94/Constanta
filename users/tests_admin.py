@@ -1,4 +1,5 @@
-from django.test import TestCase
+from django.contrib import admin
+from django.test import RequestFactory, TestCase
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -156,3 +157,85 @@ class StaffPrivilegeEscalationTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.target.refresh_from_db()
         self.assertTrue(self.target.is_superuser)
+
+    def test_staff_cannot_open_superuser_password_page(self):
+        response = self.client.get(
+            f'/admin/users/user/{self.superadmin.pk}/password/'
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_cannot_reset_superuser_password(self):
+        old_password_hash = self.superadmin.password
+        response = self.client.post(
+            f'/admin/users/user/{self.superadmin.pk}/password/',
+            {
+                'password1': 'Audit-New-Pass-456!',
+                'password2': 'Audit-New-Pass-456!',
+                'usable_password': 'true',
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.superadmin.refresh_from_db()
+        self.assertEqual(self.superadmin.password, old_password_hash)
+        self.assertTrue(self.superadmin.check_password('123'))
+        self.assertFalse(self.superadmin.check_password('Audit-New-Pass-456!'))
+
+    def test_staff_cannot_change_superuser(self):
+        response = self.client.post(
+            f'/admin/users/user/{self.superadmin.pk}/change/',
+            {'username': 'esc_super', 'is_active': 'on'},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_ban_action_skips_superuser(self):
+        response = self.client.post('/admin/users/user/', {
+            'action': 'ban_users',
+            '_selected_action': [str(self.superadmin.pk)],
+            'post': 'yes',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.superadmin.refresh_from_db()
+        self.assertIsNone(self.superadmin.banned_at)
+
+    def test_staff_cannot_delete_superuser(self):
+        self.staff.user_permissions.add(
+            Permission.objects.get(content_type__app_label='users',
+                                   codename='delete_user')
+        )
+        response = self.client.get(
+            f'/admin/users/user/{self.superadmin.pk}/delete/'
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(
+            User.objects.filter(pk=self.superadmin.pk).exists()
+        )
+
+    def test_staff_delete_queryset_skips_superuser(self):
+        request = RequestFactory().post('/admin/users/user/')
+        request.user = self.staff
+        model_admin = admin.site.get_model_admin(User)
+        model_admin.delete_queryset(
+            request,
+            User.objects.filter(
+                pk__in=[self.superadmin.pk, self.target.pk]
+            ),
+        )
+        self.assertFalse(User.objects.filter(pk=self.target.pk).exists())
+        self.assertTrue(
+            User.objects.filter(pk=self.superadmin.pk).exists()
+        )
+
+    def test_superuser_can_still_reset_own_password(self):
+        self.client.logout()
+        self.client.login(username='esc_super', password='123')
+        response = self.client.post(
+            f'/admin/users/user/{self.superadmin.pk}/password/',
+            {
+                'password1': 'Admin-New-Pass-456!',
+                'password2': 'Admin-New-Pass-456!',
+                'usable_password': 'true',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.superadmin.refresh_from_db()
+        self.assertTrue(self.superadmin.check_password('Admin-New-Pass-456!'))

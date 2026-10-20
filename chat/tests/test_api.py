@@ -171,6 +171,25 @@ class APITests(TestCase):
         result = _content_disposition_header('файл.txt')
         self.assertIn('filename*', result)
 
+    def test_content_disposition_inline_non_ascii(self):
+        result = _content_disposition_header('файл.txt', 'inline')
+        self.assertTrue(result.startswith('inline;'))
+        self.assertIn('filename*', result)
+
+    def test_download_inline_non_ascii_filename(self):
+        file = SimpleUploadedFile(
+            'inline.png', make_png(), content_type='image/png')
+        msg = Message.objects.create(
+            sender=self.user, receiver=self.other,
+            content='inline', attachment=file, attachment_type='image',
+            attachment_original_name='изображение.png',
+        )
+        response = self.client.get(
+            f'/download/{msg.id}/?inline=1')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('filename*', response['Content-Disposition'])
+        self.assertTrue(response['Content-Disposition'].startswith('inline;'))
+
     def test_send_oversized_file(self):
         file = SimpleUploadedFile("big.bin", b"x" * (settings.FILE_UPLOAD_MAX_MEMORY_SIZE + 1), content_type="application/octet-stream")
         response = self.client.post('/api/send/', {
@@ -390,6 +409,36 @@ class APITests(TestCase):
         self.assertFalse(os.path.exists(old_path))
         self.assertTrue(group.avatar.name.endswith('.png'))
 
+    def test_api_update_group_keeps_old_avatar_when_save_fails(self):
+        group = Group.objects.create(
+            name='Old Av', owner=self.user, avatar=image_upload('keep_av.png'))
+        old_name = group.avatar.name
+        old_path = group.avatar.path
+        with mock.patch.object(Group, 'save', side_effect=RuntimeError('boom')):
+            response = self.client.post(f'/groups/{group.id}/settings/', {
+                'name': 'New Av',
+                'avatar': image_upload('new_av.png'),
+            })
+        self.assertEqual(response.status_code, 500)
+        group.refresh_from_db()
+        self.assertEqual(group.avatar.name, old_name)
+        self.assertTrue(os.path.exists(old_path))
+
+    def test_api_remove_group_avatar_keeps_file_when_save_fails(self):
+        group = Group.objects.create(
+            name='Old Av', owner=self.user, avatar=image_upload('keep_remove.png'))
+        old_name = group.avatar.name
+        old_path = group.avatar.path
+        with mock.patch.object(Group, 'save', side_effect=RuntimeError('boom')):
+            response = self.client.post(f'/groups/{group.id}/settings/', {
+                'name': 'New Av',
+                'remove_avatar': 'true',
+            })
+        self.assertEqual(response.status_code, 500)
+        group.refresh_from_db()
+        self.assertEqual(group.avatar.name, old_name)
+        self.assertTrue(os.path.exists(old_path))
+
     def test_send_message_invalid_image_rejected(self):
         file = SimpleUploadedFile("weird.png", b'\x00\x00\x00', content_type="image/png")
         response = self.client.post('/api/send/', {
@@ -416,6 +465,21 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertNotEqual(response.status_code, 500)
 
+    def test_send_invalid_reply_to_id_returns_400(self):
+        response = self.client.post('/api/send/', {
+            'user_id': self.other.id,
+            'content': 'hi',
+            'reply_to_id': 'not-a-uuid',
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_send_invalid_group_id_returns_400(self):
+        response = self.client.post('/api/send/', {
+            'group_id': 'not-a-uuid',
+            'content': 'hi',
+        })
+        self.assertEqual(response.status_code, 400)
+
     def test_send_response_contains_cursor(self):
         response = self.client.post('/api/send/', {
             'user_id': self.other.id, 'content': 'cursor test'
@@ -438,6 +502,14 @@ class PollAPITests(TestCase):
 
     def test_poll_requires_target(self):
         response = self.client.get('/api/poll/', {'after': ''})
+        self.assertEqual(response.status_code, 400)
+
+    def test_poll_invalid_group_id_returns_400(self):
+        response = self.client.get('/api/poll/', {'group_id': 'not-a-uuid'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_poll_invalid_channel_id_returns_400(self):
+        response = self.client.get('/api/poll/', {'channel_id': 'not-a-uuid'})
         self.assertEqual(response.status_code, 400)
 
     def test_poll_private_messages_after_cursor(self):

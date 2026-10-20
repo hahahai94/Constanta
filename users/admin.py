@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from django.utils.html import format_html
 from Constanta.csv_export import export_to_csv
@@ -71,6 +72,23 @@ class UltimateUserAdmin(BaseUserAdmin):
                 cleaned.append((name, options))
         return cleaned
 
+    def _target_is_protected(self, request, obj):
+        return (
+            obj is not None
+            and obj.is_superuser
+            and not request.user.is_superuser
+        )
+
+    def has_change_permission(self, request, obj=None):
+        if self._target_is_protected(request, obj):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if self._target_is_protected(request, obj):
+            return False
+        return super().has_delete_permission(request, obj)
+
     def avatar_preview(self, obj):
         if obj.avatar:
             return format_html(
@@ -90,10 +108,14 @@ class UltimateUserAdmin(BaseUserAdmin):
     def ban_users(self, request, queryset):
         banned = 0
         skipped_self = False
+        skipped_superuser = False
         for user in queryset:
             if user.pk == request.user.pk:
                 # иначе администратор заблокировал бы себе доступ
                 skipped_self = True
+                continue
+            if user.is_superuser and not request.user.is_superuser:
+                skipped_superuser = True
                 continue
             if user.banned_at is not None:
                 continue
@@ -108,12 +130,17 @@ class UltimateUserAdmin(BaseUserAdmin):
         message = f'Забанено пользователей: {banned}'
         if skipped_self:
             message += ' (собственный аккаунт пропущен)'
+        if skipped_superuser:
+            message += ' (суперпользователи пропущены)'
         self.message_user(request, message, messages.SUCCESS)
 
     @admin.action(description="✅ Разбанить выбранных пользователей")
     def unban_users(self, request, queryset):
+        queryset = queryset.filter(banned_at__isnull=False)
+        if not request.user.is_superuser:
+            queryset = queryset.exclude(is_superuser=True)
         unbanned = 0
-        for user in queryset.filter(banned_at__isnull=False):
+        for user in queryset:
             user.banned_at = None
             user.banned_by = None
             user.save(update_fields=['banned_at', 'banned_by'])
@@ -159,6 +186,8 @@ class UltimateUserAdmin(BaseUserAdmin):
         )
 
     def delete_model(self, request, obj):
+        if self._target_is_protected(request, obj):
+            raise PermissionDenied
         log_admin_action(
             request.user, 'delete_user', f'Удалён пользователь {obj.username}',
             target_user=None, request=request,
@@ -166,6 +195,8 @@ class UltimateUserAdmin(BaseUserAdmin):
         super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
+        if not request.user.is_superuser:
+            queryset = queryset.exclude(is_superuser=True)
         for username in list(queryset.values_list('username', flat=True)):
             log_admin_action(
                 request.user, 'delete_user', f'Удалён пользователь {username}',

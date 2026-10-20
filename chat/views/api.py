@@ -65,12 +65,15 @@ def _safe_filename(name):
     return name or 'file'
 
 
-def _content_disposition_header(filename):
+def _content_disposition_header(filename, disposition='attachment'):
     safe = _safe_filename(filename)
     ascii_part = safe.encode('ascii', errors='replace').decode('ascii')
     if ascii_part == safe:
-        return f'attachment; filename="{safe}"'
-    return f'attachment; filename="{ascii_part}"; filename*=UTF-8\'\'{quote(safe)}'
+        return f'{disposition}; filename="{safe}"'
+    return (
+        f'{disposition}; filename="{ascii_part}"; '
+        f'filename*=UTF-8\'\'{quote(safe)}'
+    )
 
 
 @login_required
@@ -111,7 +114,14 @@ def send_message(request):
 
     reply_msg = None
     if reply_to_id:
-        reply_msg = Message.objects.filter(id=reply_to_id, is_deleted=False).first()
+        try:
+            reply_msg = Message.objects.filter(
+                id=reply_to_id, is_deleted=False).first()
+        except (ValidationError, ValueError):
+            return JsonResponse(
+                {'status': 'error', 'message': 'Неверный reply_to_id'},
+                status=400,
+            )
         if reply_msg:
             if user_id:
                 ids = {request.user.id, user_id}
@@ -142,7 +152,13 @@ def send_message(request):
             )
             template_name = 'parts/message_list.html'
         elif group_id:
-            group_obj = get_object_or_404(Group, id=group_id)
+            try:
+                group_obj = get_object_or_404(Group, id=group_id)
+            except ValidationError:
+                return JsonResponse(
+                    {'status': 'error', 'message': 'Неверный group_id'},
+                    status=400,
+                )
             membership = GroupMember.objects.filter(group=group_obj, user=request.user).first()
             if membership is None:
                 return JsonResponse({'status': 'error', 'message': 'Не в группе'}, status=403)
@@ -248,6 +264,10 @@ def api_update_group(request, group_id):
         group.name = name
         group.description = description
 
+        old_avatar = group.avatar
+        old_avatar_name = old_avatar.name if old_avatar else ''
+        old_avatar_storage = old_avatar.storage if old_avatar else None
+
         if 'avatar' in request.FILES:
             # Сначала проверяем новый файл: иначе при ошибке уже потеряли бы
             # старый аватар (problems.md, П-3).
@@ -256,14 +276,19 @@ def api_update_group(request, group_id):
             except ValidationError as exc:
                 message = exc.messages[0] if exc.messages else 'Недопустимый файл'
                 return JsonResponse({'status': 'error', 'message': message}, status=400)
-            if group.avatar:
-                group.avatar.delete()
             group.avatar = request.FILES['avatar']
         elif request.POST.get('remove_avatar') == 'true' and group.avatar:
-            group.avatar.delete()
             group.avatar = None
 
         group.save()
+
+        current_avatar_name = group.avatar.name if group.avatar else ''
+        if old_avatar_name and old_avatar_name != current_avatar_name:
+            try:
+                old_avatar_storage.delete(old_avatar_name)
+            except Exception:
+                logger.exception('Failed to delete old group avatar %s', old_avatar_name)
+
         return JsonResponse({'status': 'ok'})
 
     except Exception:
@@ -452,11 +477,8 @@ def download_attachment(request, message_id):
             as_attachment=not inline,
             content_type=content_type,
         )
-        if inline:
-            response['Content-Disposition'] = (
-                f'inline; filename="{_safe_filename(original_name)}"')
-        else:
-            response['Content-Disposition'] = _content_disposition_header(original_name)
+        response['Content-Disposition'] = _content_disposition_header(
+            original_name, 'inline' if inline else 'attachment')
         response['X-Content-Type-Options'] = 'nosniff'
         return response
     except FileNotFoundError:
@@ -575,7 +597,11 @@ def api_poll(request):
         template_name = 'parts/message_list.html'
 
     elif group_id:
-        group = get_object_or_404(Group, id=group_id)
+        try:
+            group = get_object_or_404(Group, id=group_id)
+        except ValidationError:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Неверный group_id'}, status=400)
         if not GroupMember.objects.filter(group=group, user=user).exists():
             return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
         messages_qs = Message.objects.filter(
@@ -584,7 +610,11 @@ def api_poll(request):
         template_name = 'parts/group_message_list.html'
 
     elif channel_id:
-        channel = get_object_or_404(Channel, id=channel_id)
+        try:
+            channel = get_object_or_404(Channel, id=channel_id)
+        except ValidationError:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Неверный channel_id'}, status=400)
         if not ChannelMember.objects.filter(channel=channel, user=user).exists():
             return JsonResponse({'status': 'error', 'message': 'Нет доступа'}, status=403)
         messages_qs = Message.objects.filter(
