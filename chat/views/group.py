@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 from chat.models import Group, GroupMember, Message
-from chat.utils import html_429, rate_limit
+from chat.utils import html_429, normalize_conversation_name, rate_limit
 from chat.utils.history import (
     build_earlier_url, load_message_page, parse_before,
 )
@@ -80,14 +80,17 @@ def group_chat(request, group_id):
 def create_group(request):
     """Создание новой группы"""
     if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        if name:
-            if Group.objects.filter(owner=request.user).count() >= settings.MAX_GROUPS_PER_USER:
-                messages.error(request, f'❌ Лимит групп ({settings.MAX_GROUPS_PER_USER})')
-                return redirect('groups')
-            group = Group.objects.create(name=name, owner=request.user)
-            GroupMember.objects.create(group=group, user=request.user, role='owner')
-            return redirect('group_chat', group_id=group.id)
+        try:
+            name = normalize_conversation_name(request.POST.get('name', ''))
+        except ValidationError as exc:
+            messages.error(request, f'❌ {exc.messages[0]}')
+            return redirect('groups')
+        if Group.objects.filter(owner=request.user).count() >= settings.MAX_GROUPS_PER_USER:
+            messages.error(request, f'❌ Лимит групп ({settings.MAX_GROUPS_PER_USER})')
+            return redirect('groups')
+        group = Group.objects.create(name=name, owner=request.user)
+        GroupMember.objects.create(group=group, user=request.user, role='owner')
+        return redirect('group_chat', group_id=group.id)
     return redirect('groups')
 
 
@@ -100,6 +103,16 @@ def edit_group(request, group_id):
         return redirect('group_chat', group_id=group_id)
 
     if request.method == 'POST':
+        try:
+            name = normalize_conversation_name(
+                request.POST.get('name', group.name))
+        except ValidationError as exc:
+            messages.error(request, f'❌ {exc.messages[0]}')
+            return redirect('group_chat', group_id=group_id)
+
+        old_avatar = group.avatar
+        old_avatar_name = old_avatar.name if old_avatar else ''
+        old_avatar_storage = old_avatar.storage if old_avatar else None
         avatar = request.FILES.get('avatar')
         if avatar:
             # Проверяем до применения изменений, чтобы отклонённый файл не
@@ -111,11 +124,14 @@ def edit_group(request, group_id):
                 messages.error(request, f'❌ {message}')
                 return redirect('group_chat', group_id=group_id)
 
-        group.name = request.POST.get('name', group.name).strip()
+        group.name = name
         group.description = request.POST.get('description', group.description).strip()
         if avatar:
             group.avatar = avatar
         group.save()
+        if (old_avatar_name and group.avatar
+                and old_avatar_name != group.avatar.name):
+            old_avatar_storage.delete(old_avatar_name)
     return redirect('group_chat', group_id=group_id)
 
 

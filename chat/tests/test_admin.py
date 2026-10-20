@@ -1,8 +1,13 @@
-from django.test import TestCase
+from django.test import TestCase, RequestFactory
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from chat.models import Group, GroupMember, Message
-from chat.admin import UltimateGroupAdmin, UltimateMessageAdmin, UltimateGroupMemberAdmin
+from chat.models import Group, GroupMember, Message, Channel
+from chat.admin import (
+    UltimateGroupAdmin, UltimateMessageAdmin, UltimateGroupMemberAdmin,
+    ChannelAdmin,
+)
+from chat.tests.factories import image_upload
 from users.models import AdminLog
 import io, os, csv
 
@@ -73,6 +78,32 @@ class ChatAdminTests(TestCase):
         self.assertFalse(os.path.exists(avatar_path))
         self.assertFalse(os.path.exists(attachment_path))
 
+    def test_admin_group_avatar_replacement_removes_old_file(self):
+        group = Group.objects.create(
+            name='Admin Avatar Group', owner=self.admin,
+            avatar=image_upload('admin_old_group.png'))
+        old_path = group.avatar.path
+        group.avatar = image_upload('admin_new_group.png')
+        request = RequestFactory().post('/admin/chat/group/')
+        request.user = self.admin
+        UltimateGroupAdmin(Group, AdminSite()).save_model(
+            request, group, None, change=True)
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(group.avatar.path))
+
+    def test_admin_channel_avatar_replacement_removes_old_file(self):
+        channel = Channel.objects.create(
+            name='Admin Avatar Channel', owner=self.admin,
+            avatar=image_upload('admin_old_channel.png'))
+        old_path = channel.avatar.path
+        channel.avatar = image_upload('admin_new_channel.png')
+        request = RequestFactory().post('/admin/chat/channel/')
+        request.user = self.admin
+        ChannelAdmin(Channel, AdminSite()).save_model(
+            request, channel, None, change=True)
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(channel.avatar.path))
+
     def test_admin_export_group_members(self):
         GroupMember.objects.create(group=self.group, user=self.user, role='member')
         response = self.client.post('/admin/chat/group/', {
@@ -81,6 +112,17 @@ class ChatAdminTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'text/csv')
+
+    def test_admin_export_group_members_escapes_formulas(self):
+        group = Group.objects.create(name='=1+1', owner=self.admin)
+        GroupMember.objects.create(group=group, user=self.user, role='member')
+        response = self.client.post('/admin/chat/group/', {
+            'action': 'export_group_members',
+            '_selected_action': [group.pk],
+        })
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(io.StringIO(response.content.decode())))
+        self.assertEqual(rows[1][0], "'=1+1")
 
     def test_admin_export_messages_csv(self):
         Message.objects.create(sender=self.user, receiver=self.admin, content='export me')

@@ -11,10 +11,13 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
-from chat.utils import parse_mentions, create_notification, rate_limit
+from chat.utils import (
+    create_notification, normalize_conversation_name, parse_mentions, rate_limit,
+)
 from chat.utils.uploads import detect_attachment_type, normalize_avatar, normalize_upload
 
 logger = logging.getLogger(__name__)
@@ -162,10 +165,16 @@ def send_message(request):
 
         if content:
             try:
-                mentioned_ids = parse_mentions(content, group=msg.group)
+                mentioned_ids = parse_mentions(
+                    content, group=msg.group, receiver=receiver)
                 if mentioned_ids:
                     msg.mentions = json.dumps(mentioned_ids)
                     msg.save(update_fields=['mentions'])
+                    mention_url = (
+                        f'{reverse("main")}?user_id={request.user.id}'
+                        if receiver is not None
+                        else reverse('group_chat', args=[msg.group_id])
+                    )
                     # один запрос вместо обращения к базе на каждое упоминание
                     recipients = User.objects.filter(
                         id__in=mentioned_ids).exclude(pk=request.user.pk)
@@ -175,7 +184,7 @@ def send_message(request):
                             notification_type='mention',
                             title='Упоминание',
                             message=f'{request.user.username} упомянул вас: {content[:50]}',
-                            url=f'/{msg.id}/',
+                            url=mention_url,
                             related_message=msg,
                         )
             except Exception:
@@ -228,11 +237,13 @@ def api_update_group(request, group_id):
         return JsonResponse({'status': 'error', 'message': 'Нет прав'}, status=403)
 
     try:
-        name = request.POST.get('name', '').strip()
-        description = request.POST.get('description', '').strip()
+        name = normalize_conversation_name(request.POST.get('name', ''))
+    except ValidationError as exc:
+        return JsonResponse(
+            {'status': 'error', 'message': exc.messages[0]}, status=400)
 
-        if not name:
-            return JsonResponse({'status': 'error', 'message': 'Название обязательно'}, status=400)
+    try:
+        description = request.POST.get('description', '').strip()
 
         group.name = name
         group.description = description

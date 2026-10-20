@@ -155,6 +155,14 @@ class APITests(TestCase):
         response = self.client.post(f'/groups/{group.id}/settings/', {'name': ''})
         self.assertEqual(response.status_code, 400)
 
+    def test_api_update_group_rejects_long_name(self):
+        group = Group.objects.create(name='Original', owner=self.user)
+        response = self.client.post(
+            f'/groups/{group.id}/settings/', {'name': 'x' * 101})
+        self.assertEqual(response.status_code, 400)
+        group.refresh_from_db()
+        self.assertEqual(group.name, 'Original')
+
     def test_detect_attachment_type_none(self):
         result = _detect_attachment_type(b'\x00\x00\x00', '')
         self.assertEqual(result, 'file')
@@ -173,14 +181,23 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_send_message_with_mention(self):
-        mentioned = User.objects.create_user(username='mention_target', password='123')
         response = self.client.post('/api/send/', {
             'user_id': self.other.id,
-            'content': f'Hello @{mentioned.username}'
+            'content': f'Hello @{self.other.username}'
         })
         self.assertEqual(response.status_code, 200)
         msg = Message.objects.get(sender=self.user, receiver=self.other)
-        self.assertIn(str(mentioned.id), msg.mentions)
+        self.assertIn(str(self.other.id), msg.mentions)
+
+    def test_private_message_ignores_third_party_mention(self):
+        outsider = User.objects.create_user(username='mention_outsider', password='123')
+        response = self.client.post('/api/send/', {
+            'user_id': self.other.id,
+            'content': f'Hello @{outsider.username}'
+        })
+        self.assertEqual(response.status_code, 200)
+        msg = Message.objects.get(sender=self.user, receiver=self.other)
+        self.assertNotIn(str(outsider.id), msg.mentions or '[]')
 
     def test_send_message_to_group(self):
         group = Group.objects.create(name='Test Group', owner=self.user)

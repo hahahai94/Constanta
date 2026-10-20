@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from chat.models import Channel, ChannelMember, Message
+from users.models import Notification
 import json
 
 User = get_user_model()
@@ -87,6 +88,18 @@ class ChannelViewTests(TestCase):
         self.assertTrue(Channel.objects.filter(name='NewChan').exists())
         self.assertRedirects(response, reverse('channel_view', args=[Channel.objects.get(name='NewChan').id]))
 
+    def test_create_channel_rejects_empty_name(self):
+        before = Channel.objects.count()
+        response = self.client.post(reverse('create_channel'), {'name': '   '})
+        self.assertRedirects(response, reverse('channel_list'))
+        self.assertEqual(Channel.objects.count(), before)
+
+    def test_create_channel_rejects_long_name(self):
+        before = Channel.objects.count()
+        response = self.client.post(reverse('create_channel'), {'name': 'x' * 101})
+        self.assertRedirects(response, reverse('channel_list'))
+        self.assertEqual(Channel.objects.count(), before)
+
     def test_join_channel(self):
         self.client.logout()
         self.client.login(username='ch_user', password='123')
@@ -162,6 +175,37 @@ class ChannelViewTests(TestCase):
         self.assertEqual(self.channel.description, 'Desc')
         self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
 
+    def test_edit_channel_rejects_empty_name(self):
+        response = self.client.post(reverse('edit_channel', args=[self.channel.id]), {
+            'name': '   '
+        })
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.name, 'Updates')
+
+    def test_edit_channel_rejects_long_name(self):
+        response = self.client.post(reverse('edit_channel', args=[self.channel.id]), {
+            'name': 'x' * 101
+        })
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.name, 'Updates')
+
+    def test_edit_channel_replaces_old_avatar_file(self):
+        import os
+        from chat.tests.factories import image_upload
+        self.channel.avatar = image_upload('old_channel_avatar.png')
+        self.channel.save()
+        old_path = self.channel.avatar.path
+        response = self.client.post(reverse('edit_channel', args=[self.channel.id]), {
+            'name': 'Updates',
+            'avatar': image_upload('new_channel_avatar.png'),
+        })
+        self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+        self.channel.refresh_from_db()
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(self.channel.avatar.path))
+
     def test_edit_channel_get(self):
         response = self.client.get(reverse('edit_channel', args=[self.channel.id]))
         self.assertEqual(response.status_code, 200)
@@ -206,6 +250,31 @@ class ChannelAPITests(TestCase):
         long_text = 'x' * 3000
         response = self.client.post(reverse('api_channel_post', args=[self.channel.id]), {'content': long_text})
         self.assertEqual(response.status_code, 400)
+
+    def test_channel_mention_notifies_subscriber(self):
+        subscriber = User.objects.create_user(username='chan_subscriber', password='123')
+        ChannelMember.objects.create(
+            channel=self.channel, user=subscriber, role='subscriber')
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('api_channel_post', args=[self.channel.id]),
+                {'content': f'@{subscriber.username} hello'},
+            )
+        self.assertEqual(response.status_code, 200)
+        note = Notification.objects.get(
+            user=subscriber, notification_type='mention')
+        self.assertEqual(note.url, reverse('channel_view', args=[self.channel.id]))
+
+    def test_channel_mention_does_not_notify_outsider(self):
+        outsider = User.objects.create_user(username='chan_outsider', password='123')
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('api_channel_post', args=[self.channel.id]),
+                {'content': f'@{outsider.username} secret'},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Notification.objects.filter(
+            user=outsider, notification_type='mention').exists())
 
     def test_channel_post_anonymous(self):
         self.client.logout()
@@ -256,9 +325,18 @@ class ChannelInviteTests(TestCase):
 
     def test_invite_join_private_channel(self):
         self.client.login(username='inv_user', password='123')
-        response = self.client.get(reverse('channel_invite', args=[self.channel.invite_token]))
+        response = self.client.post(reverse('channel_invite', args=[self.channel.invite_token]))
         self.assertTrue(ChannelMember.objects.filter(channel=self.channel, user=self.user).exists())
         self.assertRedirects(response, reverse('channel_view', args=[self.channel.id]))
+
+    def test_invite_get_shows_confirmation_without_subscribing(self):
+        self.client.login(username='inv_user', password='123')
+        response = self.client.get(reverse('channel_invite', args=[self.channel.invite_token]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Private')
+        self.assertContains(response, 'Подписаться')
+        self.assertFalse(ChannelMember.objects.filter(
+            channel=self.channel, user=self.user).exists())
 
     def test_invite_already_subscribed(self):
         ChannelMember.objects.create(channel=self.channel, user=self.user, role='subscriber')

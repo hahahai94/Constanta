@@ -11,6 +11,7 @@ import re
 # `\\w+` покрывает заявленный набор логина (буквы, цифры, подчёркивание),
 # поэтому после экранирования текста в совпадении не может быть разметки.
 MENTION_PATTERN = re.compile(r'@(\w+)')
+ALL_MENTION_PATTERN = re.compile(r'(?<![\w@.+-])@all(?![\w@.+-])')
 
 
 def extract_mentioned_usernames(content):
@@ -19,32 +20,41 @@ def extract_mentioned_usernames(content):
 
 
 def parse_mentions(content, group=None, channel=None, receiver=None):
-    """Возвращает список id упомянутых пользователей.
+    """Возвращает id упомянутых пользователей в пределах беседы.
 
-    `@all` разворачивается в участников группы или подписчиков канала; в личных
-    чатах он никого не уведомляет.
+    `@all` разворачивается только в участников группы или подписчиков канала.
+    В личном чате допустим только собеседник; глобальный поиск username не
+    выполняется, чтобы упоминание не уведомляло постороннего (problems.md,
+    П-55, П-56).
     """
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
     mentioned_ids = []
+    scope_ids = set()
 
-    if '@all' in (content or ''):
-        if group is not None:
-            from chat.models import GroupMember
-            mentioned_ids.extend(
-                GroupMember.objects.filter(group=group).values_list('user_id', flat=True)
-            )
-        elif channel is not None:
-            from chat.models import ChannelMember
-            mentioned_ids.extend(
-                ChannelMember.objects.filter(channel=channel).values_list('user_id', flat=True)
-            )
+    if receiver is not None:
+        scope_ids = {receiver.pk}
+    elif group is not None:
+        from chat.models import GroupMember
+        scope_ids = set(
+            GroupMember.objects.filter(group=group).values_list('user_id', flat=True)
+        )
+    elif channel is not None:
+        from chat.models import ChannelMember
+        scope_ids = set(
+            ChannelMember.objects.filter(channel=channel).values_list('user_id', flat=True)
+        )
+
+    if (group is not None or channel is not None) and ALL_MENTION_PATTERN.search(content or ''):
+        mentioned_ids.extend(scope_ids)
 
     usernames = extract_mentioned_usernames(content)
-    if usernames:
+    if usernames and scope_ids:
         mentioned_ids.extend(
-            User.objects.filter(username__in=usernames).values_list('id', flat=True)
+            User.objects.filter(
+                id__in=scope_ids, username__in=usernames
+            ).values_list('id', flat=True)
         )
 
     return list(set(mentioned_ids))

@@ -20,6 +20,18 @@ class GroupTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Group.objects.filter(name='Test Group').exists())
 
+    def test_create_group_rejects_empty_name(self):
+        before = Group.objects.count()
+        response = self.client.post(reverse('create_group'), {'name': '   '})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Group.objects.count(), before)
+
+    def test_create_group_rejects_long_name(self):
+        before = Group.objects.count()
+        response = self.client.post(reverse('create_group'), {'name': 'x' * 101})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Group.objects.count(), before)
+
     def test_add_member(self):
         group = Group.objects.create(name='My Group', owner=self.owner)
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
@@ -88,6 +100,24 @@ class GroupTests(TestCase):
         self.assertEqual(response.status_code, 302)
         group.refresh_from_db()
         self.assertEqual(group.name, 'New Name')
+
+    def test_edit_group_rejects_empty_name(self):
+        group = Group.objects.create(name='Old Name', owner=self.owner)
+        response = self.client.post(reverse('edit_group', args=[group.id]), {
+            'name': '   '
+        })
+        self.assertEqual(response.status_code, 302)
+        group.refresh_from_db()
+        self.assertEqual(group.name, 'Old Name')
+
+    def test_edit_group_rejects_long_name(self):
+        group = Group.objects.create(name='Old Name', owner=self.owner)
+        response = self.client.post(reverse('edit_group', args=[group.id]), {
+            'name': 'x' * 101
+        })
+        self.assertEqual(response.status_code, 302)
+        group.refresh_from_db()
+        self.assertEqual(group.name, 'Old Name')
 
     def test_change_role(self):
         group = Group.objects.create(name='G', owner=self.owner)
@@ -207,6 +237,40 @@ class GroupTests(TestCase):
         self.assertEqual(group.name, 'Updated')
         self.assertTrue(group.avatar)
         self.assertTrue(group.avatar.name.endswith('.png'))
+
+    def test_edit_group_replaces_old_avatar_file(self):
+        import os
+        from chat.tests.factories import image_upload
+        group = Group.objects.create(
+            name='Avatar Group', owner=self.owner,
+            avatar=image_upload('old_group_avatar.png'))
+        old_path = group.avatar.path
+        response = self.client.post(reverse('edit_group', args=[group.id]), {
+            'name': 'Avatar Group',
+            'avatar': image_upload('new_group_avatar.png'),
+        })
+        self.assertEqual(response.status_code, 302)
+        group.refresh_from_db()
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(group.avatar.path))
+
+    def test_edit_group_keeps_old_avatar_on_invalid_upload(self):
+        import os
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from chat.tests.factories import image_upload
+        group = Group.objects.create(
+            name='Avatar Group', owner=self.owner,
+            avatar=image_upload('keep_group_avatar.png'))
+        old_path = group.avatar.path
+        response = self.client.post(reverse('edit_group', args=[group.id]), {
+            'name': 'Avatar Group',
+            'avatar': SimpleUploadedFile(
+                'bad.png', b'not an image', content_type='image/png'),
+        })
+        self.assertEqual(response.status_code, 302)
+        group.refresh_from_db()
+        self.assertTrue(os.path.exists(old_path))
+        self.assertEqual(group.avatar.path, old_path)
 
     def test_add_member_not_admin(self):
         group = Group.objects.create(name='Locked', owner=self.owner)

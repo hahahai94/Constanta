@@ -1,13 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.utils.html import format_html
-from django.http import HttpResponse
 from django.contrib import messages
 from django.db.models import Count
 from Constanta.csv_export import export_to_csv
 from chat.models import Group, Message, GroupMember, Channel, ChannelMember
 from users.audit import log_admin_action
-import csv
 
 User = get_user_model()
 
@@ -39,6 +37,18 @@ class UltimateGroupAdmin(admin.ModelAdmin):
             _member_count=Count('members', distinct=True),
             _message_count=Count('messages', distinct=True),
         )
+
+    def save_model(self, request, obj, form, change):
+        old_name = ''
+        old_storage = None
+        if change:
+            old = Group.objects.filter(pk=obj.pk).only('avatar').first()
+            if old and old.avatar:
+                old_name = old.avatar.name
+                old_storage = old.avatar.storage
+        super().save_model(request, obj, form, change)
+        if old_name and (not obj.avatar or obj.avatar.name != old_name):
+            old_storage.delete(old_name)
 
     def avatar_preview(self, obj):
         if obj.avatar:
@@ -74,15 +84,14 @@ class UltimateGroupAdmin(admin.ModelAdmin):
 
     @admin.action(description="Экспорт участников в CSV")
     def export_group_members(self, request, queryset):
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="group_members.csv"'
-        writer = csv.writer(response)
-        writer.writerow(['Группа', 'Пользователь', 'Роль', 'Дата вступления'])
         group_ids = list(queryset.values_list('id', flat=True))
-        members = GroupMember.objects.filter(group_id__in=group_ids).select_related('group', 'user')
-        for member in members:
-            writer.writerow([member.group.name, member.user.username, member.role, member.joined_at])
-        return response
+        members = GroupMember.objects.filter(
+            group_id__in=group_ids).select_related('group', 'user')
+        return export_to_csv(
+            self, request, members, 'group_members',
+            ['group__name', 'user__username', 'role', 'joined_at'],
+            ['Группа', 'Пользователь', 'Роль', 'Дата вступления'],
+        )
 
     actions = ['hard_delete_groups', 'export_group_members']
 
@@ -171,6 +180,18 @@ class ChannelAdmin(admin.ModelAdmin):
     list_display = ('name', 'owner', 'is_private', 'created_at')
     list_filter = ('is_private', 'created_at')
     search_fields = ('name', 'owner__username')
+
+    def save_model(self, request, obj, form, change):
+        old_name = ''
+        old_storage = None
+        if change:
+            old = Channel.objects.filter(pk=obj.pk).only('avatar').first()
+            if old and old.avatar:
+                old_name = old.avatar.name
+                old_storage = old.avatar.storage
+        super().save_model(request, obj, form, change)
+        if old_name and (not obj.avatar or obj.avatar.name != old_name):
+            old_storage.delete(old_name)
 
 
 @admin.register(ChannelMember)

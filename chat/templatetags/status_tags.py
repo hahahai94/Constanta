@@ -20,5 +20,5 @@ def user_status(user):
     if diff < timedelta(minutes=3):
         return mark_safe('<span class="status-dot online"></span><small class="text-success">онлайн</small>')
     else:
-        mins = diff.seconds // 60
+        mins = int(diff.total_seconds() // 60)
         return mark_safe(f'<span class="status-dot offline"></span><small class="text-muted">{mins}м назад</small>')

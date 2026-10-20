@@ -61,6 +61,34 @@ class UserAdminTests(TestCase):
         response = self.client.get(f'/admin/users/adminlog/{log.pk}/change/')
         self.assertEqual(response.status_code, 403)
 
+    def test_admin_adminlog_no_delete(self):
+        log = AdminLog.objects.create(
+            admin=self.admin, action='ban_user', description='test', target_user=self.user
+        )
+        response = self.client.get(f'/admin/users/adminlog/{log.pk}/delete/')
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(AdminLog.objects.filter(pk=log.pk).exists())
+
+    def test_adminlog_keeps_admin_username_after_user_deletion(self):
+        log = AdminLog.objects.create(
+            admin=self.admin, action='ban_user', description='test', target_user=self.user
+        )
+        deleter = User.objects.create_superuser(
+            username='deleter', password='123',
+        )
+        self.client.logout()
+        self.client.login(username='deleter', password='123')
+        response = self.client.post('/admin/users/user/', {
+            'action': 'delete_selected',
+            '_selected_action': [str(self.admin.pk)],
+            'post': 'yes',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(User.objects.filter(pk=self.admin.pk).exists())
+        log.refresh_from_db()
+        self.assertIsNone(log.admin)
+        self.assertEqual(log.admin_username, 'superadmin')
+
 
 class StaffPrivilegeEscalationTests(TestCase):
     """П-1: персонал не должен выдавать привилегии через админку.

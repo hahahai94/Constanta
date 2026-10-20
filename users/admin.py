@@ -208,16 +208,28 @@ class BannedIPAdmin(admin.ModelAdmin):
 
 @admin.register(AdminLog)
 class AdminLogAdmin(admin.ModelAdmin):
-    list_display = ('admin', 'action', 'target_user', 'timestamp', 'ip_address')
+    list_display = ('admin_label', 'action', 'target_user', 'timestamp', 'ip_address')
     list_filter = ('action', 'timestamp', 'admin')
-    search_fields = ('admin__username', 'target_user__username', 'description')
-    readonly_fields = ('admin', 'action', 'target_user', 'description', 'timestamp', 'ip_address')
+    search_fields = ('admin_username', 'admin__username', 'target_user__username', 'description')
+    readonly_fields = (
+        'admin', 'admin_username', 'action', 'target_user', 'description',
+        'timestamp', 'ip_address',
+    )
     ordering = ('-timestamp',)
+
+    @admin.display(description='Админ')
+    def admin_label(self, obj):
+        if obj.admin_username:
+            return obj.admin_username
+        return obj.admin.username if obj.admin_id else '—'
 
     def has_add_permission(self, request):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 

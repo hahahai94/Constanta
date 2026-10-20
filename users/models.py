@@ -66,7 +66,11 @@ class AdminLog(models.Model):
         ('unban_ip', 'Разблокировка IP'),
     ]
 
-    admin = models.ForeignKey(User, related_name='admin_actions', on_delete=models.CASCADE)
+    admin = models.ForeignKey(
+        User, related_name='admin_actions', on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    admin_username = models.CharField(max_length=150, blank=True, default='')
     action = models.CharField(max_length=50, choices=ACTION_CHOICES)
     target_user = models.ForeignKey(User, related_name='admin_logs', on_delete=models.SET_NULL, null=True, blank=True)
     description = models.TextField()
@@ -79,8 +83,19 @@ class AdminLog(models.Model):
         verbose_name = 'Лог админа'
         verbose_name_plural = 'Логи админа'
 
+    def save(self, *args, **kwargs):
+        if self.admin_id:
+            self.admin_username = self.admin.username
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = set(update_fields) | {'admin_username'}
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.admin.username} -> {self.action} -> {self.target_user}"
+        admin_name = self.admin_username
+        if not admin_name and self.admin_id:
+            admin_name = self.admin.username
+        return f"{admin_name or '—'} -> {self.action} -> {self.target_user}"
 
 
 class Notification(models.Model):

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from chat.models import Channel, ChannelMember, Message
-from chat.utils import html_429, rate_limit
+from chat.utils import html_429, normalize_conversation_name, rate_limit
 from chat.utils.uploads import normalize_avatar
 
 POSTS_PER_PAGE = 30
@@ -82,17 +82,20 @@ def channel_view(request, channel_id):
 @rate_limit('create_channel', limit=10, period=300, on_limited=html_429)
 def create_channel(request):
     if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        if name:
-            if Channel.objects.filter(owner=request.user).count() >= settings.MAX_CHANNELS_PER_USER:
-                # раньше каналы не ограничивались вовсе, в отличие от групп (П-28)
-                messages.error(
-                    request, f'❌ Лимит каналов ({settings.MAX_CHANNELS_PER_USER})')
-                return redirect('channel_list')
-            is_private = request.POST.get('is_private') == '1'
-            channel = Channel.objects.create(name=name, owner=request.user, is_private=is_private)
-            ChannelMember.objects.create(channel=channel, user=request.user, role='owner')
-            return redirect('channel_view', channel_id=channel.id)
+        try:
+            name = normalize_conversation_name(request.POST.get('name', ''))
+        except ValidationError as exc:
+            messages.error(request, f'❌ {exc.messages[0]}')
+            return redirect('channel_list')
+        if Channel.objects.filter(owner=request.user).count() >= settings.MAX_CHANNELS_PER_USER:
+            # раньше каналы не ограничивались вовсе, в отличие от групп (П-28)
+            messages.error(
+                request, f'❌ Лимит каналов ({settings.MAX_CHANNELS_PER_USER})')
+            return redirect('channel_list')
+        is_private = request.POST.get('is_private') == '1'
+        channel = Channel.objects.create(name=name, owner=request.user, is_private=is_private)
+        ChannelMember.objects.create(channel=channel, user=request.user, role='owner')
+        return redirect('channel_view', channel_id=channel.id)
     return redirect('channel_list')
 
 
@@ -104,6 +107,16 @@ def edit_channel(request, channel_id):
         messages.error(request, 'Нет прав')
         return redirect('channel_view', channel_id=channel_id)
     if request.method == 'POST':
+        try:
+            name = normalize_conversation_name(
+                request.POST.get('name', channel.name))
+        except ValidationError as exc:
+            messages.error(request, f'❌ {exc.messages[0]}')
+            return redirect('channel_view', channel_id=channel_id)
+
+        old_avatar = channel.avatar
+        old_avatar_name = old_avatar.name if old_avatar else ''
+        old_avatar_storage = old_avatar.storage if old_avatar else None
         avatar = request.FILES.get('avatar')
         if avatar:
             # Проверяем до применения изменений (problems.md, П-3).
@@ -114,12 +127,15 @@ def edit_channel(request, channel_id):
                 messages.error(request, f'❌ {message}')
                 return redirect('channel_view', channel_id=channel_id)
 
-        channel.name = request.POST.get('name', channel.name).strip()
+        channel.name = name
         channel.description = request.POST.get('description', channel.description).strip()
         channel.is_private = request.POST.get('is_private') == '1'
         if avatar:
             channel.avatar = avatar
         channel.save()
+        if (old_avatar_name and channel.avatar
+                and old_avatar_name != channel.avatar.name):
+            old_avatar_storage.delete(old_avatar_name)
         return redirect('channel_view', channel_id=channel_id)
     membership = ChannelMember.objects.filter(channel=channel, user=request.user).first()
     posts_qs = Message.objects.filter(
@@ -180,10 +196,14 @@ def channel_invite(request, token):
     channel = get_object_or_404(Channel, invite_token=token)
     if ChannelMember.objects.filter(channel=channel, user=request.user).exists():
         messages.info(request, 'Вы уже подписаны на этот канал')
-    else:
+        return redirect('channel_view', channel_id=channel.id)
+
+    if request.method == 'POST':
         ChannelMember.objects.create(channel=channel, user=request.user, role='subscriber')
         messages.success(request, f'Вы подписались на {channel.name}')
-    return redirect('channel_view', channel_id=channel.id)
+        return redirect('channel_view', channel_id=channel.id)
+
+    return render(request, 'channel_invite.html', {'channel': channel})
 
 
 @login_required

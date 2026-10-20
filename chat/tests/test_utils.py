@@ -72,7 +72,10 @@ class UtilsMentionTests(TestCase):
         self.assertEqual(parse_mentions('Hello world'), [])
 
     def test_parse_mention_user(self):
-        self.assertIn(self.user.id, parse_mentions(f'Hey @{self.user.username}'))
+        self.assertIn(
+            self.user.id,
+            parse_mentions(f'Hey @{self.user.username}', receiver=self.user),
+        )
 
     def test_parse_mention_all_in_group(self):
         group = Group.objects.create(name='Test Group', owner=self.sender)
@@ -106,9 +109,40 @@ class UtilsMentionTests(TestCase):
         self.assertIn(u2.id, ids)
         self.assertEqual(len(ids), 2)
 
+    def test_parse_mention_skips_outsider_in_group(self):
+        group = Group.objects.create(name='Scoped Group', owner=self.sender)
+        outsider = User.objects.create_user(username='group_outsider', password='123')
+        GroupMember.objects.create(group=group, user=self.user, role='member')
+        ids = parse_mentions(f'@{outsider.username}', group=group)
+        self.assertNotIn(outsider.id, ids)
+        self.assertIn(self.user.id, parse_mentions(
+            f'@{self.user.username}', group=group))
+
+    def test_parse_mention_skips_outsider_in_channel(self):
+        channel = Channel.objects.create(name='Scoped Channel', owner=self.sender)
+        outsider = User.objects.create_user(username='scoped_outsider', password='123')
+        ChannelMember.objects.create(channel=channel, user=self.user, role='subscriber')
+        ids = parse_mentions(f'@{outsider.username}', channel=channel)
+        self.assertNotIn(outsider.id, ids)
+        self.assertIn(self.user.id, parse_mentions(
+            f'@{self.user.username}', channel=channel))
+
+    def test_private_mention_only_includes_receiver(self):
+        outsider = User.objects.create_user(username='private_outsider', password='123')
+        ids = parse_mentions(
+            f'@{self.user.username} @{outsider.username}', receiver=self.user)
+        self.assertEqual(ids, [self.user.id])
+
+    def test_all_substring_does_not_expand_to_everyone(self):
+        group = Group.objects.create(name='All Substring Group', owner=self.sender)
+        GroupMember.objects.create(group=group, user=self.user, role='member')
+        for content in ('@allison', '@all_extra', '@all-extra'):
+            with self.subTest(content=content):
+                self.assertEqual(parse_mentions(content, group=group), [])
+
     def test_parse_mentions_returns_plain_ids(self):
         """П-16: функция отдаёт id, а не разметку — HTML собирался и выбрасывался."""
-        ids = parse_mentions(f'@{self.user.username}')
+        ids = parse_mentions(f'@{self.user.username}', receiver=self.user)
         self.assertTrue(all(isinstance(value, int) for value in ids))
 
 class UtilsNotificationTests(TransactionTestCase):

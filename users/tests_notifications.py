@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from chat.models import Group, GroupMember, Message
 from users.models import Notification
 
 User = get_user_model()
@@ -57,6 +58,70 @@ class NotificationCreationTests(TestCase):
         message = Message.objects.get(sender=self.sender, receiver=self.receiver)
         self.assertNotIn('<span', message.mentions)
         self.assertNotIn('<a ', message.mentions)
+
+    def test_private_mention_does_not_notify_third_party(self):
+        outsider = User.objects.create_user(username='private_third', password='123')
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post('/api/send/', {
+                'user_id': self.receiver.id,
+                'content': f'@{outsider.username} private secret',
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Notification.objects.filter(
+            user=outsider, notification_type='mention').exists())
+
+    def test_group_mention_does_not_notify_outsider(self):
+        group = Group.objects.create(name='Private Group', owner=self.sender)
+        GroupMember.objects.create(group=group, user=self.sender, role='owner')
+        outsider = User.objects.create_user(username='group_third', password='123')
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post('/api/send/', {
+                'group_id': str(group.id),
+                'content': f'@{outsider.username} group secret',
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Notification.objects.filter(
+            user=outsider, notification_type='mention').exists())
+        message = Message.objects.get(group=group, content__contains='group secret')
+        self.assertNotIn(str(outsider.id), message.mentions or '[]')
+
+    def test_all_substring_does_not_notify_group_members(self):
+        member = User.objects.create_user(username='all_sub_member', password='123')
+        group = Group.objects.create(name='All Substring', owner=self.sender)
+        GroupMember.objects.create(group=group, user=self.sender, role='owner')
+        GroupMember.objects.create(group=group, user=member, role='member')
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post('/api/send/', {
+                'group_id': str(group.id),
+                'content': '@allison hello',
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Notification.objects.filter(
+            user=member, notification_type='mention').exists())
+
+    def test_private_mention_url_opens_sender_conversation(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post('/api/send/', {
+                'user_id': self.receiver.id,
+                'content': f'@{self.receiver.username} hello',
+            })
+        note = Notification.objects.get(
+            user=self.receiver, notification_type='mention')
+        self.assertEqual(note.url, f'{reverse("main")}?user_id={self.sender.id}')
+
+    def test_group_mention_url_opens_group(self):
+        member = User.objects.create_user(username='url_member', password='123')
+        group = Group.objects.create(name='URL Group', owner=self.sender)
+        GroupMember.objects.create(group=group, user=self.sender, role='owner')
+        GroupMember.objects.create(group=group, user=member, role='member')
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post('/api/send/', {
+                'group_id': str(group.id),
+                'content': f'@{member.username} hello',
+            })
+        note = Notification.objects.get(
+            user=member, notification_type='mention')
+        self.assertEqual(note.url, reverse('group_chat', args=[group.id]))
 
 
 class NotificationViewTests(TestCase):

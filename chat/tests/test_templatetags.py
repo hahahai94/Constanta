@@ -27,6 +27,12 @@ class UserStatusTagTests(TestCase):
         result = self._render_status(self.user)
         self.assertIn('offline', result)
 
+    def test_status_counts_minutes_beyond_one_day(self):
+        """П-63: `timedelta.seconds` не содержит дни."""
+        self.user.last_seen = timezone.now() - timedelta(days=2)
+        result = self._render_status(self.user)
+        self.assertIn('2880м назад', result)
+
     def test_status_none_user(self):
         result = self._render_status(None)
         self.assertEqual(result.strip(), '')
