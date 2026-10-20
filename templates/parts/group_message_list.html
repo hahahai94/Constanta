@@ -11,7 +11,7 @@
                 data-delete-id="{{ msg.id }}" title="Удалить сообщение">🗑</button>
         {% endif %}
         {% if msg.reply_to %}
-        <div class="reply-quote" onclick="scrollToMessage('{{ msg.reply_to.id }}')">
+        <div class="reply-quote" data-scroll-to="{{ msg.reply_to.id }}">
             <span class="reply-quote-author">{{ msg.reply_to.sender.username }}</span>
             <span class="reply-quote-text">{{ msg.reply_to.preview_text|default:"📎 Вложение" }}</span>
         </div>

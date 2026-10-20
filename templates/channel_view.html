@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ channel.name }} — Constanta{% endblock %}
 {% block extra_css %}
 <style>
@@ -47,7 +48,8 @@
       {% if channel.owner == user %}
       <form method="post" action="{% url 'delete_channel' channel.id %}" class="d-inline">
         {% csrf_token %}
-        <button class="btn btn-danger" style="padding: 6px 14px; font-size: 13px;" onclick="return confirm('Удалить канал?')">Удалить</button>
+        <button class="btn btn-danger" style="padding: 6px 14px; font-size: 13px;"
+                data-confirm="Удалить канал?">Удалить</button>
       </form>
       {% endif %}
       {% if channel.owner != user %}
@@ -60,7 +62,7 @@
   </div>
 </div>
 
-<div class="container mt-4">
+<div class="container mt-4" data-channel-id="{{ channel.id }}">
   {% if edit_mode %}
   <div class="post-form">
     <h5>Редактировать канал</h5>
@@ -92,10 +94,11 @@
   <div class="post-form">
     <h6 class="mb-2">🔗 Ссылка-приглашение</h6>
     <div class="d-flex">
-      <input type="text" class="form-control me-2" value="{{ invite_url }}" readonly onclick="this.select()">
+      <input type="text" class="form-control me-2" value="{{ invite_url }}" readonly data-select-on-focus>
       <form method="post" action="{% url 'channel_regenerate_invite' channel.id %}">
         {% csrf_token %}
-        <button class="btn btn-outline-secondary" type="submit" onclick="return confirm('Обновить ссылку? Старая перестанет работать.')">Обновить</button>
+        <button class="btn btn-outline-secondary" type="submit"
+                data-confirm="Обновить ссылку? Старая перестанет работать.">Обновить</button>
       </form>
     </div>
     <small class="text-muted">По этой ссылке можно подписаться, в том числе на приватный канал.</small>
@@ -121,7 +124,6 @@
   {% if posts_page and posts_page.has_next %}
   <div class="text-center mb-3">
     <button class="btn btn-outline-primary btn-sm rounded-pill" id="load-more-btn"
-            onclick="loadMorePosts()"
             data-page="{{ posts_page.next_page_number }}">
       <i class="bi bi-arrow-down-circle me-1"></i>Загрузить ещё
     </button>
@@ -132,78 +134,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script>
-window.loadMorePosts = function() {
-    const btn = document.getElementById('load-more-btn');
-    if (!btn || btn.disabled) return;
-    btn.disabled = true;
-
-    const page = btn.dataset.page;
-    const url = new URL(window.location.href);
-    url.searchParams.set('page', page);
-
-    fetch(url.toString(), { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-        .then(r => r.json())
-        .then(data => {
-            document.querySelector('.posts-container').insertAdjacentHTML('beforeend', data.html);
-            if (data.has_next) {
-                btn.dataset.page = data.page + 1;
-                btn.disabled = false;
-            } else {
-                btn.remove();
-            }
-        })
-        .catch(() => { btn.disabled = false; });
-};
-
-// автополлинг новых постов
-window.latestCursor = function() {
-    let max = null;
-    document.querySelectorAll('[data-message-id]').forEach(function(el) {
-        const c = el.dataset.cursor;
-        if (c && (!max || c > max)) max = c;
-    });
-    return max;
-};
-
-(function() {
-    const channelId = '{{ channel.id }}';
-    if (!channelId) return;
-    window.pollChannelState = { cursor: window.latestCursor(), channelId: channelId };
-
-    window.doPoll = function() {
-        const url = '/api/poll/?' + (pollChannelState.cursor ? 'after=' + encodeURIComponent(pollChannelState.cursor) + '&' : '') + 'channel_id=' + pollChannelState.channelId;
-        fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-            .then(r => r.json())
-            .then(data => {
-                if (data.count > 0) {
-                    const container = document.querySelector('.posts-container');
-                    container.insertAdjacentHTML('afterbegin', data.html);
-                    if (data.cursor) pollChannelState.cursor = data.cursor;
-                }
-            })
-            .catch(() => {});
-    };
-
-    setInterval(window.doPoll, 3000);
-})();
-
-document.querySelectorAll('[data-channel-post-form]').forEach(form => {
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch(this.action, { method: 'POST', body: formData, headers: { 'X-CSRFToken': formData.get('csrfmiddlewaretoken') } })
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        this.querySelector('textarea').value = '';
-        this.querySelector('[type="file"]').value = '';
-        window.doPoll();
-      } else {
-        alert(data.message);
-      }
-    });
-  });
-});
-</script>
+<script src="{% static 'js/channel.js' %}"></script>
 {% endblock %}

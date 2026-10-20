@@ -60,6 +60,8 @@ class ChannelViewTests(TestCase):
     def test_channel_view_subscribed(self):
         response = self.client.get(reverse('channel_view', args=[self.channel.id]))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'js/channel.js')
+        self.assertContains(response, 'data-channel-id')
 
     def test_join_channel_rejects_get(self):
         """П-9: подписка через GET больше не работает."""

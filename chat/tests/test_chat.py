@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from chat.models import Message
 from chat.tests.factories import fake_upload, image_upload
 
-import html
 import re
 
 User = get_user_model()
@@ -101,27 +100,17 @@ class ReplyButtonRenderingTests(TestCase):
             'request': None,
         })
 
-    def _handler_values(self, markup):
-        """Значения inline-обработчиков, декодированные как в браузере.
-
-        Браузер декодирует сущности внутри значения атрибута до разбора JS,
-        поэтому проверять нужно именно декодированный текст.
-        """
-        return [html.unescape(value) for value in self.HANDLER_RE.findall(markup)]
-
     def test_username_never_appears_inside_an_inline_handler(self):
-        # берём сообщение с цитатой, чтобы хотя бы один обработчик точно был
+        # берём сообщение с цитатой, раньше там был inline-обработчик
         reply = Message.objects.create(
             sender=self.receiver, receiver=self.sender,
             content='original text', reply_to=self.message,
         )
         for template in self.TEMPLATES:
             with self.subTest(template=template):
-                values = self._handler_values(self._render(template, message=reply))
-                self.assertTrue(values, 'ожидался хотя бы один inline-обработчик')
-                for value in values:
-                    self.assertNotIn(self.sender.username, value)
-                    self.assertNotIn('original text', value)
+                markup = self._render(template, message=reply)
+                values = self.HANDLER_RE.findall(markup)
+                self.assertEqual(values, [], 'inline-обработчики запрещены CSP')
 
     def test_reply_button_has_no_inline_handler(self):
         for template in self.TEMPLATES:
@@ -137,14 +126,15 @@ class ReplyButtonRenderingTests(TestCase):
         self.assertIn('&#x27;', markup)
         self.assertNotIn(self.PAYLOAD, markup)
 
-    def test_reply_quote_handler_receives_uuid_only(self):
+    def test_reply_quote_passes_uuid_through_data_attribute(self):
         reply = Message.objects.create(
             sender=self.receiver, receiver=self.sender,
             content='original text', reply_to=self.message,
         )
-        markup = self._render('parts/message_list.html', message=reply)
-        values = self._handler_values(markup)
-        self.assertTrue(values)
-        for value in values:
-            for argument in re.findall(r"'([^']*)'", value):
-                self.assertRegex(argument, r'^[0-9a-f-]{36}$')
+        for template in self.TEMPLATES:
+            with self.subTest(template=template):
+                markup = self._render(template, message=reply)
+                self.assertNotIn('onclick', markup)
+                match = re.search(r'data-scroll-to="([^"]+)"', markup)
+                self.assertIsNotNone(match)
+                self.assertRegex(match.group(1), r'^[0-9a-f-]{36}$')

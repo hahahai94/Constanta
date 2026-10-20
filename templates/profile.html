@@ -73,7 +73,8 @@
                     <div class="col-12">
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Вы действительно хотите выйти из системы?')">🚪 Выйти из аккаунта</button>
+                            <button type="submit" class="btn btn-outline-danger w-100"
+                                    data-confirm="Вы действительно хотите выйти из системы?">🚪 Выйти из аккаунта</button>
                         </form>
                     </div>
                 </div>

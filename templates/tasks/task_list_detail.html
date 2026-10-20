@@ -62,9 +62,10 @@
             <button class="btn btn-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#addTaskModal">
                 <i class="bi bi-plus-lg me-2"></i>Задача
             </button>
-            <form method="post" action="{% url 'delete_task_list' task_list.id %}" class="d-inline" onsubmit="return confirm('Удалить весь список с задачами?')">
+            <form method="post" action="{% url 'delete_task_list' task_list.id %}" class="d-inline">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-outline-danger rounded-pill px-3">
+                <button type="submit" class="btn btn-outline-danger rounded-pill px-3"
+                        data-confirm="Удалить весь список с задачами?">
                     <i class="bi bi-trash"></i>
                 </button>
             </form>
@@ -101,11 +102,12 @@
                         </button></li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            <form method="post" action="{% url 'task_list_detail' task_list.id %}" class="d-inline" onsubmit="return confirm('Удалить задачу?')">
+                            <form method="post" action="{% url 'task_list_detail' task_list.id %}" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="delete_task">
                                 <input type="hidden" name="task_id" value="{{ task.id }}">
-                                <button type="submit" class="dropdown-item text-danger">
+                                <button type="submit" class="dropdown-item text-danger"
+                                        data-confirm="Удалить задачу?">
                                     <i class="bi bi-trash me-2"></i>Удалить
                                 </button>
                             </form>

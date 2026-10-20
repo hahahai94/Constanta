@@ -23,7 +23,7 @@
                 <img src="/static/ban_icon.png"
                      alt="Ban Icon"
                      style="width: 120px; height: 120px; object-fit: contain;"
-                     onerror="this.style.display='none'; document.getElementById('fallback-icon').style.display='block';">
+                     data-hide-on-error data-fallback="#fallback-icon">
 
                 {# Вариант 2: Запасная иконка (если нет файла) #}
                 <svg id="fallback-icon" xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-shield-lock text-danger" viewBox="0 0 16 16" style="display: none;">

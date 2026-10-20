@@ -1,4 +1,39 @@
 (function() {
+    // ===== Общие обработчики без inline-атрибутов (CSP, П-52) =====
+    document.addEventListener('click', function(event) {
+        var cancelReply = event.target.closest('[data-cancel-reply]');
+        if (cancelReply && typeof window.cancelReply === 'function') {
+            window.cancelReply();
+        }
+
+        var scrollTarget = event.target.closest('[data-scroll-to]');
+        if (scrollTarget && typeof window.scrollToMessage === 'function') {
+            window.scrollToMessage(scrollTarget.dataset.scrollTo);
+        }
+
+        var selectable = event.target.closest('[data-select-on-focus]');
+        if (selectable && typeof selectable.select === 'function') {
+            selectable.select();
+        }
+
+        var confirmTarget = event.target.closest('[data-confirm]');
+        if (confirmTarget && !window.confirm(confirmTarget.dataset.confirm)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    });
+
+    document.querySelectorAll('[data-hide-on-error]').forEach(function(image) {
+        image.addEventListener('error', function() {
+            image.hidden = true;
+            var fallback = document.querySelector(image.dataset.fallback);
+            if (fallback) {
+                fallback.hidden = false;
+                fallback.style.display = 'inline';
+            }
+        });
+    });
+
     // ===== CSRF =====
     // Токен берётся из meta-тега в base.html: раньше он читался только из
     // скрытого поля формы, которого нет на страницах без форм, поэтому
@@ -14,7 +49,7 @@
     function heartbeat() {
         var token = getCSRFToken();
         if (!token) return;
-        var url = window.HEARTBEAT_URL || '/api/heartbeat/';
+        var url = (document.body && document.body.dataset.heartbeatUrl) || '/api/heartbeat/';
         fetch(url, {
             method: 'POST',
             headers: { 'X-CSRFToken': token }

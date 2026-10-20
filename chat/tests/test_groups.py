@@ -72,6 +72,8 @@ class GroupTests(TestCase):
         GroupMember.objects.create(group=group, user=self.owner, role='owner')
         response = self.client.get(reverse('group_chat', args=[group.id]))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'js/chat-group.js')
+        self.assertContains(response, 'data-group-id')
 
     def test_group_chat_denied(self):
         group = Group.objects.create(name='Private', owner=self.member)
