@@ -530,12 +530,18 @@ body {
 }
 
 .notification-toast {
+    display: block;
+    background-color: var(--surface);
     color: var(--text);
+    border: 1px solid var(--border);
     border-left: 4px solid var(--accent);
+    overflow: hidden;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 }
 .notification-toast .toast-header {
     gap: 4px;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
 }
 .notification-toast .toast-body {
     white-space: normal;

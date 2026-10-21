@@ -5,10 +5,9 @@ from django.db import models
 from django.db.models.signals import post_delete, post_save
 from django.contrib.auth.models import AbstractUser
 from django.dispatch import receiver
-from django.utils import timezone
-from datetime import timedelta
 
 from chat.utils.uploads import user_avatar_upload_to
+from users.presence import is_user_online
 
 
 class User(AbstractUser):
@@ -19,9 +18,7 @@ class User(AbstractUser):
 
     @property
     def is_online(self):
-        if not self.last_seen:
-            return False
-        return timezone.now() - self.last_seen < timedelta(minutes=3)
+        return is_user_online(self.last_seen)
 
     ban_reason = models.TextField(blank=True, default='Нарушение правил')
     banned_at = models.DateTimeField(null=True, blank=True)

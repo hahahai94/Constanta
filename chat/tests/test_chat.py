@@ -1,10 +1,12 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from chat.models import Message
 from chat.tests.factories import fake_upload, image_upload
 
 import re
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -71,6 +73,14 @@ class PrivateChatTests(TestCase):
         response = self.client.get(f'/?user_id={self.user2.id}')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.user2.username)
+
+    def test_chat_header_formats_last_seen(self):
+        self.user2.last_seen = timezone.now() - timedelta(hours=2)
+        self.user2.save(update_fields=['last_seen'])
+
+        response = self.client.get(f'/?user_id={self.user2.id}')
+        self.assertContains(response, '2 часа')
+        self.assertNotContains(response, 'назад')
 
 
 class ReplyButtonRenderingTests(TestCase):

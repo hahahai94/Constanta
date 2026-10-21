@@ -83,6 +83,7 @@
             });
             instance.show();
         } else {
+            toast.classList.add('show');
             setTimeout(function() { toast.remove(); }, 5000);
         }
     }

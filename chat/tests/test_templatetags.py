@@ -16,22 +16,28 @@ class UserStatusTagTests(TestCase):
         self.user.last_seen = timezone.now()
         result = self._render_status(self.user)
         self.assertIn('online', result)
+        self.assertIn('онлайн', result)
 
     def test_status_offline_never(self):
         self.user.last_seen = None
         result = self._render_status(self.user)
         self.assertIn('offline', result)
+        self.assertIn('давно', result)
 
     def test_status_offline_long_ago(self):
         self.user.last_seen = timezone.now() - timedelta(hours=2)
         result = self._render_status(self.user)
         self.assertIn('offline', result)
+        self.assertIn('2 часа', result)
+        self.assertNotIn('назад', result)
 
     def test_status_counts_minutes_beyond_one_day(self):
         """П-63: `timedelta.seconds` не содержит дни."""
         self.user.last_seen = timezone.now() - timedelta(days=2)
         result = self._render_status(self.user)
-        self.assertIn('2880м назад', result)
+        self.assertIn('2 дня', result)
+        self.assertNotIn('2880', result)
+        self.assertNotIn('назад', result)
 
     def test_status_none_user(self):
         result = self._render_status(None)

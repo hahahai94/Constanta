@@ -25,14 +25,6 @@
         <p class="text-muted">{{ profile_user.bio }}</p>
         {% endif %}
 
-        <p class="small">
-          {% if profile_user.is_online %}
-          <span class="text-success">● Онлайн</span>
-          {% else %}
-          <span class="text-muted">● Был(а) {% if profile_user.last_seen %}{{ profile_user.last_seen|timesince }} назад{% else %}давно{% endif %}</span>
-          {% endif %}
-        </p>
-
         {% if user.is_authenticated and profile_user != user %}
         <a href="{% url 'main' %}?user_id={{ profile_user.id }}" class="btn btn-primary w-100 mt-3">
           💬 Написать

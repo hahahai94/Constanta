@@ -11,6 +11,7 @@ from users.models import BannedIP, AdminLog, Notification
 from users.forms import RegistrationForm, ChangeUsernameForm, ProfileForm, ChangePasswordForm
 from users.backends import CustomAuthBackend
 from users.middleware import IPBanMiddleware
+from users.presence import format_last_seen
 from users.views import auth_view, logout_view, profile_view, users_catalog, change_username, change_password, password_done
 from django.utils import timezone
 from datetime import timedelta
@@ -86,6 +87,48 @@ class UserModelTests(TestCase):
             title='Test', message='Hello'
         )
         self.assertIn('mention', str(notification))
+
+
+class LastSeenFormattingTests(TestCase):
+    def setUp(self):
+        self.now = timezone.now()
+
+    def test_never_seen(self):
+        self.assertEqual(format_last_seen(None), 'давно')
+
+    def test_less_than_a_minute(self):
+        self.assertEqual(self._format(seconds=30), 'меньше минуты')
+
+    def test_minutes_use_plural_forms(self):
+        cases = (
+            (1, '1 минута'),
+            (3, '3 минуты'),
+            (5, '5 минут'),
+            (11, '11 минут'),
+            (21, '21 минута'),
+        )
+        for minutes, expected in cases:
+            with self.subTest(minutes=minutes):
+                self.assertEqual(self._format(minutes=minutes), expected)
+
+    def test_hours_and_days(self):
+        self.assertEqual(self._format(hours=2), '2 часа')
+        self.assertEqual(self._format(days=3), '3 дня')
+        self.assertEqual(self._format(days=19), '19 дней')
+
+    def test_months_and_years(self):
+        self.assertEqual(self._format(days=40), '1 месяц')
+        self.assertEqual(self._format(days=800), '2 года')
+        self.assertEqual(self._format(days=1900), '5 лет')
+
+    def test_future_timestamp_does_not_go_negative(self):
+        self.assertEqual(
+            format_last_seen(self.now + timedelta(minutes=1), now=self.now),
+            'меньше минуты',
+        )
+
+    def _format(self, **delta):
+        return format_last_seen(self.now - timedelta(**delta), now=self.now)
 
 
 class CustomAuthBackendTests(TestCase):
@@ -446,6 +489,35 @@ class ProfileViewTests(TestCase):
         response = self.client.get('/users/?q=findme')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'zzz_findme')
+
+    def test_users_catalog_formats_last_seen(self):
+        other = User.objects.create_user(username='catalog_last_seen', password='pass456')
+        other.last_seen = timezone.now() - timedelta(days=2)
+        other.save(update_fields=['last_seen'])
+
+        response = self.client.get('/users/')
+        self.assertContains(response, '2 дня')
+        self.assertNotContains(response, 'назад')
+        self.assertNotContains(response, '2880')
+
+    def test_public_profile_online_status_is_not_duplicated(self):
+        other = User.objects.create_user(username='online_profile', password='pass456')
+        other.last_seen = timezone.now()
+        other.save(update_fields=['last_seen'])
+
+        response = self.client.get(reverse('public_profile', args=[other.username]))
+        body = response.content.decode('utf-8')
+        self.assertEqual(body.lower().count('онлайн'), 1)
+
+    def test_public_profile_formats_last_seen(self):
+        other = User.objects.create_user(username='offline_profile', password='pass456')
+        other.last_seen = timezone.now() - timedelta(days=19)
+        other.save(update_fields=['last_seen'])
+
+        response = self.client.get(reverse('public_profile', args=[other.username]))
+        self.assertContains(response, '19 дней')
+        self.assertNotContains(response, 'назад')
+        self.assertNotContains(response, '28193')
 
 
 class ClientIPTests(TestCase):

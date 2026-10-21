@@ -1,7 +1,7 @@
 from django import template
-from django.utils import timezone
 from django.utils.safestring import mark_safe
-from datetime import timedelta
+
+from users.presence import format_last_seen, is_user_online
 
 register = template.Library()
 
@@ -11,14 +11,8 @@ def user_status(user):
     if not user or not hasattr(user, 'last_seen'):
         return ''
 
-    if not user.last_seen:
-        return mark_safe('<span class="status-dot offline"></span><small class="text-muted">давно</small>')
-
-    now = timezone.now()
-    diff = now - user.last_seen
-
-    if diff < timedelta(minutes=3):
+    if is_user_online(user.last_seen):
         return mark_safe('<span class="status-dot online"></span><small class="text-success">онлайн</small>')
-    else:
-        mins = int(diff.total_seconds() // 60)
-        return mark_safe(f'<span class="status-dot offline"></span><small class="text-muted">{mins}м назад</small>')
+
+    label = format_last_seen(user.last_seen)
+    return mark_safe(f'<span class="status-dot offline"></span><small class="text-muted">{label}</small>')
