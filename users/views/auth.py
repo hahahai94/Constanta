@@ -21,12 +21,18 @@ LOGIN_IP_LIMIT = 20
 LOGIN_IP_PERIOD = 300        # 20 неудач с одного адреса за 5 минут
 REGISTER_IP_LIMIT = 5
 REGISTER_IP_PERIOD = 3600    # 5 регистраций с одного адреса за час
+MAX_LOGIN_KEY_USERNAME = 150
+
+
+def _normalized_login_username(username):
+    """Ограничивает длину имени пользователя для ключа кеша (problems.md, П-74)."""
+    return (username or '').strip().lower()[:MAX_LOGIN_KEY_USERNAME]
 
 
 def _login_keys(request, username):
     ip = get_client_ip(request) or 'unknown'
     return (
-        (f'login_user:{(username or "").strip().lower()}', LOGIN_USER_LIMIT, LOGIN_USER_PERIOD),
+        (f'login_user:{_normalized_login_username(username)}', LOGIN_USER_LIMIT, LOGIN_USER_PERIOD),
         (f'login_ip:{ip}', LOGIN_IP_LIMIT, LOGIN_IP_PERIOD),
     )
 
@@ -107,7 +113,7 @@ def auth_view(request):
                 if user is not None:
                     # Сбрасываем только счётчик этого аккаунта: пароль доказан,
                     # подобрать его это не помогает. Лимит по IP не трогаем.
-                    clear(f'login_user:{username.strip().lower()}')
+                    clear(f'login_user:{_normalized_login_username(username)}')
                     login(request, user)
                     return redirect('main')
 

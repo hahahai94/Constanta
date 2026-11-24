@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.db.models import Count
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
@@ -17,15 +18,18 @@ from chat.utils.notifications import mark_conversation_read, message_unread_coun
 from chat.utils.uploads import normalize_avatar
 
 User = get_user_model()
+DEFAULT_MAX_GROUP_MEMBERS = 500
 
 
 @login_required
 def groups_list(request):
-    """Список групп пользователя"""
-    from django.core.paginator import Paginator
-    memberships_qs = GroupMember.objects.filter(
-        user=request.user
-    ).select_related('group').order_by('group__name')
+    """Список групп пользователя (с аннотацией числа участников, П-80)."""
+    memberships_qs = (
+        GroupMember.objects.filter(user=request.user)
+        .select_related('group')
+        .annotate(members_count=Count('group__members'))
+        .order_by('group__name')
+    )
     paginator = Paginator(memberships_qs, 20)
     page_number = request.GET.get('page', 1)
     memberships = paginator.get_page(page_number)
@@ -120,6 +124,7 @@ def edit_group(request, group_id):
         old_avatar = group.avatar
         old_avatar_name = old_avatar.name if old_avatar else ''
         old_avatar_storage = old_avatar.storage if old_avatar else None
+        remove_avatar = request.POST.get('remove_avatar') in ('1', 'true', 'on')
         avatar = request.FILES.get('avatar')
         if avatar:
             # Проверяем до применения изменений, чтобы отклонённый файл не
@@ -135,9 +140,11 @@ def edit_group(request, group_id):
         group.description = request.POST.get('description', group.description).strip()
         if avatar:
             group.avatar = avatar
+        elif remove_avatar:
+            group.avatar = None
         group.save()
-        if (old_avatar_name and group.avatar
-                and old_avatar_name != group.avatar.name):
+        new_avatar_name = group.avatar.name if group.avatar else ''
+        if old_avatar_name and old_avatar_name != new_avatar_name:
             old_avatar_storage.delete(old_avatar_name)
     return redirect('group_chat', group_id=group_id)
 
@@ -153,11 +160,18 @@ def add_member(request, group_id):
 
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
+        max_members = getattr(settings, 'MAX_GROUP_MEMBERS', DEFAULT_MAX_GROUP_MEMBERS)
+        if GroupMember.objects.filter(group=group).count() >= max_members:
+            messages.error(request, f'❌ Лимит участников группы ({max_members})')
+            return redirect('group_chat', group_id=group_id)
         try:
-            user = User.objects.get(username=username)
-            if not GroupMember.objects.filter(group=group, user=user).exists():
-                GroupMember.objects.create(group=group, user=user, role='member')
-            else:
+            user = User.objects.get(
+                username=username, is_active=True, banned_at__isnull=True
+            )
+            _, created = GroupMember.objects.get_or_create(
+                group=group, user=user, defaults={'role': 'member'}
+            )
+            if not created:
                 messages.warning(request, '⚠️ Уже в группе')
         except User.DoesNotExist:
             messages.error(request, '❌ Пользователь не найден')

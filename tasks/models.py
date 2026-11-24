@@ -10,7 +10,7 @@ class TaskList(models.Model):
 
     class Meta:
         db_table = 'task_lists'
-        ordering = ['-created_at']
+        ordering = ['-created_at', '-id']
         verbose_name = 'Список задач'
         verbose_name_plural = 'Списки задач'
 
@@ -42,7 +42,7 @@ class Task(models.Model):
 
     class Meta:
         db_table = 'tasks'
-        ordering = ['is_done', '-created_at']
+        ordering = ['is_done', '-created_at', '-id']
         verbose_name = 'Задача'
         verbose_name_plural = 'Задачи'
 

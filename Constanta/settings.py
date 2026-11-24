@@ -18,7 +18,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
     '127.0.0.1', 'localhost', 'testserver',
 ])
 
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -106,7 +106,7 @@ LOGGING = {
 }
 
 LANGUAGE_CODE = env('LANGUAGE_CODE', default='ru')
-TIME_ZONE = env('TIMEZONE', default='Asia/Vladivostok')
+TIME_ZONE = env('TIME_ZONE', default='Asia/Vladivostok')
 USE_I18N = True
 USE_TZ = True
 
@@ -168,6 +168,7 @@ CACHES = {
 # Доверять заголовку X-Forwarded-For только если приложение реально стоит за прокси.
 # Иначе клиент может подделать IP и обойти IP-бан / rate-limit.
 USE_X_FORWARDED_FOR = env.bool('USE_X_FORWARDED_FOR', default=False)
+USE_X_FORWARDED_HOST = env.bool('USE_X_FORWARDED_HOST', default=False)
 
 # Заголовку X-Forwarded-For доверяем только от перечисленных адресов прокси.
 # Без этого списка включение USE_X_FORWARDED_FOR открывает обход лимитов: nginx
@@ -213,4 +214,7 @@ SECURE_PROXY_SSL_HEADER = (
 
 MAX_GROUPS_PER_USER = env.int('MAX_GROUPS_PER_USER', default=50)
 MAX_CHANNELS_PER_USER = env.int('MAX_CHANNELS_PER_USER', default=50)
+MAX_GROUP_MEMBERS = env.int('MAX_GROUP_MEMBERS', default=500)
+MAX_TASK_LISTS_PER_USER = env.int('MAX_TASK_LISTS_PER_USER', default=50)
+MAX_TASKS_PER_LIST = env.int('MAX_TASKS_PER_LIST', default=500)
 MAX_MESSAGE_LENGTH = env.int('MAX_MESSAGE_LENGTH', default=2000)

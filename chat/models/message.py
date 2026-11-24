@@ -2,6 +2,7 @@ import uuid
 import os
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from chat.utils import generate_file_hash
 from chat.utils.storage import attachment_storage
 
@@ -63,6 +64,16 @@ class Message(models.Model):
             models.Index(fields=['group', '-created_at']),
             models.Index(fields=['channel', '-created_at']),
             models.Index(fields=['attachment_hash']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(receiver__isnull=False, group__isnull=True, channel__isnull=True)
+                    | Q(receiver__isnull=True, group__isnull=False, channel__isnull=True)
+                    | Q(receiver__isnull=True, group__isnull=True, channel__isnull=False)
+                ),
+                name='message_single_recipient_check',
+            ),
         ]
 
     def __str__(self):

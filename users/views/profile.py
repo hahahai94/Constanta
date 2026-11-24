@@ -1,11 +1,10 @@
 # users/views/profile.py
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
+from django.core.paginator import Paginator
+from django.db.models import Q
 from users.models import User
 from users.forms import ChangeUsernameForm, ChangePasswordForm, ProfileForm
 from users.ratelimit import html_429, rate_limit
@@ -13,7 +12,7 @@ from users.utils import form_error_messages
 
 
 @login_required
-@rate_limit('profile_update', limit=20, period=60, on_limited=html_429)
+@rate_limit('profile_update', limit=20, period=60, methods=('POST',), on_limited=html_429)
 def profile_view(request):
     if request.method == 'POST':
         old_avatar = request.user.avatar
@@ -34,16 +33,19 @@ def profile_view(request):
 
 @login_required
 def users_catalog(request):
-    from django.db.models import Q
-    from django.core.paginator import Paginator
     q = request.GET.get('q', '').strip()
+    base_qs = User.objects.filter(
+        is_active=True, banned_at__isnull=True
+    ).exclude(id=request.user.id)
+
     if q:
-        users_qs = User.objects.filter(
+        users_qs = base_qs.filter(
             Q(username__icontains=q) | Q(nick__icontains=q) |
             Q(first_name__icontains=q) | Q(last_name__icontains=q)
-        ).exclude(id=request.user.id).order_by('username')
+        ).order_by('username')
     else:
-        users_qs = User.objects.exclude(id=request.user.id).order_by('username')
+        users_qs = base_qs.order_by('username')
+
     paginator = Paginator(users_qs, 20)
     page_number = request.GET.get('page', 1)
     users = paginator.get_page(page_number)
@@ -51,7 +53,7 @@ def users_catalog(request):
 
 
 @login_required
-@rate_limit('change_username', limit=5, period=300, on_limited=html_429)
+@rate_limit('change_username', limit=5, period=300, methods=('POST',), on_limited=html_429)
 def change_username(request):
     if request.method == 'POST':
         form = ChangeUsernameForm(request.POST, user=request.user)
@@ -65,7 +67,7 @@ def change_username(request):
 
 
 @login_required
-@rate_limit('change_password', limit=5, period=300, on_limited=html_429)
+@rate_limit('change_password', limit=5, period=300, methods=('POST',), on_limited=html_429)
 def change_password(request):
     if request.method == 'POST':
         form = ChangePasswordForm(request.user, request.POST)
@@ -85,5 +87,7 @@ def password_done(request):
 
 @login_required
 def public_profile(request, username):
-    profile_user = get_object_or_404(User, username=username)
+    profile_user = get_object_or_404(
+        User, username=username, is_active=True, banned_at__isnull=True
+    )
     return render(request, 'public_profile.html', {'profile_user': profile_user})

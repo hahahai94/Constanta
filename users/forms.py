@@ -22,6 +22,10 @@ class RegistrationForm(UserCreationForm):
         self.fields['password1'].label = 'Пароль'
         self.fields['password2'].label = 'Повторите пароль'
 
+    def clean_nick(self):
+        nick = (self.cleaned_data.get('nick') or '').strip()
+        return nick or None
+
 
 class ProfileForm(forms.ModelForm):
     avatar = forms.FileField(
@@ -38,6 +42,10 @@ class ProfileForm(forms.ModelForm):
             'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'avatar': forms.FileInput(attrs={'class': 'form-control'}),
         }
+
+    def clean_nick(self):
+        nick = (self.cleaned_data.get('nick') or '').strip()
+        return nick or None
 
     def clean_avatar(self):
         avatar = self.cleaned_data.get('avatar')
