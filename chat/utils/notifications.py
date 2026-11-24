@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import F
 from django.urls import reverse
 from django.utils import timezone
 
@@ -68,7 +69,7 @@ def _notification_text(message):
 
 
 def notify_message_recipients(message, recipient_ids):
-    """Создаёт/обновляет по одной непрочитанной записи на чат."""
+    """Создаёт/обновляет по одной непрочитанной записи на чат (атомарно, П-66)."""
     from users.models import Notification
 
     recipient_ids = {
@@ -82,58 +83,45 @@ def notify_message_recipients(message, recipient_ids):
     def _run():
         now = timezone.now()
         key, title, url = _message_payload(message)
-        payloads = {
-            recipient_id: (key, title, url)
-            for recipient_id in recipient_ids
-        }
+        text = _notification_text(message)
 
-        keys = {payload[0] for payload in payloads.values()}
-        existing = Notification.objects.filter(
+        existing_qs = Notification.objects.filter(
             user_id__in=recipient_ids,
             notification_type='message',
             is_read=False,
-            conversation_key__in=keys,
+            conversation_key=key,
         )
-        existing_by_key = {
-            (note.user_id, note.conversation_key): note
-            for note in existing
-        }
+        existing_user_ids = set(existing_qs.values_list('user_id', flat=True))
 
-        to_create = []
-        to_update = []
-        text = _notification_text(message)
-        for recipient_id, (key, title, url) in payloads.items():
-            note = existing_by_key.get((recipient_id, key))
-            if note is None:
-                to_create.append(Notification(
-                    user_id=recipient_id,
-                    notification_type='message',
-                    title=title,
-                    message=text,
-                    url=url,
-                    related_message=message,
-                    conversation_key=key,
-                    unread_count=1,
-                    created_at=now,
-                    updated_at=now,
-                ))
-                continue
+        if existing_user_ids:
+            existing_qs.update(
+                unread_count=F('unread_count') + 1,
+                title=title,
+                message=text,
+                url=url,
+                related_message=message,
+                updated_at=now,
+            )
 
-            note.unread_count += 1
-            note.title = title
-            note.message = text
-            note.url = url
-            note.related_message = message
-            note.updated_at = now
-            to_update.append(note)
+        to_create = [
+            Notification(
+                user_id=recipient_id,
+                notification_type='message',
+                title=title,
+                message=text,
+                url=url,
+                related_message=message,
+                conversation_key=key,
+                unread_count=1,
+                created_at=now,
+                updated_at=now,
+            )
+            for recipient_id in recipient_ids
+            if recipient_id not in existing_user_ids
+        ]
 
         if to_create:
-            Notification.objects.bulk_create(to_create)
-        if to_update:
-            Notification.objects.bulk_update(to_update, [
-                'unread_count', 'title', 'message', 'url',
-                'related_message', 'updated_at',
-            ])
+            Notification.objects.bulk_create(to_create, ignore_conflicts=True)
 
     transaction.on_commit(_run)
 

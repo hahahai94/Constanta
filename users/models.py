@@ -35,6 +35,16 @@ class User(AbstractUser):
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 
+    def save(self, *args, **kwargs):
+        if self.nick is not None:
+            normalized = self.nick.strip() or None
+            if normalized != self.nick:
+                self.nick = normalized
+                update_fields = kwargs.get('update_fields')
+                if update_fields is not None:
+                    kwargs['update_fields'] = set(update_fields) | {'nick'}
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.nick if self.nick else self.username
 

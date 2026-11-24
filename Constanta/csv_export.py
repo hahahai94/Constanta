@@ -13,13 +13,13 @@ import csv
 from django.http import HttpResponse
 
 # Символы, с которых Excel начинает разбирать формулу.
-FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r', '\n')
 
 
 def csv_safe(value):
-    """Защищает от формул в Excel."""
+    """Защищает от формул в Excel (включая ведущие пробелы и перенос строки, П-73)."""
     text = '' if value is None else str(value)
-    if text.startswith(FORMULA_PREFIXES):
+    if text.lstrip(' ').startswith(FORMULA_PREFIXES):
         return "'" + text
     return text
 

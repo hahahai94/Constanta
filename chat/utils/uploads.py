@@ -76,6 +76,10 @@ _AUDIO_MAGIC = {
     b'fLaC': '.flac',
     b'ID3': '.mp3',
     b'\xff\xfb': '.mp3',
+    b'\xff\xf3': '.mp3',
+    b'\xff\xf2': '.mp3',
+    b'\xff\xf1': '.aac',
+    b'\xff\xf9': '.aac',
     b'\x1a\x45\xdf\xa3': '.webm',   # Matroska/WebM
 }
 
@@ -85,6 +89,18 @@ def read_all(uploaded_file):
     data = uploaded_file.read()
     uploaded_file.seek(0)
     return data
+
+
+def _has_audio_or_video_signature(data):
+    """Проверяет реальные magic bytes аудио/видео контейнера (problems.md, П-65)."""
+    if data.startswith(b'RIFF') and data[8:12] == b'WAVE':
+        return True
+    if len(data) >= 8 and data[4:8] == b'ftyp':
+        return True
+    for magic in _AUDIO_MAGIC:
+        if data.startswith(magic):
+            return True
+    return False
 
 
 def detect_attachment_type(data, content_type=''):
@@ -105,17 +121,14 @@ def detect_attachment_type(data, content_type=''):
 
     # Аудио проверяется раньше изображений: пересечений у сигнатур нет, но так
     # слабая сигнатура ``b'BM'`` не может перехватить чужой контейнер.
-    for magic in _AUDIO_MAGIC:
-        if data.startswith(magic):
-            return 'voice'
+    if _has_audio_or_video_signature(data):
+        return 'voice'
 
     for magic in _IMAGE_MAGIC:
         if data.startswith(magic):
             return 'image'
 
     declared = (content_type or '').lower()
-    if declared.startswith(('audio/', 'video/')):
-        return 'voice'
     if declared.startswith('image/'):
         return 'image'
     return 'file'
@@ -152,11 +165,18 @@ def image_extension(image_format):
     return IMAGE_EXTENSIONS.get((image_format or '').upper(), FALLBACK_EXTENSION)
 
 
-def audio_extension_from_magic(data):
+def audio_extension_from_magic(data, declared_type=''):
+    """Выводит расширение аудио/видео из реальных magic bytes (problems.md, П-65)."""
+    if data.startswith(b'RIFF') and data[8:12] == b'WAVE':
+        return '.wav'
+    if len(data) >= 8 and data[4:8] == b'ftyp':
+        return '.mp4' if declared_type.lower().startswith('video/') else '.m4a'
     for magic, extension in _AUDIO_MAGIC.items():
         if data.startswith(magic):
+            if extension == '.ogg' and declared_type.lower() == 'audio/opus':
+                return '.opus'
             return extension
-    return '.ogg'
+    return FALLBACK_EXTENSION
 
 
 def safe_document_extension(filename):
@@ -188,9 +208,9 @@ def normalize_upload(uploaded_file, *, max_bytes=None, max_pixels=MAX_IMAGE_PIXE
         return 'image', IMAGE_EXTENSIONS[image_format]
 
     if attachment_type == 'voice':
-        extension = MEDIA_EXTENSIONS.get(declared.lower())
-        if extension is None:
-            extension = audio_extension_from_magic(data)
+        extension = audio_extension_from_magic(data, declared)
+        if extension == FALLBACK_EXTENSION:
+            return 'file', safe_document_extension(uploaded_file.name)
         return 'voice', extension
 
     return 'file', safe_document_extension(uploaded_file.name)

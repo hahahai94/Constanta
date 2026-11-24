@@ -78,7 +78,7 @@ class APITests(TestCase):
         self.assertEqual(msg.attachment_type, 'image')
 
     def test_send_file_message_audio(self):
-        file = SimpleUploadedFile("voice.ogg", io.BytesIO(b'audio').read(), content_type="audio/ogg")
+        file = SimpleUploadedFile("voice.ogg", b'OggS\x00\x02' + b'\x00' * 22, content_type="audio/ogg")
         response = self.client.post('/api/send/', {
             'user_id': self.other.id,
             'content': 'Voice message',

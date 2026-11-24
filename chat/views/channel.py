@@ -176,10 +176,12 @@ def join_channel(request, channel_id):
     if channel.is_private:
         messages.error(request, 'Это приватный канал — подписка только по приглашению')
         return redirect('channel_list')
-    if ChannelMember.objects.filter(channel=channel, user=request.user).exists():
+    _, created = ChannelMember.objects.get_or_create(
+        channel=channel, user=request.user, defaults={'role': 'subscriber'}
+    )
+    if not created:
         messages.warning(request, 'Вы уже подписаны')
     else:
-        ChannelMember.objects.create(channel=channel, user=request.user, role='subscriber')
         messages.success(request, f'Вы подписались на {channel.name}')
     return redirect('channel_view', channel_id=channel_id)
 
@@ -207,7 +209,9 @@ def channel_invite(request, token):
         return redirect('channel_view', channel_id=channel.id)
 
     if request.method == 'POST':
-        ChannelMember.objects.create(channel=channel, user=request.user, role='subscriber')
+        ChannelMember.objects.get_or_create(
+            channel=channel, user=request.user, defaults={'role': 'subscriber'}
+        )
         messages.success(request, f'Вы подписались на {channel.name}')
         return redirect('channel_view', channel_id=channel.id)
 

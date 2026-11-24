@@ -1,125 +1,146 @@
-(function() {
+(function () {
     const body = document.body;
-    const pollUrl = body && body.dataset.notificationsPollUrl;
-    const chatListUrl = body && body.dataset.chatListUrl;
-    if (!pollUrl || !document.getElementById('notification-badge')) return;
+    if (!body) return;
 
-    const activeKey = body.dataset.activeConversationKey || '';
-    let cursor = null;
+    const pollUrl = body.dataset.notificationsPollUrl;
+    const chatListUrl = body.dataset.chatListUrl;
+    const activeConvKey = body.dataset.activeConversationKey || '';
+    const notifBadge = document.getElementById('notification-badge');
+    const chatBadge = document.getElementById('global-chat-badge');
+    const toastContainer = document.getElementById('notification-toasts');
+    const chatListEl = document.getElementById('chat-list');
+
+    if (!pollUrl) return;
+
+    let since = new Date().toISOString();
     let polling = false;
-    let refreshingChats = false;
+    const shownIds = new Set();
 
-    function refreshChatList() {
-        const list = document.getElementById('chat-list');
-        if (!list || !chatListUrl || refreshingChats) return;
-        refreshingChats = true;
-        const active = list.querySelector('.chat-item.active');
-        const activeId = active ? active.dataset.chatUser : '';
-        const url = new URL(chatListUrl, window.location.origin);
-        if (activeId) url.searchParams.set('active_user_id', activeId);
-
-        fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (!data.html || list.innerHTML.trim() === data.html.trim()) return;
-                const scrollTop = list.scrollTop;
-                list.innerHTML = data.html;
-                list.scrollTop = scrollTop;
-            })
-            .catch(function() {})
-            .finally(function() { refreshingChats = false; });
+    function updateBadge(el, count) {
+        if (!el) return;
+        const num = Number(count) || 0;
+        if (num > 0) {
+            el.textContent = num > 99 ? '99+' : String(num);
+            el.classList.remove('d-none');
+        } else {
+            el.textContent = '';
+            el.classList.add('d-none');
+        }
     }
 
-    function setBadge(id, count) {
-        const badge = document.getElementById(id);
-        if (!badge) return;
-        badge.textContent = count > 0 ? count : '';
-        badge.classList.toggle('d-none', !count);
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
     }
 
-    function updateBadges(data) {
-        setBadge('global-chat-badge', data.unread_messages_count || 0);
-        setBadge('notification-badge', data.unread_notifications_count || 0);
+    function isSafeLocalUrl(url) {
+        return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\');
     }
 
     function showToast(event) {
-        const container = document.getElementById('notification-toasts');
-        if (!container || event.conversation_key === activeKey) return;
+        if (!toastContainer || !event || shownIds.has(event.id)) return;
+        shownIds.add(event.id);
+        if (shownIds.size > 200) {
+            const first = shownIds.values().next().value;
+            shownIds.delete(first);
+        }
 
         const toast = document.createElement('a');
-        toast.className = 'toast notification-toast text-decoration-none';
-        toast.href = event.url || '/notifications/';
+        toast.href = isSafeLocalUrl(event.url) ? event.url : '/notifications/';
+        toast.className = 'toast show text-decoration-none text-dark mb-2 shadow';
         toast.setAttribute('role', 'alert');
 
-        const header = document.createElement('div');
-        header.className = 'toast-header';
-        const title = document.createElement('strong');
-        title.className = 'me-auto';
-        title.textContent = (event.icon || '🔔') + ' ' + (event.title || 'Уведомление');
-        const count = document.createElement('span');
-        count.className = 'badge bg-primary rounded-pill';
-        count.textContent = event.count || 1;
-        const close = document.createElement('button');
-        close.type = 'button';
-        close.className = 'btn-close ms-2';
-        close.setAttribute('data-bs-dismiss', 'toast');
-        close.setAttribute('aria-label', 'Закрыть');
-        close.addEventListener('click', function(event) {
-            event.preventDefault();
-        });
-        header.append(title, count, close);
+        const countBadge = event.unread_count > 1
+            ? `<span class="badge bg-primary rounded-pill ms-1">${escapeHtml(event.unread_count)}</span>`
+            : '';
 
-        const text = document.createElement('div');
-        text.className = 'toast-body';
-        text.textContent = event.message || '';
+        toast.innerHTML = `
+            <div class="toast-header">
+                <strong class="me-auto text-truncate">${escapeHtml(event.icon || '🔔')} ${escapeHtml(event.title || 'Уведомление')}${countBadge}</strong>
+                <button type="button" class="btn-close ms-2" aria-label="Закрыть"></button>
+            </div>
+            <div class="toast-body small text-truncate">${escapeHtml(event.message || '')}</div>
+        `;
 
-        toast.append(header, text);
-        container.appendChild(toast);
-
-        if (window.bootstrap && window.bootstrap.Toast) {
-            const instance = new window.bootstrap.Toast(toast, {delay: 5000});
-            toast.addEventListener('hidden.bs.toast', function() {
+        const closeBtn = toast.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
                 toast.remove();
             });
-            instance.show();
-        } else {
-            toast.classList.add('show');
-            setTimeout(function() { toast.remove(); }, 5000);
         }
+
+        toastContainer.appendChild(toast);
+        setTimeout(function () {
+            if (toast.parentNode) toast.remove();
+        }, 6000);
     }
 
-    function poll() {
+    function refreshChatList() {
+        if (!chatListEl || !chatListUrl) return;
+        const url = new URL(chatListUrl, window.location.origin);
+        const currentParams = new URLSearchParams(window.location.search);
+        const activeUserId = currentParams.get('user_id');
+        if (activeUserId) {
+            url.searchParams.set('user_id', activeUserId);
+        }
+
+        fetch(url.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (data && typeof data.html === 'string') {
+                    chatListEl.innerHTML = data.html;
+                }
+            })
+            .catch(function () {});
+    }
+
+    function pollNotifications() {
         if (polling || document.hidden) return;
         polling = true;
-        const url = new URL(pollUrl, window.location.origin);
-        if (cursor) url.searchParams.set('since', cursor);
 
-        fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-            .then(function(response) {
-                if (!response.ok) throw new Error('poll failed');
-                return response.json();
-            })
-            .then(function(data) {
-                updateBadges(data);
-                if (Array.isArray(data.events)) data.events.forEach(showToast);
-                if (data.cursor) cursor = data.cursor;
-                if (data.events && data.events.length) {
-                    document.dispatchEvent(new CustomEvent('constanta:notification'));
+        const url = new URL(pollUrl, window.location.origin);
+        if (since) url.searchParams.set('since', since);
+
+        fetch(url.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data) return;
+                if (data.server_time) since = data.server_time;
+                updateBadge(notifBadge, data.unread_notifications_count);
+                updateBadge(chatBadge, data.unread_messages_count);
+
+                const events = Array.isArray(data.events) ? data.events : [];
+                let hasChatChanges = false;
+                events.forEach(function (ev) {
+                    if (ev.conversation_key && ev.conversation_key === activeConvKey) {
+                        return;
+                    }
+                    showToast(ev);
+                    if (ev.type === 'message' || ev.type === 'mention') {
+                        hasChatChanges = true;
+                    }
+                });
+                if (hasChatChanges) {
                     refreshChatList();
                 }
             })
-            .catch(function() {})
-            .finally(function() { polling = false; });
+            .catch(function () {})
+            .finally(function () {
+                polling = false;
+            });
     }
 
-    setInterval(poll, 4000);
-    setInterval(refreshChatList, 5000);
-    document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) {
-            poll();
-            refreshChatList();
-        }
+    setInterval(pollNotifications, 4000);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) pollNotifications();
     });
-    poll();
-    refreshChatList();
 })();

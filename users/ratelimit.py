@@ -67,20 +67,26 @@ def html_429(request, *args, **kwargs):
     )
 
 
-def rate_limit(key_prefix, limit=30, period=60, on_limited=None):
+def rate_limit(key_prefix, limit=30, period=60, on_limited=None, methods=None):
     """Ограничивает частоту запросов к вьюхе.
 
-    Лимит применяется ко **всем** методам, включая GET. Раньше GET/HEAD/OPTIONS
-    по умолчанию исключались, поэтому декоратор на ``api_poll`` (GET-only) не
-    делал ничего, а самый частый эндпоинт приложения оставался без ограничений
-    (problems.md, П-6).
+    По умолчанию лимит применяется ко **всем** методам, включая GET.
+    Если передан ``methods`` (например, ``('POST',)``), счётчик тикает
+    только на указанных HTTP-методах (problems.md, П-78).
 
     ``on_limited`` позволяет вернуть ответ, подходящий для HTML-формы;
     по умолчанию отдаётся JSON.
     """
+    allowed_methods = {m.upper() for m in methods} if methods else None
+
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
+            if allowed_methods is not None:
+                req_method = (getattr(request, 'method', '') or '').upper()
+                if req_method not in allowed_methods:
+                    return view_func(request, *args, **kwargs)
+
             user = getattr(request, 'user', None)
             if user is not None and getattr(user, 'is_authenticated', False):
                 identity = f'user:{user.pk}'
