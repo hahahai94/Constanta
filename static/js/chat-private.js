@@ -4,7 +4,9 @@
  * которые не кешировались браузером. Django-тегов внутри нет, поэтому файл
  * статический.
  */
+(function() {
 const emojiList = [
+
     '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','🥰','😍','🤩','😘','😗',
     '😋','😛','😜','😝','🤑','🤗','🤭','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬',
     '😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯',
@@ -242,13 +244,16 @@ window.latestCursor = function() {
     return max;
 };
 
+let isPolling = false;
+
 window.doPoll = function() {
-    if (!window.pollState || !pollState.param) return;
+    if (isPolling || document.hidden || !window.pollState || !pollState.param) return;
+    isPolling = true;
     const url = '/api/poll/?' + (pollState.cursor ? 'after=' + encodeURIComponent(pollState.cursor) + '&' : '') + pollState.param;
     fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : null)
         .then(data => {
-            if (data.count > 0) {
+            if (data && data.count > 0) {
                 const container = document.getElementById('messages-container');
                 const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
                 const inserted = window.appendUniqueMessages
@@ -256,11 +261,13 @@ window.doPoll = function() {
                     : (container.insertAdjacentHTML('beforeend', data.html), true);
                 window.advanceCursor(pollState, data.cursor);
                 if (inserted && wasAtBottom) window.scrollToBottom();
-                // под ником в списке чатов тоже должно быть актуальное превью
                 window.updateChatPreview(data.peer_id, data.preview);
             }
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+            isPolling = false;
+        });
 };
 
 // ===== АВТООБНОВЛЕНИЕ (JSON API) =====
@@ -273,8 +280,12 @@ if (!window.pollState) {
     else if (groupId) pollState.param = 'group_id=' + groupId;
 
     window.autoRefreshInterval = setInterval(window.doPoll, 2000);
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) window.doPoll();
+    });
     window.doPoll();
 }
 
 // Прокрутка к последнему сообщению
 window.scrollToBottom();
+})();

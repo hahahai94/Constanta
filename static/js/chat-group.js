@@ -246,13 +246,16 @@ window.latestCursor = function() {
     if (!groupId) return;
 
     window.pollGroupState = { cursor: window.latestCursor(), groupId: groupId };
+    let isPolling = false;
 
     window.doPoll = function() {
+        if (isPolling || document.hidden) return;
+        isPolling = true;
         const url = '/api/poll/?' + (pollGroupState.cursor ? 'after=' + encodeURIComponent(pollGroupState.cursor) + '&' : '') + 'group_id=' + pollGroupState.groupId;
         fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-            .then(r => r.json())
+            .then(r => r.ok ? r.json() : null)
             .then(data => {
-                if (data.count > 0) {
+                if (data && data.count > 0) {
                     const container = document.getElementById('messages-container');
                     const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
                     const inserted = window.appendUniqueMessages
@@ -262,10 +265,16 @@ window.latestCursor = function() {
                     if (inserted && wasAtBottom) container.scrollTop = container.scrollHeight;
                 }
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => {
+                isPolling = false;
+            });
     };
 
     setInterval(window.doPoll, 2000);
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) window.doPoll();
+    });
 })();
 
 // ===== 6. УПРАВЛЕНИЕ =====
@@ -315,10 +324,12 @@ window.saveGroupSettings = () => {
         return;
     }
 
+    const removeAvatar = document.getElementById('remove-group-avatar')?.checked;
     const formData = new FormData();
     formData.append('name', name);
     formData.append('description', desc);
     if (avatarFile) formData.append('avatar', avatarFile);
+    else if (removeAvatar) formData.append('remove_avatar', 'true');
 
     fetch(urls.updateGroup, {
         method: 'POST',

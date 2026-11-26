@@ -53,7 +53,11 @@
         {% endfor %}
     </div>
 
-    {% include 'parts/pagination.html' with page_obj=notifications %}
+    {% if show_all %}
+        {% include 'parts/pagination.html' with page_obj=notifications extra_query='&all=1' %}
+    {% else %}
+        {% include 'parts/pagination.html' with page_obj=notifications %}
+    {% endif %}
     {% else %}
     <div class="text-center py-5 text-muted">
         <i class="bi bi-bell-slash" style="font-size: 4rem; opacity: 0.3;"></i>

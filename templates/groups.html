@@ -29,7 +29,7 @@
                             <span class="badge bg-primary rounded-pill">{{ membership.unread_count }}</span>
                             {% endif %}
                         </div>
-                        <small class="text-muted">{{ membership.group.members.count }} участников</small>
+                        <small class="text-muted">{{ membership.members_count }} участников</small>
                     </div>
                 </div>
                 <p class="text-muted small">{{ membership.group.description|truncatewords:15 }}</p>

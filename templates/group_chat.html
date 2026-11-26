@@ -168,6 +168,14 @@
                         <input type="file" id="avatar-upload" class="d-none" accept="image/*">
                     </div>
                     <small class="text-muted d-block mt-2">Нажмите на камеру, чтобы изменить аватарку</small>
+                    {% if group.avatar %}
+                    <div class="form-check d-inline-block mt-2">
+                        <input class="form-check-input" type="checkbox" id="remove-group-avatar">
+                        <label class="form-check-label small text-danger" for="remove-group-avatar">
+                            Удалить текущую аватарку
+                        </label>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Название группы</label>

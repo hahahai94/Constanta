@@ -40,13 +40,17 @@ function loadMorePosts() {
 document.getElementById('load-more-btn')?.addEventListener('click', loadMorePosts);
 
 const pollState = { cursor: latestCursor(), channelId: channelId };
+let isPolling = false;
 
-function doPoll() {
+function doPoll(force) {
+    if (!force && (isPolling || document.hidden)) return;
+    if (isPolling) return;
+    isPolling = true;
     const url = '/api/poll/?' + (pollState.cursor ? 'after=' + encodeURIComponent(pollState.cursor) + '&' : '') + 'channel_id=' + pollState.channelId;
     fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : null)
         .then(data => {
-            if (data.count > 0) {
+            if (data && data.count > 0) {
                 if (window.appendUniqueMessages) {
                     window.appendUniqueMessages(
                         postsContainer, data.html, 'afterbegin');
@@ -56,11 +60,17 @@ function doPoll() {
                 window.advanceCursor(pollState, data.cursor);
             }
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+            isPolling = false;
+        });
 }
 
 if (channelId) {
     setInterval(doPoll, 3000);
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) doPoll();
+    });
 }
 
 document.querySelectorAll('[data-channel-post-form]').forEach(form => {
@@ -73,7 +83,7 @@ document.querySelectorAll('[data-channel-post-form]').forEach(form => {
                 if (data.status === 'ok') {
                     this.querySelector('textarea').value = '';
                     this.querySelector('[type="file"]').value = '';
-                    doPoll();
+                    doPoll(true);
                 } else {
                     alert(data.message);
                 }
